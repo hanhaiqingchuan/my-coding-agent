@@ -1,0 +1,38 @@
+# Local design/runtime artifacts belong to the private outer workspace.
+/.superpowers/
+
+# Secrets and local configuration.
+.env
+.env.*
+!.env.example
+/config.toml
+
+# Python.
+/.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Application state and logs.
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+/logs/
+
+# Frontend.
+/web/node_modules/
+/web/dist/
+/web/.vite/
+/playwright-report/
+/test-results/
+
+# Editor and operating-system files.
+.DS_Store
+.idea/
+.vscode/
