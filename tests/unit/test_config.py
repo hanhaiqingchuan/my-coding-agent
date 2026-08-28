@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from coding_agent.config import ConfigurationError, load_settings, resolve_api_key
+from coding_agent.context.builder import ContextRequest
 
 
 def test_cli_override_wins_over_toml(tmp_path: Path) -> None:
@@ -56,6 +57,62 @@ def test_unknown_toml_field_is_rejected(tmp_path: Path) -> None:
 
     with pytest.raises(ConfigurationError, match="agent.unknown"):
         load_settings(config_file, {}, {})
+
+
+@pytest.mark.parametrize(
+    ("toml", "field", "fix"),
+    [
+        (
+            "[model]\ncontext_window = 10240\nmax_output_tokens = 8192\n"
+            "[context]\nsafety_margin_tokens = 2048\n",
+            "model.context_window",
+            "context.safety_margin_tokens",
+        ),
+        (
+            "[context]\nrecent_turns_min = 1\n",
+            "context.recent_turns_min",
+            "at least 2",
+        ),
+    ],
+)
+def test_context_budget_checks_run_at_startup_with_a_field_and_a_fix(
+    tmp_path: Path, toml: str, field: str, fix: str
+) -> None:
+    """Deferring these to ContextRequest would raise a bare ValueError mid-run instead."""
+    config_file = tmp_path / "config.toml"
+    config_file.write_text(toml, encoding="utf-8")
+
+    with pytest.raises(ConfigurationError) as error:
+        load_settings(config_file, {}, {})
+
+    message = str(error.value)
+    assert message.startswith(f"{field}:")
+    assert fix in message
+    assert "ANTHROPIC_API_KEY" not in message
+
+
+def test_smallest_accepted_context_budget_builds_a_context_request(tmp_path: Path) -> None:
+    """Every accepted configuration must satisfy the invariants the loop relies on."""
+    config_file = tmp_path / "config.toml"
+    config_file.write_text(
+        "[model]\ncontext_window = 10241\nmax_output_tokens = 8192\n"
+        "[context]\nsafety_margin_tokens = 2048\nrecent_turns_min = 2\n",
+        encoding="utf-8",
+    )
+
+    settings = load_settings(config_file, {}, {})
+    request = ContextRequest(
+        system="",
+        context_window=settings.model.context_window,
+        max_output_tokens=settings.model.max_output_tokens,
+        safety_margin_tokens=settings.context.safety_margin_tokens,
+        compact_trigger_ratio=settings.context.compact_trigger_ratio,
+        compact_target_ratio=settings.context.compact_target_ratio,
+        summary_max_tokens=settings.context.summary_max_tokens,
+        recent_user_turns=settings.context.recent_turns_min,
+    )
+
+    assert request.available_input_tokens == 1
 
 
 def test_missing_api_key_names_environment_variable_without_leaking_value(valid_settings) -> None:

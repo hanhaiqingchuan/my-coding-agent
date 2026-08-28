@@ -249,8 +249,6 @@ def _validate(
     _require_positive(server.port, "server.port")
     _require_positive(model.context_window, "model.context_window")
     _require_positive(model.max_output_tokens, "model.max_output_tokens")
-    if model.context_window < model.max_output_tokens:
-        raise ConfigurationError("model.context_window: must be at least model.max_output_tokens")
     if not model.stream:
         raise ConfigurationError("model.stream: P0 requires stream=true")
     _require_positive(agent.tool_argument_retries, "agent.tool_argument_retries")
@@ -265,10 +263,21 @@ def _validate(
     if not 0 < context.recent_budget_ratio < 1:
         raise ConfigurationError("context.recent_budget_ratio: must be between 0 and 1")
     _require_positive(context.safety_margin_tokens, "context.safety_margin_tokens")
+    if model.context_window <= model.max_output_tokens + context.safety_margin_tokens:
+        raise ConfigurationError(
+            "model.context_window: must exceed model.max_output_tokens plus "
+            "context.safety_margin_tokens so an input budget remains; raise "
+            "model.context_window or lower model.max_output_tokens or "
+            "context.safety_margin_tokens"
+        )
     _require_positive(context.summary_max_tokens, "context.summary_max_tokens")
     if context.summary_max_tokens >= model.context_window:
         raise ConfigurationError("context.summary_max_tokens: must be below model.context_window")
-    _require_positive(context.recent_turns_min, "context.recent_turns_min")
+    if context.recent_turns_min < 2:
+        raise ConfigurationError(
+            "context.recent_turns_min: must keep at least 2 complete user turns; "
+            "set it to 2 or more"
+        )
     _require_positive(retry.max_attempts, "retry.max_attempts")
     _require_positive(retry.initial_delay_seconds, "retry.initial_delay_seconds")
     _require_positive(retry.max_delay_seconds, "retry.max_delay_seconds")
