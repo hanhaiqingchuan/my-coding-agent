@@ -1,0 +1,35 @@
+:root { color: #d8dee9; background: #101419; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+* { box-sizing: border-box; }
+body { min-width: 320px; min-height: 100vh; margin: 0; background: #101419; }
+button, input { font: inherit; }
+button { cursor: pointer; }
+.app-shell { display: grid; grid-template-columns: minmax(220px, 280px) minmax(0, 1fr) minmax(240px, 320px); min-height: 100vh; }
+.session-sidebar, .run-details-panel { padding: 20px; background: #151b22; border-color: #2a3440; }
+.session-sidebar { border-right: 1px solid #2a3440; }
+.run-details-panel { border-left: 1px solid #2a3440; }
+.conversation-panel { position: relative; padding: 28px; }
+.workspace-picker { display: grid; gap: 10px; }
+.workspace-picker h1 { margin: 0 0 8px; font-size: 1.05rem; }
+.workspace-picker label { display: grid; gap: 5px; color: #aab7c4; font-size: .82rem; }
+input { width: 100%; padding: 8px; border: 1px solid #3b4857; border-radius: 6px; color: inherit; background: #0f141a; }
+button { border: 1px solid #3b4857; border-radius: 6px; padding: 8px 10px; color: #e9eef5; background: #202a35; }
+button:hover { background: #2b3948; }
+.session-list { display: grid; gap: 6px; padding: 0; list-style: none; }
+.session-row { width: 100%; text-align: left; }
+.session-row small { display: block; overflow: hidden; color: #9aa8b7; text-overflow: ellipsis; white-space: nowrap; }
+.conversation-placeholder { max-width: 760px; margin: 18vh auto 0; color: #b9c5d1; }
+.conversation-placeholder h1 { color: #eff4fa; }
+.connection-status { color: #8fa0b2; font-size: .9rem; }
+.run-details-list { display: grid; gap: 12px; }
+.run-details-list div { display: grid; gap: 3px; }
+.run-details-list dt { color: #91a0ae; font-size: .8rem; }
+.run-details-list dd { margin: 0; overflow-wrap: anywhere; }
+.run-details-toggle, .run-details-drawer { display: none; }
+@media (max-width: 800px) {
+  .app-shell { grid-template-columns: minmax(180px, 230px) minmax(0, 1fr); }
+  .run-details-panel { display: none; }
+  .run-details-toggle { display: inline-block; position: absolute; top: 16px; right: 16px; }
+  .run-details-drawer { display: block; position: fixed; z-index: 2; top: 0; right: 0; bottom: 0; width: min(360px, 92vw); padding: 20px; border-left: 1px solid #3b4857; background: #151b22; box-shadow: -12px 0 30px #0008; }
+  .drawer-close { float: right; }
+}
+@media (max-width: 560px) { .app-shell { grid-template-columns: 1fr; } .session-sidebar { border-bottom: 1px solid #2a3440; border-right: 0; } }

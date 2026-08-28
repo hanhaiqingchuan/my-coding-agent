@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "My Coding Agent browser protocol contract",
+  "enums": {
+    "RunState": ["starting", "building_context", "compacting", "model_streaming", "retry_wait", "awaiting_approval", "tool_running", "cancelling", "completed", "stopped", "cancelled", "failed", "interrupted"],
+    "StopReason": ["completed", "user_stop", "max_rounds", "doom_loop", "empty_response", "output_truncated", "incomplete_tool_call", "auth_error", "config_error", "retry_exhausted", "context_overflow", "model_refusal", "pause_turn", "server_restart", "model_protocol_error"],
+    "ApprovalStatus": ["pending", "approved", "rejected", "cancelled"],
+    "ApprovalDecision": ["approve", "reject"],
+    "ToolExecutionState": ["queued", "awaiting_approval", "running", "succeeded", "failed", "rejected", "cancelled", "skipped", "unknown"]
+  },
+  "required": {
+    "RunDto": ["id", "session_id", "state", "stop_reason", "error_kind", "cancellation_requested_at", "config_snapshot", "started_at", "finished_at"],
+    "MessageDto": ["id", "session_id", "run_id", "seq", "role", "parts", "status", "tool_call_id"],
+    "ToolExecutionDto": ["tool_call_id", "run_id", "assistant_message_id", "call_order", "name", "input", "requires_approval", "approval_status", "approval_decision", "approval_decided_at", "execution_state", "result", "duration_ms"],
+    "PendingApprovalDto": ["run_id", "tool_call_id", "name", "input", "target", "preview", "metadata"],
+    "SessionSnapshotDto": ["session", "active_run", "messages", "tools", "pending_approval", "interrupted_banner", "snapshot_seq"],
+    "DurableEvent": ["seq", "session_id", "run_id", "type", "payload", "created_at"]
+  },
+  "clientCommandTypes": ["session.subscribe", "run.start", "run.stop", "approval.resolve", "session.ack_recovery"],
+  "serverMessageTypes": ["ack", "command_error", "snapshot", "durable", "assistant.delta", "tool.output.delta"]
+}

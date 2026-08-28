@@ -2,11 +2,26 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import get_args
 
 from fastapi.testclient import TestClient
 
 from coding_agent.api.app import create_app
-from coding_agent.api.schemas import DurableEventDto, SessionSnapshotDto
+from coding_agent.api.schemas import (
+    AckEnvelope,
+    ApprovalResolveCommand,
+    AssistantDeltaEnvelope,
+    CommandErrorEnvelope,
+    DurableEnvelope,
+    DurableEventDto,
+    RunStartCommand,
+    RunStopCommand,
+    SessionAckRecoveryCommand,
+    SessionSnapshotDto,
+    SessionSubscribeCommand,
+    SnapshotEnvelope,
+    ToolOutputDeltaEnvelope,
+)
 from coding_agent.core.models import (
     ApprovalDecision,
     ApprovalStatus,
@@ -302,6 +317,56 @@ def test_snapshot_json_schema_freezes_domain_enums_for_the_frontend() -> None:
     assert definitions["ApprovalStatus"]["enum"] == [item.value for item in ApprovalStatus]
     assert definitions["ApprovalDecision"]["enum"] == [item.value for item in ApprovalDecision]
     assert definitions["ToolExecutionState"]["enum"] == [item.value for item in ToolExecutionState]
+
+
+def test_frontend_contract_fixture_matches_the_backend_dto_schema() -> None:
+    """A checked-in browser contract must change with strict DTO fields and enums."""
+    import json
+
+    fixture_path = Path(__file__).parents[2] / "web" / "src" / "api" / "schema.fixture.json"
+    fixture = json.loads(fixture_path.read_text(encoding="utf-8"))
+    definitions = SessionSnapshotDto.model_json_schema()["$defs"]
+
+    assert fixture["enums"] == {
+        "RunState": definitions["RunState"]["enum"],
+        "StopReason": definitions["StopReason"]["enum"],
+        "ApprovalStatus": definitions["ApprovalStatus"]["enum"],
+        "ApprovalDecision": definitions["ApprovalDecision"]["enum"],
+        "ToolExecutionState": definitions["ToolExecutionState"]["enum"],
+    }
+    assert fixture["required"] == {
+        "RunDto": definitions["RunDto"]["required"],
+        "MessageDto": definitions["MessageDto"]["required"],
+        "ToolExecutionDto": definitions["ToolExecutionDto"]["required"],
+        "PendingApprovalDto": definitions["PendingApprovalDto"]["required"],
+        "SessionSnapshotDto": SessionSnapshotDto.model_json_schema()["required"],
+        "DurableEvent": DurableEventDto.model_json_schema()["required"],
+    }
+    assert fixture["clientCommandTypes"] == [
+        _literal_type(command)
+        for command in (
+            SessionSubscribeCommand,
+            RunStartCommand,
+            RunStopCommand,
+            ApprovalResolveCommand,
+            SessionAckRecoveryCommand,
+        )
+    ]
+    assert fixture["serverMessageTypes"] == [
+        _literal_type(envelope)
+        for envelope in (
+            AckEnvelope,
+            CommandErrorEnvelope,
+            SnapshotEnvelope,
+            DurableEnvelope,
+            AssistantDeltaEnvelope,
+            ToolOutputDeltaEnvelope,
+        )
+    ]
+
+
+def _literal_type(dto: type[object]) -> str:
+    return str(get_args(dto.model_fields["type"].annotation)[0])  # type: ignore[attr-defined]
 
 
 def test_durable_event_dto_recursively_thaws_nested_frozen_payload() -> None:
