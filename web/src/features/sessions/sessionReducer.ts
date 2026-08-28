@@ -1,5 +1,7 @@
 import type { ServerMessage, SessionSnapshotDto } from "../../api/types";
 
+const TERMINAL_RUN_STATES = new Set(["completed", "stopped", "cancelled", "failed", "interrupted"]);
+
 export type ConnectionState = "connecting" | "connected" | "reconnecting" | "offline";
 
 export type SessionViewState = {
@@ -48,6 +50,10 @@ export function reduceServerMessage(
   if (message.type === "durable") {
     if (message.event.seq <= state.lastSeq) {
       return state;
+    }
+    const eventState = message.event.payload.state;
+    if (typeof eventState === "string" && TERMINAL_RUN_STATES.has(eventState)) {
+      return { ...state, lastSeq: message.event.seq, assistantDrafts: {}, toolOutputDrafts: {} };
     }
     return { ...state, lastSeq: message.event.seq };
   }

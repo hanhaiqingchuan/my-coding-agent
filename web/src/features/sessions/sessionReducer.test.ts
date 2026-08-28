@@ -114,6 +114,27 @@ test("a transient assistant delta leaves the durable cursor unchanged", () => {
   expect(next.assistantDrafts["attempt-1"]).toBe("Working…");
 });
 
+test("a terminal durable event clears transient assistant and tool output drafts", () => {
+  const streaming = {
+    ...createInitialSessionViewState(),
+    lastSeq: 7,
+    assistantDrafts: { "attempt-1": "Incomplete answer" },
+    toolOutputDrafts: { "call-1": "partial output" },
+  };
+
+  const next = reduceServerMessage(streaming, {
+    type: "durable",
+    event: {
+      ...eventWithSeq(8),
+      type: "run.finished",
+      payload: { state: "completed" },
+    },
+  });
+
+  expect(next.assistantDrafts).toEqual({});
+  expect(next.toolOutputDrafts).toEqual({});
+});
+
 test("connection changes retain an active run until a server snapshot says otherwise", () => {
   const connected = {
     ...createInitialSessionViewState(),
