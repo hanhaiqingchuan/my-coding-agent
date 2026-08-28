@@ -238,6 +238,10 @@ class MessageStreamAssembler:
                 raise ModelProtocolError("MISSING_TOOL_USE_ID", "tool_use block requires an id")
             if not event.block_name:
                 raise ModelProtocolError("MISSING_TOOL_USE_NAME", "tool_use block requires a name")
+            if not isinstance(event.initial_input, Mapping):
+                raise ModelProtocolError(
+                    "INVALID_TOOL_USE_INPUT", "tool_use block start requires object input"
+                )
             if any(existing.id == event.block_id for existing in self._blocks):
                 raise ModelProtocolError(
                     "DUPLICATE_TOOL_USE_ID", f"duplicate tool_use id {event.block_id!r}"
@@ -274,6 +278,11 @@ class MessageStreamAssembler:
             if event.partial_json is None:
                 raise ModelProtocolError(
                     "MISSING_PARTIAL_JSON", "input_json_delta requires partial_json"
+                )
+            if block.initial_input:
+                raise ModelProtocolError(
+                    "TOOL_INPUT_SOURCE_CONFLICT",
+                    "tool input cannot come from both block start and partial JSON",
                 )
             block.fragments.append(event.partial_json)
             return ()
@@ -373,7 +382,7 @@ class MessageStreamAssembler:
                     "INVALID_TOOL_INPUT_JSON", f"tool input is incomplete or invalid: {error.msg}"
                 ) from error
         else:
-            parsed = block.initial_input if block.initial_input is not None else {}
+            parsed = block.initial_input
         if not isinstance(parsed, Mapping):
             raise ModelProtocolError("TOOL_INPUT_NOT_OBJECT", "tool input must be a JSON object")
         return ToolUsePart(ToolCall(id=block.id or "", name=block.name or "", input=parsed))

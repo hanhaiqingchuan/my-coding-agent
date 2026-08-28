@@ -31,6 +31,7 @@ _CONTEXT_ERROR_TYPES = {
     "prompt_is_too_long",
     "request_too_large",
 }
+_RETRYABLE_ERROR_TYPES = {"api_error", "overloaded_error", "rate_limit_error"}
 
 
 class AnthropicMessagesModel:
@@ -107,7 +108,7 @@ def _request_payload(model: str, request: ModelRequest) -> dict[str, object]:
 def _compile_messages(request: ModelRequest) -> list[dict[str, object]]:
     wire: list[tuple[dict[str, object], bool]] = []
     pending_tool_ids: tuple[str, ...] | None = None
-    pending_result_blocks: list[dict[str, object]] = []
+    pending_result_blocks: dict[str, dict[str, object]] = {}
 
     for message in request.messages:
         if message.role == "assistant":
@@ -138,7 +139,7 @@ def _compile_messages(request: ModelRequest) -> list[dict[str, object]]:
             _append_wire_message(wire, "assistant", content, atomic=bool(tool_ids))
             if tool_ids:
                 pending_tool_ids = tuple(tool_ids)
-                pending_result_blocks = []
+                pending_result_blocks = {}
             continue
 
         has_results = any(isinstance(part, ToolResult) for part in message.parts)
@@ -153,15 +154,17 @@ def _compile_messages(request: ModelRequest) -> list[dict[str, object]]:
                     "ORPHAN_TOOL_RESULT", "tool result has no preceding assistant tool use"
                 )
             results = tuple(part for part in message.parts if isinstance(part, ToolResult))
-            result_ids = tuple(result.tool_call_id for result in results)
-            result_offset = len(pending_result_blocks)
-            expected_ids = pending_tool_ids[result_offset : result_offset + len(results)]
-            if result_ids != expected_ids:
-                raise ModelProtocolError(
-                    "TOOL_RESULT_MISMATCH",
-                    f"expected tool results {expected_ids!r}, received {result_ids!r}",
-                )
             for result in results:
+                if result.tool_call_id not in pending_tool_ids:
+                    raise ModelProtocolError(
+                        "TOOL_RESULT_MISMATCH",
+                        f"unexpected tool result id {result.tool_call_id!r}",
+                    )
+                if result.tool_call_id in pending_result_blocks:
+                    raise ModelProtocolError(
+                        "DUPLICATE_TOOL_RESULT_ID",
+                        f"duplicate tool result id {result.tool_call_id!r}",
+                    )
                 block: dict[str, object] = {
                     "type": "tool_result",
                     "tool_use_id": result.tool_call_id,
@@ -169,11 +172,12 @@ def _compile_messages(request: ModelRequest) -> list[dict[str, object]]:
                 }
                 if not result.ok:
                     block["is_error"] = True
-                pending_result_blocks.append(block)
+                pending_result_blocks[result.tool_call_id] = block
             if len(pending_result_blocks) == len(pending_tool_ids):
-                _append_wire_message(wire, "user", pending_result_blocks, atomic=True)
+                ordered_blocks = [pending_result_blocks[tool_id] for tool_id in pending_tool_ids]
+                _append_wire_message(wire, "user", ordered_blocks, atomic=True)
                 pending_tool_ids = None
-                pending_result_blocks = []
+                pending_result_blocks = {}
             continue
 
         if pending_tool_ids is not None:
@@ -286,7 +290,11 @@ def _map_status_error(error: APIStatusError) -> ModelAPIError:
     elif retry_override == "false":
         retryable = False
     else:
-        retryable = status_code in {408, 409, 429} or status_code >= 500
+        retryable = (
+            structured_type in _RETRYABLE_ERROR_TYPES
+            or status_code in {408, 409, 429}
+            or status_code >= 500
+        )
     if error_type == "context_too_large":
         retryable = False
     return ModelAPIError(

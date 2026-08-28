@@ -304,6 +304,43 @@ def test_tool_identity_cannot_change_after_block_start() -> None:
     assert raised.value.code == "TOOL_USE_NAME_CONFLICT"
 
 
+@pytest.mark.parametrize("initial_input", [None, []])
+def test_tool_use_start_requires_object_input(initial_input: object) -> None:
+    """Treating a missing or non-object start input as {} would hide malformed wire data."""
+    content_block: dict[str, object] = {
+        "type": "tool_use",
+        "id": "tool-1",
+        "name": "read_file",
+    }
+    if initial_input is not None:
+        content_block["input"] = initial_input
+    events = [
+        text_response_events()[0],
+        {"type": "content_block_start", "index": 0, "content_block": content_block},
+    ]
+    assembler = MessageStreamAssembler()
+
+    with pytest.raises(ModelProtocolError) as raised:
+        feed_all(assembler, events)
+
+    assert raised.value.code == "INVALID_TOOL_USE_INPUT"
+
+
+def test_nonempty_initial_tool_input_conflicts_with_partial_json() -> None:
+    """Silently preferring partial JSON would discard valid input from block start."""
+    events = list(two_tool_use_event_stream())
+    block_start = events[4]
+    content_block = block_start["content_block"]
+    assert isinstance(content_block, dict)
+    content_block["input"] = {"path": "seed.py"}
+    assembler = MessageStreamAssembler()
+
+    with pytest.raises(ModelProtocolError) as raised:
+        feed_all(assembler, events[:6])
+
+    assert raised.value.code == "TOOL_INPUT_SOURCE_CONFLICT"
+
+
 def test_tool_use_stop_without_tool_block_is_a_protocol_error() -> None:
     """A tool-use stop without a call cannot be continued safely."""
     assembler = MessageStreamAssembler()

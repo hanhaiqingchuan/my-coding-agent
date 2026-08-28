@@ -66,6 +66,21 @@ class BlockingStream:
         self.closed = True
 
 
+class FailingStream:
+    def __init__(self, error: Exception) -> None:
+        self._error = error
+        self.closed = False
+
+    def __aiter__(self) -> FailingStream:
+        return self
+
+    async def __anext__(self) -> dict[str, object]:
+        raise self._error
+
+    async def close(self) -> None:
+        self.closed = True
+
+
 class FakeMessages:
     def __init__(self, outcome: object) -> None:
         self.outcome = outcome
@@ -298,6 +313,59 @@ async def test_mismatched_tool_results_fail_before_network_call(
     assert client.messages.calls == []
 
 
+@pytest.mark.asyncio
+async def test_tool_results_are_matched_by_id_then_emitted_in_call_order(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Pairing by position would reject a complete batch that arrived out of order."""
+    original = request_with_tool_history()
+    messages = list(original.messages)
+    messages[3], messages[4] = messages[4], messages[3]
+    request = ModelRequest(
+        system=original.system,
+        messages=tuple(messages),
+        tools=original.tools,
+        max_tokens=original.max_tokens,
+    )
+    client, _ = install_fake_client(monkeypatch, FakeStream(text_response_events()))
+    model = AnthropicMessagesModel(ModelSettings(model="model-a"), api_key="secret")
+
+    await model.complete(request, lambda _: None, CancellationToken())
+
+    wire_messages = client.messages.calls[0]["messages"]
+    assert isinstance(wire_messages, list)
+    result_message = wire_messages[2]
+    assert isinstance(result_message, dict)
+    assert [block["tool_use_id"] for block in result_message["content"]] == [
+        "tool-1",
+        "tool-2",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_duplicate_tool_result_id_is_rejected(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A duplicate result must not satisfy the required complete ID set."""
+    original = request_with_tool_history()
+    messages = list(original.messages)
+    messages[4] = messages[3]
+    request = ModelRequest(
+        system=original.system,
+        messages=tuple(messages),
+        tools=original.tools,
+        max_tokens=original.max_tokens,
+    )
+    client, _ = install_fake_client(monkeypatch, FakeStream(text_response_events()))
+    model = AnthropicMessagesModel(ModelSettings(model="model-a"), api_key="secret")
+
+    with pytest.raises(ModelProtocolError) as raised:
+        await model.complete(request, lambda _: None, CancellationToken())
+
+    assert raised.value.code == "DUPLICATE_TOOL_RESULT_ID"
+    assert client.messages.calls == []
+
+
 def status_error(
     status: int,
     body: object,
@@ -381,6 +449,31 @@ async def test_status_retry_metadata_comes_from_status_and_headers(
     assert raised.value.error_type == "rate_limit_error"
     assert raised.value.retry_after == "7"
     assert raised.value.retryable is False
+
+
+@pytest.mark.asyncio
+async def test_sse_overloaded_error_with_http_200_is_retryable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Classifying an SSE error by HTTP 200 alone would suppress its required retry."""
+    error = status_error(
+        200,
+        {
+            "type": "error",
+            "error": {"type": "overloaded_error", "message": "structured only"},
+        },
+    )
+    stream = FailingStream(error)
+    install_fake_client(monkeypatch, stream)
+    model = AnthropicMessagesModel(ModelSettings(model="model-a"), api_key="secret")
+
+    with pytest.raises(ModelAPIError) as raised:
+        await model.complete(request_with_tool_history(), lambda _: None, CancellationToken())
+
+    assert raised.value.status_code == 200
+    assert raised.value.error_type == "overloaded_error"
+    assert raised.value.retryable is True
+    assert stream.closed is True
 
 
 @pytest.mark.asyncio
