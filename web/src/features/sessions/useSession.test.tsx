@@ -105,8 +105,13 @@ function finishedEvent(sequence: number): ServerMessage {
       seq: sequence,
       session_id: "session-1",
       run_id: "run-1",
-      type: "run.finished",
-      payload: { state: "completed" },
+      // A run reaching a terminal state is published as a state change.
+      type: "run.state_changed",
+      payload: {
+        state: "completed",
+        stop_reason: "completed",
+        error_kind: null,
+      },
       created_at: "2026-08-28T00:00:01Z",
     },
   };
@@ -158,19 +163,7 @@ test("a durable event refreshes the authoritative session snapshot", async () =>
     "model_streaming",
   );
 
-  act(() =>
-    BrowserSocket.instances[0].message({
-      type: "durable",
-      event: {
-        seq: 7,
-        session_id: "session-1",
-        run_id: "run-1",
-        type: "run.finished",
-        payload: { state: "completed" },
-        created_at: "2026-08-28T00:00:01Z",
-      },
-    }),
-  );
+  act(() => BrowserSocket.instances[0].message(finishedEvent(7)));
 
   await waitFor(() =>
     expect(result.current.state.snapshot?.active_run).toBeNull(),

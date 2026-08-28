@@ -201,8 +201,12 @@ test("a terminal durable event clears transient assistant and tool output drafts
     type: "durable",
     event: {
       ...eventWithSeq(8),
-      type: "run.finished",
-      payload: { state: "completed" },
+      type: "run.state_changed",
+      payload: {
+        state: "completed",
+        stop_reason: "completed",
+        error_kind: null,
+      },
     },
   });
 
