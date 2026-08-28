@@ -928,6 +928,12 @@ button:disabled:hover {
   color: var(--text-muted);
   font-size: var(--text-sm);
 }
+/* The panel falls back to the last finished run, so the rows always state which
+   run they describe. Typed with an element to outrank the margin reset above. */
+p.run-details-scope {
+  margin-bottom: var(--space-4);
+  color: var(--text-secondary);
+}
 .run-details-list {
   display: grid;
   gap: var(--space-4);

@@ -3,8 +3,15 @@ import type { JsonValue, RunTotalsDto, SessionSnapshotDto } from "../api/types";
 type RunDetailsPanelProps = { snapshot: SessionSnapshotDto | null };
 
 export function RunDetailsPanel({ snapshot }: RunDetailsPanelProps) {
-  const run = snapshot?.active_run;
-  if (run === null || run === undefined) {
+  const activeRun = snapshot?.active_run ?? null;
+  /**
+   * `active_run` is strictly non-terminal and every stop reason is written in the
+   * statement that makes a run terminal, so the reason a run ended only ever reaches
+   * this panel through `last_finished_run`.
+   */
+  const finishedRun = snapshot?.last_finished_run ?? null;
+  const run = activeRun ?? finishedRun;
+  if (run === null) {
     return (
       <section>
         <h2>Run details</h2>
@@ -12,12 +19,16 @@ export function RunDetailsPanel({ snapshot }: RunDetailsPanelProps) {
       </section>
     );
   }
+  const isFinished = activeRun === null;
   const model = modelName(run.config_snapshot.model);
   const stopReason = run.stop_reason?.replaceAll("_", " ") ?? null;
   const errorKind = run.error_kind?.replaceAll("_", " ") ?? null;
   return (
     <section>
       <h2>Run details</h2>
+      <p className="run-details-scope">
+        {isFinished ? "Last finished run. No run is active." : "Active run."}
+      </p>
       <dl className="run-details-list">
         <div>
           <dt>State</dt>
@@ -49,6 +60,12 @@ export function RunDetailsPanel({ snapshot }: RunDetailsPanelProps) {
           <dt>Started</dt>
           <dd>{new Date(run.started_at).toLocaleString()}</dd>
         </div>
+        {run.finished_at !== null ? (
+          <DetailRow
+            label="Finished"
+            value={new Date(run.finished_at).toLocaleString()}
+          />
+        ) : null}
       </dl>
     </section>
   );
