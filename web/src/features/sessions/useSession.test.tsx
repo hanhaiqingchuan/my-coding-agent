@@ -68,6 +68,7 @@ function snapshot(
               retry_count: 0,
             },
           },
+    last_finished_run: null,
     messages:
       state === "completed"
         ? [

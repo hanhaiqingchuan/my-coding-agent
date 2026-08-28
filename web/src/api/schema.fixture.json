@@ -106,6 +106,7 @@
     "SessionSnapshotDto": [
       "session",
       "active_run",
+      "last_finished_run",
       "messages",
       "tools",
       "pending_approval",

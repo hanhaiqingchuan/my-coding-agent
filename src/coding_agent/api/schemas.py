@@ -301,6 +301,7 @@ class InterruptedBannerDto(StrictDto):
 class SessionSnapshotDto(StrictDto):
     session: SessionDto
     active_run: RunDto | None
+    last_finished_run: RunDto | None
     messages: list[MessageDto]
     tools: list[ToolExecutionDto]
     pending_approval: PendingApprovalDto | None
@@ -313,6 +314,11 @@ class SessionSnapshotDto(StrictDto):
             session=SessionDto.from_domain(snapshot.session),
             active_run=(
                 RunDto.from_domain(snapshot.active_run) if snapshot.active_run is not None else None
+            ),
+            last_finished_run=(
+                RunDto.from_domain(snapshot.last_finished_run)
+                if snapshot.last_finished_run is not None
+                else None
             ),
             messages=[MessageDto.from_domain(message) for message in snapshot.messages],
             tools=[ToolExecutionDto.from_domain(tool) for tool in snapshot.tools],

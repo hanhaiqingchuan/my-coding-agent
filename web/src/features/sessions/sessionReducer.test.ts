@@ -55,6 +55,7 @@ function snapshot(
       updated_at: "2026-08-28T00:00:00Z",
     },
     active_run: { ...activeRun, state },
+    last_finished_run: null,
     messages: [],
     tools: [],
     pending_approval: null,

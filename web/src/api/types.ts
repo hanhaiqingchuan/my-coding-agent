@@ -170,6 +170,7 @@ export type InterruptedBannerDto = {
 export type SessionSnapshotDto = {
   session: SessionDto;
   active_run: RunDto | null;
+  last_finished_run: RunDto | null;
   messages: MessageDto[];
   tools: ToolExecutionDto[];
   pending_approval: PendingApprovalDto | null;
@@ -244,6 +245,7 @@ export const REQUIRED_DTO_FIELDS = {
   SessionSnapshotDto: [
     "session",
     "active_run",
+    "last_finished_run",
     "messages",
     "tools",
     "pending_approval",

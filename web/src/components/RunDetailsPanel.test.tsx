@@ -50,6 +50,7 @@ function snapshotWithRun(run: Partial<RunDto>): SessionSnapshotDto {
       },
       ...run,
     },
+    last_finished_run: null,
     messages: [],
     tools: [],
     pending_approval: null,

@@ -276,6 +276,15 @@ class SQLiteStore:
                     (session_id, *(state.value for state in _TERMINAL_STATES)),
                 ).fetchone()
                 active_run = _run_from_row(row) if row is not None else None
+                finished = connection.execute(
+                    f"""
+                    SELECT * FROM runs
+                    WHERE session_id = ? AND state IN ({_TERMINAL_PLACEHOLDERS})
+                    ORDER BY finished_at DESC, started_at DESC LIMIT 1
+                    """,
+                    (session_id, *(state.value for state in _TERMINAL_STATES)),
+                ).fetchone()
+                last_finished_run = _run_from_row(finished) if finished is not None else None
                 messages = tuple(
                     _message_from_row(item)
                     for item in connection.execute(
@@ -335,6 +344,7 @@ class SQLiteStore:
             tools,
             pending_approval,
             interrupted_banner,
+            last_finished_run,
         )
 
     def stage_tool_group(self, run_id: str, turn: AssistantTurn) -> PendingToolGroup:

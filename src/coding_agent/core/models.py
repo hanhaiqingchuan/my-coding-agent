@@ -421,6 +421,13 @@ class SessionSnapshot:
     tools: tuple[ToolExecution, ...] = ()
     pending_approval: PendingApproval | None = None
     interrupted_banner: InterruptedRunNotice | None = None
+    last_finished_run: Run | None = None
+    """The session's most recently finished run.
+
+    ``active_run`` stays strictly non-terminal, so every ``stop_reason`` is written in the
+    same statement that makes a run terminal and would otherwise never reach the browser.
+    This field keeps that finished record available to the run panel spec 13 describes.
+    """
 
     def __post_init__(self) -> None:
         if self.snapshot_seq < 0:

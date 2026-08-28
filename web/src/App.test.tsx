@@ -50,6 +50,7 @@ const snapshot: SessionSnapshotDto = {
       retry_count: 0,
     },
   },
+  last_finished_run: null,
   messages: [],
   tools: [],
   pending_approval: {

@@ -9,6 +9,7 @@ from coding_agent.core.models import (
     ApprovalDecision,
     AssistantTurn,
     EffectStartResult,
+    ErrorKind,
     MessageStatus,
     ModelStopReason,
     RunState,
@@ -341,6 +342,36 @@ def test_settling_a_tool_result_records_its_measured_duration(store: SQLiteStore
 
     assert [tool.duration_ms for tool in store.load_snapshot(session.id).tools] == [37, None]
     assert [fact["duration_ms"] for fact in store.tool_executions_for_report(run.id)] == [37, None]
+
+
+def test_snapshot_publishes_the_most_recently_finished_run(store: SQLiteStore, session) -> None:
+    """Without it the stop reason vanishes the moment a run leaves the active slot."""
+    first = store.begin_run(session.id, "one", {}, "cmd-one", "hash-one")
+    store.transition_run(
+        first.id,
+        {RunState.STARTING},
+        RunState.FAILED,
+        StopReason.AUTH_ERROR,
+        ErrorKind.AUTH_ERROR,
+    )
+    second = store.begin_run(session.id, "two", {}, "cmd-two", "hash-two")
+
+    while_active = store.load_snapshot(session.id)
+    store.transition_run(
+        second.id, {RunState.STARTING}, RunState.STOPPED, StopReason.MAX_ROUNDS, None
+    )
+    once_finished = store.load_snapshot(session.id)
+
+    assert while_active.active_run is not None
+    assert while_active.active_run.id == second.id
+    assert while_active.last_finished_run is not None
+    assert while_active.last_finished_run.id == first.id
+    assert while_active.last_finished_run.stop_reason is StopReason.AUTH_ERROR
+    assert while_active.last_finished_run.error_kind is ErrorKind.AUTH_ERROR
+    assert once_finished.active_run is None
+    assert once_finished.last_finished_run is not None
+    assert once_finished.last_finished_run.id == second.id
+    assert once_finished.last_finished_run.stop_reason is StopReason.MAX_ROUNDS
 
 
 def test_terminal_run_rejects_new_assistant_turns(store: SQLiteStore, session) -> None:

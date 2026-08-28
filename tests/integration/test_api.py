@@ -310,6 +310,29 @@ def test_snapshot_includes_frozen_tools_and_the_current_pending_approval(tmp_pat
     assert snapshot["interrupted_banner"] is None
 
 
+def test_snapshot_keeps_the_last_finished_run_and_its_stop_reason(tmp_path: Path) -> None:
+    """Spec 13 needs the stop reason after the run ends, when active_run is already None."""
+    client, store, _ = _make_client(tmp_path)
+    session = store.create_session(str(tmp_path.resolve()), "Stopped")
+    run = store.begin_run(session.id, "stop it", {}, "start", "start-hash")
+    store.request_cancellation(run.id, "stop", "stop-hash")
+    store.transition_run(
+        run.id,
+        {RunState.CANCELLING},
+        RunState.CANCELLED,
+        StopReason.USER_STOP,
+        None,
+    )
+
+    snapshot = client.get(f"/api/sessions/{session.id}/snapshot").json()
+
+    assert snapshot["active_run"] is None
+    assert snapshot["last_finished_run"]["id"] == run.id
+    assert snapshot["last_finished_run"]["state"] == RunState.CANCELLED.value
+    assert snapshot["last_finished_run"]["stop_reason"] == StopReason.USER_STOP.value
+    assert snapshot["last_finished_run"]["error_kind"] is None
+
+
 def test_snapshot_publishes_the_run_counters_the_store_accumulated(tmp_path: Path) -> None:
     """The run panel cannot show rounds, retries or usage the run DTO never carries."""
     client, store, _ = _make_client(tmp_path)
