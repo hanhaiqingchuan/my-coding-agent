@@ -181,6 +181,8 @@ class ToolResult:
     content: str
     ok: bool
     error: ToolError | None = None
+    data: FrozenJsonMapping = field(default_factory=dict)
+    truncated: bool = False
 
     def __post_init__(self) -> None:
         if not self.tool_call_id:
@@ -189,6 +191,9 @@ class ToolResult:
             raise ValueError("a successful tool result must not have an error")
         if not self.ok and self.error is None:
             raise ValueError("a failed tool result requires a stable error")
+        if not isinstance(self.truncated, bool):
+            raise ValueError("tool result truncated must be a boolean")
+        object.__setattr__(self, "data", _freeze_mapping(self.data))
 
 
 AssistantPart: TypeAlias = TextPart | ToolUsePart

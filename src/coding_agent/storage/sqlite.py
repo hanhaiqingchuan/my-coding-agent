@@ -1258,6 +1258,8 @@ def _part_to_value(part: MessagePart) -> dict[str, object]:
             "error": (
                 {"code": part.error.code, "message": part.error.message} if part.error else None
             ),
+            "data": dict(part.data),
+            "truncated": part.truncated,
         }
     raise TypeError(f"unsupported message part: {type(part).__name__}")
 
@@ -1277,6 +1279,8 @@ def _parts_from_json(value: str) -> tuple[MessagePart, ...]:
                     item["content"],
                     item["ok"],
                     ToolError(error["code"], error["message"]) if error else None,
+                    item.get("data", {}),
+                    item.get("truncated", False),
                 )
             )
         else:
