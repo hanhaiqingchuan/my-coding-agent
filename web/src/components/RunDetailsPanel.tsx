@@ -29,11 +29,11 @@ export function RunDetailsPanel({ snapshot }: RunDetailsPanelProps) {
       <dl className="run-details-list">
         <div>
           <dt>State</dt>
-          <dd>{run.state}</dd>
+          <dd className={`run-state run-state-${run.state}`}>{run.state}</dd>
         </div>
         <div>
           <dt>Run ID</dt>
-          <dd>{run.id}</dd>
+          <dd className="run-details-mono">{run.id}</dd>
         </div>
         {model !== null ? <DetailRow label="Model" value={model} /> : null}
         {round !== null ? <DetailRow label="Round" value={round} /> : null}
