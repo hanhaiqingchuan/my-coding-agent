@@ -27,10 +27,8 @@ export function ApprovalDock({
       ) : null}
       {isCommand ? (
         <CommandDetails
-          command={stringValue(pendingApproval.input.command)}
-          cwd={stringValue(pendingApproval.input.cwd)}
-          reason={stringValue(pendingApproval.input.reason)}
-          timeoutSeconds={pendingApproval.input.timeout_seconds}
+          input={pendingApproval.input}
+          metadata={pendingApproval.metadata}
         />
       ) : null}
       {!isCommand && !isWrite ? (

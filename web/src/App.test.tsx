@@ -65,7 +65,13 @@ const snapshot: SessionSnapshotDto = {
     },
     target: null,
     preview: null,
-    metadata: {},
+    metadata: {
+      command: "pwd",
+      cwd: "/workspace",
+      relative_cwd: ".",
+      reason: "Check workspace",
+      timeout_seconds: 1,
+    },
   },
   interrupted_banner: {
     run_id: "run-previous",

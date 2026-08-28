@@ -79,6 +79,37 @@ test("shows the frozen run_command timeout in seconds and always warns that the 
   expect(dock.textContent).toContain("This command is not sandboxed");
 });
 
+test("prefers the effective cwd and timeout the backend froze for a bare command call", () => {
+  // The common call omits cwd and timeout_seconds; run_command freezes the effective
+  // values into the approval metadata, which is the only place they exist.
+  render(
+    <ApprovalDock
+      pendingApproval={{
+        run_id: "run-1",
+        tool_call_id: "call-3",
+        name: "run_command",
+        input: { command: "pytest -q" },
+        target: "/workspace/services",
+        preview: null,
+        metadata: {
+          command: "pytest -q",
+          cwd: "/workspace/services",
+          relative_cwd: "services",
+          reason: null,
+          timeout_seconds: 120,
+        },
+      }}
+      onResolve={vi.fn()}
+    />,
+  );
+
+  const dock = screen.getByRole("region", { name: "Pending approval" });
+  expect(dock.textContent).toContain("pytest -q");
+  expect(screen.getByText("/workspace/services")).not.toBeNull();
+  expect(screen.getByText("120s")).not.toBeNull();
+  expect(dock.textContent).toContain("This command is not sandboxed");
+});
+
 test("marks the timeout as absent instead of inventing the schema default", () => {
   render(
     <ApprovalDock
@@ -87,6 +118,12 @@ test("marks the timeout as absent instead of inventing the schema default", () =
         input: {
           command: "pytest -q",
           cwd: ".",
+          reason: "Run the offline suite",
+        },
+        metadata: {
+          command: "pytest -q",
+          cwd: "/workspace",
+          relative_cwd: ".",
           reason: "Run the offline suite",
         },
       }}
@@ -177,8 +214,18 @@ test("shows a diff preview for write approvals", () => {
       pendingApproval={{
         ...pendingCommand,
         name: "write_file",
+        input: {
+          operation: "write",
+          path: "notes.md",
+          content: "new\n",
+        },
+        target: "/workspace/notes.md",
         preview: "@@ -1 +1 @@\n-old\n+new",
-        metadata: {},
+        metadata: {
+          operation: "write",
+          path: "/workspace/notes.md",
+          content: "new\n",
+        },
       }}
       onResolve={vi.fn()}
     />,

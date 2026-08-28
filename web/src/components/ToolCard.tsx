@@ -5,16 +5,40 @@ type ToolCardProps = {
   outputDraft?: string;
 };
 
+/** Longest text argument rendered in full; longer values are cut with a visible note. */
+const MAX_TEXT_CHARACTERS = 2000;
+
+/**
+ * The write_file arguments the model can freeze, in the order they are shown. The schema
+ * is operation/path/content/old_text/new_text/replace_all with additionalProperties
+ * false, so no `diff` or `patch` key can ever arrive on a write card.
+ */
+const WRITE_ARGUMENTS: ReadonlyArray<{
+  key: string;
+  label: string;
+  multiline: boolean;
+}> = [
+  { key: "operation", label: "Operation", multiline: false },
+  { key: "path", label: "Path", multiline: false },
+  { key: "replace_all", label: "Replace all", multiline: false },
+  { key: "content", label: "Content", multiline: true },
+  { key: "old_text", label: "Replaced text", multiline: true },
+  { key: "new_text", label: "Replacement text", multiline: true },
+];
+
+type WriteRow = {
+  label: string;
+  value: string;
+  multiline: boolean;
+  truncationNote: string | null;
+};
+
 export function ToolCard({ tool, outputDraft }: ToolCardProps) {
-  const command = stringValue(tool.input.command);
-  const cwd = stringValue(tool.input.cwd);
-  const reason = stringValue(tool.input.reason);
-  const diff =
-    stringValue(tool.input.diff) ??
-    stringValue(tool.input.patch) ??
-    stringValue(tool.input.content);
-  const isCommand = tool.name.includes("command") || command !== null;
-  const isWrite = tool.name.includes("write") || diff !== null;
+  const isCommand =
+    tool.name.includes("command") || stringValue(tool.input.command) !== null;
+  const writeRows = tool.name.includes("write")
+    ? writeArgumentRows(tool.input)
+    : [];
 
   return (
     <article
@@ -27,18 +51,9 @@ export function ToolCard({ tool, outputDraft }: ToolCardProps) {
       </header>
       <details>
         <summary>Details</summary>
-        {isCommand ? (
-          <CommandDetails
-            command={command}
-            cwd={cwd}
-            reason={reason}
-            timeoutSeconds={tool.input.timeout_seconds}
-          />
-        ) : null}
-        {isWrite && diff !== null ? (
-          <pre className="tool-diff">{diff}</pre>
-        ) : null}
-        {!isCommand && !isWrite ? (
+        {isCommand ? <CommandDetails input={tool.input} /> : null}
+        {writeRows.length > 0 ? <WriteDetails rows={writeRows} /> : null}
+        {!isCommand && writeRows.length === 0 ? (
           <pre>{JSON.stringify(tool.input, null, 2)}</pre>
         ) : null}
         {tool.result !== null ? (
@@ -59,16 +74,16 @@ export function ToolCard({ tool, outputDraft }: ToolCardProps) {
 }
 
 export function CommandDetails({
-  command,
-  cwd,
-  reason,
-  timeoutSeconds,
+  input,
+  metadata,
 }: {
-  command: string | null;
-  cwd: string | null;
-  reason: string | null;
-  timeoutSeconds: JsonValue | undefined;
+  input: Record<string, JsonValue>;
+  metadata?: Record<string, JsonValue>;
 }) {
+  const command = stringValue(effectiveValue(input, metadata, "command"));
+  const cwd = stringValue(effectiveValue(input, metadata, "cwd"));
+  const reason = stringValue(effectiveValue(input, metadata, "reason"));
+  const timeoutSeconds = effectiveValue(input, metadata, "timeout_seconds");
   return (
     <dl className="tool-command-details">
       <div>
@@ -101,9 +116,78 @@ export function CommandDetails({
   );
 }
 
+function WriteDetails({ rows }: { rows: WriteRow[] }) {
+  return (
+    <dl className="tool-write-details">
+      {rows.map((row) => (
+        <div
+          key={row.label}
+          className={row.multiline ? "tool-text-row" : undefined}
+        >
+          <dt>{row.label}</dt>
+          <dd>
+            {row.multiline ? <pre>{row.value}</pre> : row.value}
+            {row.truncationNote !== null ? (
+              <p className="tool-truncation">{row.truncationNote}</p>
+            ) : null}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+/**
+ * The frozen write_file arguments that are actually present. A settled ToolExecutionDto
+ * carries no `preview`, so the unified diff the approval card showed cannot be rebuilt
+ * here; the card shows the arguments the backend froze instead of pretending they are a
+ * diff. An input the tool never accepted yields no rows, and the caller then falls back
+ * to the raw JSON so a card is never argument-less.
+ */
+function writeArgumentRows(input: Record<string, JsonValue>): WriteRow[] {
+  const rows: WriteRow[] = [];
+  for (const { key, label, multiline } of WRITE_ARGUMENTS) {
+    const value = input[key];
+    const text =
+      typeof value === "string"
+        ? value
+        : typeof value === "boolean"
+          ? String(value)
+          : null;
+    if (text === null) continue;
+    const truncate = multiline && text.length > MAX_TEXT_CHARACTERS;
+    rows.push({
+      label,
+      value: truncate ? text.slice(0, MAX_TEXT_CHARACTERS) : text,
+      multiline,
+      truncationNote: truncate
+        ? `Showing the first ${MAX_TEXT_CHARACTERS} of ${text.length} characters.`
+        : null,
+    });
+  }
+  return rows;
+}
+
+/**
+ * The effective value of one command argument. `metadata` holds what run_command actually
+ * resolved and froze (the workspace-absolute cwd and the timeout in force), while `input`
+ * holds only what the model sent, so metadata wins whenever it carries the key. A settled
+ * ToolExecutionDto ships no metadata, so its card falls back to the frozen input and no
+ * default is ever invented here.
+ */
+function effectiveValue(
+  input: Record<string, JsonValue>,
+  metadata: Record<string, JsonValue> | undefined,
+  key: string,
+): JsonValue | undefined {
+  if (metadata !== undefined && key in metadata) return metadata[key];
+  return input[key];
+}
+
 function timeoutLabel(timeoutSeconds: JsonValue | undefined): string {
-  // Only the frozen `timeout_seconds` argument is shown; when the model omitted
-  // it the backend default stays invisible rather than being guessed here.
+  // Only a timeout the backend actually reported is shown; when neither the frozen
+  // metadata nor the model input carries one, the schema default stays invisible
+  // rather than being guessed here.
   return typeof timeoutSeconds === "number" ? `${timeoutSeconds}s` : "—";
 }
 

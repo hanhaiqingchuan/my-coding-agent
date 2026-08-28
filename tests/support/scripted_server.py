@@ -112,6 +112,67 @@ class BrowserScriptedModel:
                 usage=Usage(input_tokens=8, output_tokens=8),
             )
 
+        if prompt == "timeline-flow" and len(results) == 0:
+            # Two calls in one round, so call_order runs 0 and 1 here and restarts at 0 in
+            # the next round; the command deliberately omits cwd and timeout_seconds.
+            text = "Round one prepares two effects."
+            await _emit((text,), on_text_delta, cancellation, delay=0.1)
+            return AssistantTurn(
+                id=f"timeline-round-1-{uuid4()}",
+                parts=(
+                    TextPart(text),
+                    ToolUsePart(
+                        ToolCall(
+                            f"timeline-write-{uuid4()}",
+                            "write_file",
+                            {
+                                "operation": "write",
+                                "path": "timeline-a.txt",
+                                "content": "alpha\n",
+                            },
+                        )
+                    ),
+                    ToolUsePart(
+                        ToolCall(
+                            f"timeline-command-{uuid4()}",
+                            "run_command",
+                            {"command": "printf verified > timeline-marker.txt"},
+                        )
+                    ),
+                ),
+                stop_reason=ModelStopReason.TOOL_USE,
+                usage=Usage(input_tokens=8, output_tokens=8),
+            )
+
+        if prompt == "timeline-flow" and len(results) == 2:
+            text = "Round two continues after the first round."
+            await _emit((text,), on_text_delta, cancellation, delay=0.1)
+            return AssistantTurn(
+                id=f"timeline-round-2-{uuid4()}",
+                parts=(
+                    TextPart(text),
+                    ToolUsePart(
+                        ToolCall(
+                            f"timeline-replace-{uuid4()}",
+                            "write_file",
+                            {
+                                "operation": "replace",
+                                "path": "timeline-a.txt",
+                                "old_text": "alpha",
+                                "new_text": "beta",
+                            },
+                        )
+                    ),
+                ),
+                stop_reason=ModelStopReason.TOOL_USE,
+                usage=Usage(input_tokens=8, output_tokens=8),
+            )
+
+        if prompt == "timeline-flow":
+            return await _streamed_turn(
+                "All timeline steps completed.", on_text_delta, cancellation
+            )
+
         if prompt == "agent-flow" and len(results) == 0:
             text = "Preparing the workspace change…"
             await _emit((text,), on_text_delta, cancellation, delay=0.25)

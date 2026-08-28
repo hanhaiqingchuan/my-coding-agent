@@ -661,27 +661,31 @@ button:disabled:hover {
   border-left: 3px solid var(--info-line);
   border-style: dashed;
 }
-.tool-command-details {
+.tool-command-details,
+.tool-write-details {
   display: grid;
   gap: var(--space-2);
   margin: var(--space-3) 0 0;
   min-width: 0;
 }
-.tool-command-details div {
+.tool-command-details div,
+.tool-write-details div {
   display: grid;
   grid-template-columns: 132px minmax(0, 1fr);
   gap: var(--space-3);
   align-items: baseline;
   min-width: 0;
 }
-.tool-command-details dt {
+.tool-command-details dt,
+.tool-write-details dt {
   color: var(--text-muted);
   font-size: var(--text-2xs);
   font-weight: 650;
   letter-spacing: 0.05em;
   text-transform: uppercase;
 }
-.tool-command-details dd {
+.tool-command-details dd,
+.tool-write-details dd {
   margin: 0;
   min-width: 0;
   overflow-wrap: anywhere;
@@ -696,6 +700,26 @@ button:disabled:hover {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   color: var(--code-fg);
+}
+/* WriteDetails lists only frozen write_file arguments, so every value is a machine
+   value; its text arguments stack under their label instead of sharing its column. */
+.tool-write-details dd {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--code-fg);
+}
+.tool-write-details .tool-text-row {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 2px;
+}
+.tool-write-details .tool-text-row pre {
+  margin-top: var(--space-1);
+}
+.tool-truncation {
+  margin: var(--space-1) 0 0;
+  color: var(--text-muted);
+  font-family: var(--font-sans);
+  font-size: var(--text-2xs);
 }
 .tool-command-details .tool-risk {
   display: grid;
@@ -1057,6 +1081,10 @@ button:disabled:hover {
     padding: var(--space-4);
   }
   .tool-command-details div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+  .tool-write-details div {
     grid-template-columns: minmax(0, 1fr);
     gap: 2px;
   }
