@@ -94,5 +94,22 @@ class ToolRegistry:
         except (ToolInputError, WorkspacePathError) as error:
             return error_result(call.id, call.name, error.code, error.message)
 
+    async def execute(self, prepared: PreparedToolCall, context: ToolContext) -> ToolResult:
+        """Execute only a call previously frozen by :meth:`prepare`."""
+        if prepared.call.name == ReadFileTool.name:
+            tool = self._read_file
+        elif prepared.call.name == WriteFileTool.name:
+            tool = self._write_file
+        elif prepared.call.name == RunCommandTool.name:
+            tool = self._run_command
+        else:
+            return error_result(
+                prepared.call.id,
+                prepared.call.name,
+                "UNKNOWN_TOOL",
+                f"unknown tool: {prepared.call.name}",
+            )
+        return await tool.execute(prepared, context)
+
 
 __all__ = ["ToolContext", "ToolRegistry"]

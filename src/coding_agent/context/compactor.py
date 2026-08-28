@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from collections.abc import Mapping
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from importlib.resources import files
@@ -15,6 +15,7 @@ from coding_agent.context.estimator import estimate_input_tokens
 from coding_agent.core.cancellation import CancellationToken
 from coding_agent.core.errors import CancellationRequested, StoreError
 from coding_agent.core.models import (
+    AssistantTurn,
     ContextSnapshot,
     Message,
     ModelStopReason,
@@ -34,6 +35,7 @@ from coding_agent.model.protocol import (
 from coding_agent.storage.sqlite import SQLiteStore
 
 CompressionPhase = Literal["planning", "request", "validation", "persistence"]
+CompactionInvoker = Callable[[ModelRequest, CancellationToken], Awaitable[AssistantTurn]]
 _SUMMARY_FIELDS = (
     "completed_work_and_evidence",
     "important_files_and_symbols",
@@ -81,9 +83,11 @@ class Compactor:
         self,
         plan: CompactionPlan,
         cancellation: CancellationToken,
+        *,
+        invoke: CompactionInvoker | None = None,
     ) -> CompactionResult:
         try:
-            return await self._compact(plan, cancellation)
+            return await self._compact(plan, cancellation, invoke)
         except CancellationRequested:
             return _failure(
                 phase="request",
@@ -95,6 +99,7 @@ class Compactor:
         self,
         plan: CompactionPlan,
         cancellation: CancellationToken,
+        invoke: CompactionInvoker | None,
     ) -> CompactionResult:
         planning_error = _validate_plan(plan)
         if planning_error is not None:
@@ -125,7 +130,11 @@ class Compactor:
 
             cancellation.raise_if_cancelled()
             try:
-                turn = await self._gateway.complete(request, _ignore_delta, cancellation)
+                turn = (
+                    await invoke(request, cancellation)
+                    if invoke is not None
+                    else await self._gateway.complete(request, _ignore_delta, cancellation)
+                )
             except ModelAPIError as error:
                 return _failure(
                     phase="request",

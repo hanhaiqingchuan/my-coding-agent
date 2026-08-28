@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import inspect
 from collections.abc import Sequence
 
@@ -42,3 +43,31 @@ class ScriptedModel:
 
 
 __all__ = ["ScriptedModel"]
+
+
+class BlockingModel:
+    """Return a scripted turn only after the test releases an in-flight request."""
+
+    def __init__(self, turn: AssistantTurn) -> None:
+        self.turn = turn
+        self.requests: list[ModelRequest] = []
+        self.started = asyncio.Event()
+        self.release = asyncio.Event()
+
+    @property
+    def call_count(self) -> int:
+        return len(self.requests)
+
+    async def complete(
+        self,
+        request: ModelRequest,
+        on_text_delta: DeltaSink,
+        cancellation: CancellationToken,
+    ) -> AssistantTurn:
+        self.requests.append(request)
+        self.started.set()
+        await self.release.wait()
+        return self.turn
+
+
+__all__.append("BlockingModel")

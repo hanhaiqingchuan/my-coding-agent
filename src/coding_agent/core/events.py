@@ -26,6 +26,7 @@ _TRANSITIONS: dict[RunState, frozenset[RunState]] = {
     RunState.COMPACTING: frozenset({RunState.BUILDING_CONTEXT, RunState.CANCELLING}),
     RunState.MODEL_STREAMING: frozenset(
         {
+            RunState.BUILDING_CONTEXT,
             RunState.RETRY_WAIT,
             RunState.AWAITING_APPROVAL,
             RunState.COMPLETED,
@@ -33,7 +34,9 @@ _TRANSITIONS: dict[RunState, frozenset[RunState]] = {
         }
     ),
     RunState.RETRY_WAIT: frozenset({RunState.MODEL_STREAMING, RunState.CANCELLING}),
-    RunState.AWAITING_APPROVAL: frozenset({RunState.TOOL_RUNNING, RunState.CANCELLING}),
+    RunState.AWAITING_APPROVAL: frozenset(
+        {RunState.BUILDING_CONTEXT, RunState.TOOL_RUNNING, RunState.CANCELLING}
+    ),
     RunState.TOOL_RUNNING: frozenset({RunState.BUILDING_CONTEXT, RunState.CANCELLING}),
     RunState.CANCELLING: frozenset({RunState.CANCELLED}),
     RunState.COMPLETED: frozenset(),

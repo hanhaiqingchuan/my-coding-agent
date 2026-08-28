@@ -76,6 +76,7 @@ class ToolExecutionState(StrEnum):
     RUNNING = "running"
     SUCCEEDED = "succeeded"
     FAILED = "failed"
+    REJECTED = "rejected"
     CANCELLED = "cancelled"
     SKIPPED = "skipped"
     UNKNOWN = "unknown"

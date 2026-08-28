@@ -39,6 +39,7 @@ from coding_agent.core.models import (
     ToolExecutionState,
     ToolResult,
     ToolUsePart,
+    Usage,
 )
 
 
@@ -104,6 +105,11 @@ class SQLiteStore:
                 "SELECT * FROM sessions ORDER BY updated_at DESC, id"
             ).fetchall()
         return [_session_from_row(row) for row in rows]
+
+    def get_run(self, run_id: str) -> Run:
+        """Return one run for runtime coordination without exposing a connection."""
+        with self.connection() as connection:
+            return self._get_run_from(connection, run_id)
 
     def begin_run(
         self,
@@ -311,7 +317,7 @@ class SQLiteStore:
             )
             prepared: list[PreparedToolCall] = []
             for index, call in enumerate(turn.tool_calls):
-                requires_approval = call.name != "read_file"
+                requires_approval = call.name in {"write_file", "run_command"}
                 approval_status = "pending" if requires_approval else "approved"
                 state = (
                     ToolExecutionState.AWAITING_APPROVAL
@@ -403,11 +409,7 @@ class SQLiteStore:
                     WHERE tool_call_id = ?
                     """,
                     (
-                        (
-                            ToolExecutionState.SUCCEEDED.value
-                            if result.ok
-                            else ToolExecutionState.FAILED.value
-                        ),
+                        _execution_state_for_result(result).value,
                         encoded_result,
                         result.tool_call_id,
                     ),
@@ -512,6 +514,196 @@ class SQLiteStore:
                 {"message_id": turn.id},
             )
 
+    def commit_final_turn_and_finish(
+        self,
+        run_id: str,
+        turn: AssistantTurn,
+        *,
+        state: RunState,
+        stop_reason: StopReason,
+        error_kind: ErrorKind | None,
+    ) -> Run:
+        """Atomically commit a tool-free assistant turn and its terminal run state."""
+        if turn.tool_calls:
+            raise StoreError("FINAL_TURN_HAS_TOOLS", "a final turn cannot contain tool calls")
+        if state not in _TERMINAL_STATES:
+            raise StoreError("RUN_NOT_TERMINAL", "final turn requires a terminal run state")
+        with self._transaction() as connection:
+            run = self._get_run_from(connection, run_id)
+            self._require_active_run(run)
+            self._require_no_pending_group(connection, run.id)
+            validate_transition(run.state, state)
+            connection.execute(
+                """
+                INSERT INTO messages(
+                    id, session_id, run_id, seq, role, parts_json, status
+                ) VALUES (?, ?, ?, ?, 'assistant', ?, ?)
+                """,
+                (
+                    turn.id,
+                    run.session_id,
+                    run.id,
+                    self._next_message_seq(connection, run.session_id),
+                    _parts_json(turn.parts),
+                    MessageStatus.COMMITTED.value,
+                ),
+            )
+            self._append_event(
+                connection,
+                run.session_id,
+                run.id,
+                "assistant.turn_committed",
+                {"message_id": turn.id},
+            )
+            finished_at = _now()
+            connection.execute(
+                """
+                UPDATE runs
+                SET state = ?, stop_reason = ?, error_kind = ?, finished_at = ?
+                WHERE id = ? AND state = ?
+                """,
+                (
+                    state.value,
+                    stop_reason.value,
+                    error_kind.value if error_kind else None,
+                    finished_at,
+                    run.id,
+                    run.state.value,
+                ),
+            )
+            self._append_event(
+                connection,
+                run.session_id,
+                run.id,
+                "run.state_changed",
+                {
+                    "state": state.value,
+                    "stop_reason": stop_reason.value,
+                    "error_kind": error_kind.value if error_kind else None,
+                },
+            )
+            return self._get_run_from(connection, run.id)
+
+    def record_interrupted_turn(self, run_id: str, turn: AssistantTurn) -> None:
+        """Retain displayable non-canonical output without exposing it to context building."""
+        if not turn.parts:
+            return
+        with self._transaction() as connection:
+            run = self._get_run_from(connection, run_id)
+            self._require_active_run(run)
+            connection.execute(
+                """
+                INSERT INTO messages(
+                    id, session_id, run_id, seq, role, parts_json, status
+                ) VALUES (?, ?, ?, ?, 'assistant', ?, ?)
+                """,
+                (
+                    turn.id,
+                    run.session_id,
+                    run.id,
+                    self._next_message_seq(connection, run.session_id),
+                    _parts_json(turn.parts),
+                    MessageStatus.INTERRUPTED.value,
+                ),
+            )
+            self._append_event(
+                connection,
+                run.session_id,
+                run.id,
+                "assistant.interrupted",
+                {"message_id": turn.id, "stop_reason": turn.stop_reason.value},
+            )
+
+    def start_model_request(
+        self,
+        run_id: str,
+        round_no: int,
+        kind: str,
+        model: str,
+        config_hash: str,
+    ) -> str:
+        """Persist request intent before any model I/O begins."""
+        if kind not in {"main", "compaction"}:
+            raise ValueError("model request kind must be main or compaction")
+        request_id = str(uuid4())
+        with self._transaction() as connection:
+            self._require_active_run(self._get_run_from(connection, run_id))
+            connection.execute(
+                """
+                INSERT INTO model_requests(
+                    id, run_id, round_no, kind, model, config_hash, started_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (request_id, run_id, round_no, kind, model, config_hash, _now()),
+            )
+        return request_id
+
+    def finish_model_request(
+        self,
+        request_id: str,
+        *,
+        result: str,
+        usage: Usage | None,
+        attempt_count: int,
+        network_retry_count: int,
+        total_wait_ms: int,
+    ) -> None:
+        """Close one request record and roll successful usage into the owning run."""
+        with self._transaction() as connection:
+            row = connection.execute(
+                "SELECT run_id, kind, finished_at FROM model_requests WHERE id = ?",
+                (request_id,),
+            ).fetchone()
+            if row is None:
+                raise StoreError("MODEL_REQUEST_NOT_FOUND", "model request record not found")
+            if row["finished_at"] is not None:
+                raise StoreError("MODEL_REQUEST_ALREADY_FINISHED", "model request already finished")
+            values = usage or Usage()
+            connection.execute(
+                """
+                UPDATE model_requests
+                SET finished_at = ?, result = ?, attempt_count = ?,
+                    input_tokens = ?, output_tokens = ?,
+                    cache_creation_input_tokens = ?, cache_read_input_tokens = ?,
+                    usage_source = ?, network_retry_count = ?, total_wait_ms = ?
+                WHERE id = ?
+                """,
+                (
+                    _now(),
+                    result,
+                    attempt_count,
+                    values.input_tokens,
+                    values.output_tokens,
+                    values.cache_creation_input_tokens,
+                    values.cache_read_input_tokens,
+                    "provider" if usage is not None else None,
+                    network_retry_count,
+                    total_wait_ms,
+                    request_id,
+                ),
+            )
+            connection.execute(
+                """
+                UPDATE runs
+                SET input_tokens = input_tokens + coalesce(?, 0),
+                    output_tokens = output_tokens + coalesce(?, 0),
+                    cache_creation_input_tokens = cache_creation_input_tokens + coalesce(?, 0),
+                    cache_read_input_tokens = cache_read_input_tokens + coalesce(?, 0),
+                    round_count = round_count + ?,
+                    retry_count = retry_count + ?
+                WHERE id = ?
+                """,
+                (
+                    values.input_tokens,
+                    values.output_tokens,
+                    values.cache_creation_input_tokens,
+                    values.cache_read_input_tokens,
+                    1 if row["kind"] == "main" else 0,
+                    network_retry_count,
+                    row["run_id"],
+                ),
+            )
+
     def request_cancellation(
         self,
         run_id: str,
@@ -603,6 +795,49 @@ class SQLiteStore:
             self._complete_command(connection, run.session_id, client_command_id, event_seq)
             return self._get_run_from(connection, run.id)
 
+    def request_approval(self, run_id: str, prepared: PreparedToolCall) -> ApprovalRecord:
+        """Audit presentation of the current frozen call before awaiting its decision."""
+        tool_call_id = prepared.call.id
+        with self._transaction() as connection:
+            run = self._get_run_from(connection, run_id)
+            self._require_active_run(run)
+            if run.cancellation_requested_at is not None or run.state is RunState.CANCELLING:
+                raise StoreError(
+                    "RUN_CANCELLING", "approval cannot be requested during cancellation"
+                )
+            row = connection.execute(
+                "SELECT * FROM tool_executions WHERE run_id = ? AND tool_call_id = ?",
+                (run_id, tool_call_id),
+            ).fetchone()
+            if row is None:
+                raise StoreError("TOOL_CALL_NOT_FOUND", f"tool call not found: {tool_call_id}")
+            if row["approval_status"] != ApprovalStatus.PENDING.value:
+                raise StoreError("APPROVAL_ALREADY_RESOLVED", "approval was already resolved")
+            if row["execution_state"] != ToolExecutionState.AWAITING_APPROVAL.value:
+                raise StoreError("TOOL_CALL_NOT_CURRENT", "tool call is not awaiting approval")
+            if row["name"] != prepared.call.name or row["input_json"] != _json(prepared.call.input):
+                raise StoreError(
+                    "TOOL_CALL_CHANGED", "prepared tool call differs from its frozen record"
+                )
+            connection.execute(
+                "UPDATE tool_executions SET baseline_sha256 = ? WHERE tool_call_id = ?",
+                (prepared.baseline_sha256, tool_call_id),
+            )
+            self._append_event(
+                connection,
+                run.session_id,
+                run.id,
+                "approval.requested",
+                {
+                    "tool_call_id": tool_call_id,
+                    "name": prepared.call.name,
+                    "target": prepared.target,
+                    "preview": prepared.preview,
+                    "metadata": prepared.metadata,
+                },
+            )
+            return self._get_approval(connection, run.id, tool_call_id)
+
     def resolve_approval(
         self,
         run_id: str,
@@ -667,7 +902,7 @@ class SQLiteStore:
             execution_state = (
                 ToolExecutionState.QUEUED
                 if decision is ApprovalDecision.APPROVE
-                else ToolExecutionState.CANCELLED
+                else ToolExecutionState.REJECTED
             )
             connection.execute(
                 """
@@ -860,6 +1095,24 @@ class SQLiteStore:
                     "stop_reason": stop_reason.value if stop_reason else None,
                     "error_kind": error_kind.value if error_kind else None,
                 },
+            )
+            return self._get_run_from(connection, run.id)
+
+    def schedule_model_retry(self, run_id: str, payload: Mapping[str, object]) -> Run:
+        """Enter retry wait and persist the retry schedule in the same transaction."""
+        with self._transaction() as connection:
+            run = self._get_run_from(connection, run_id)
+            validate_transition(run.state, RunState.RETRY_WAIT)
+            connection.execute(
+                "UPDATE runs SET state = ? WHERE id = ? AND state = ?",
+                (RunState.RETRY_WAIT.value, run.id, run.state.value),
+            )
+            self._append_event(
+                connection,
+                run.session_id,
+                run.id,
+                "model.retry_scheduled",
+                payload,
             )
             return self._get_run_from(connection, run.id)
 
@@ -1235,6 +1488,7 @@ _FINAL_TOOL_STATES = frozenset(
     {
         ToolExecutionState.SUCCEEDED,
         ToolExecutionState.FAILED,
+        ToolExecutionState.REJECTED,
         ToolExecutionState.CANCELLED,
         ToolExecutionState.SKIPPED,
         ToolExecutionState.UNKNOWN,
@@ -1413,6 +1667,10 @@ def _synthetic_result(tool_call_id: str, state: ToolExecutionState) -> ToolResul
             "TOOL_SKIPPED",
             "tool execution was skipped because an earlier call did not complete",
         ),
+        ToolExecutionState.REJECTED: (
+            "TOOL_REJECTED",
+            "tool execution was rejected by the user",
+        ),
         ToolExecutionState.FAILED: ("TOOL_FAILED", "tool execution failed"),
         ToolExecutionState.SUCCEEDED: ("TOOL_RESULT_MISSING", "tool result was unavailable"),
     }
@@ -1423,3 +1681,19 @@ def _synthetic_result(tool_call_id: str, state: ToolExecutionState) -> ToolResul
 def _rejected_result(tool_call_id: str) -> ToolResult:
     message = "tool execution was rejected by the user"
     return ToolResult(tool_call_id, message, False, ToolError("TOOL_REJECTED", message))
+
+
+def _execution_state_for_result(result: ToolResult) -> ToolExecutionState:
+    if result.ok:
+        return ToolExecutionState.SUCCEEDED
+    if result.error is None:
+        return ToolExecutionState.FAILED
+    if result.error.code in {"COMMAND_CANCELLED", "TOOL_CANCELLED"}:
+        return ToolExecutionState.CANCELLED
+    if result.error.code == "TOOL_SKIPPED":
+        return ToolExecutionState.SKIPPED
+    if result.error.code == "TOOL_REJECTED":
+        return ToolExecutionState.REJECTED
+    if result.error.code == "EXECUTION_UNKNOWN":
+        return ToolExecutionState.UNKNOWN
+    return ToolExecutionState.FAILED
