@@ -6,13 +6,19 @@ from coding_agent.core.models import PreparedToolCall, ToolCall, ToolResult
 from coding_agent.tools import ToolContext, ToolInputError, error_result
 from coding_agent.tools.paths import WorkspaceBoundary, WorkspacePathError
 from coding_agent.tools.read_file import ReadFileTool
+from coding_agent.tools.write_file import WriteFileTool
 
 
 class ToolRegistry:
     """Dispatch known local calls while preserving user-correctable errors as results."""
 
-    def __init__(self, read_file: ReadFileTool | None = None) -> None:
+    def __init__(
+        self,
+        read_file: ReadFileTool | None = None,
+        write_file: WriteFileTool | None = None,
+    ) -> None:
         self._read_file = read_file or ReadFileTool()
+        self._write_file = write_file or WriteFileTool()
 
     def schemas(self) -> list[dict[str, object]]:
         return [
@@ -72,10 +78,14 @@ class ToolRegistry:
     def prepare(
         self, call: ToolCall, workspace: WorkspaceBoundary
     ) -> PreparedToolCall | ToolResult:
-        if call.name != ReadFileTool.name:
+        if call.name == ReadFileTool.name:
+            tool = self._read_file
+        elif call.name == WriteFileTool.name:
+            tool = self._write_file
+        else:
             return error_result(call.id, call.name, "UNKNOWN_TOOL", f"unknown tool: {call.name}")
         try:
-            return self._read_file.prepare(call, workspace)
+            return tool.prepare(call, workspace)
         except (ToolInputError, WorkspacePathError) as error:
             return error_result(call.id, call.name, error.code, error.message)
 

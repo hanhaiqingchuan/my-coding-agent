@@ -100,6 +100,7 @@ class ModelStopReason(StrEnum):
 JsonScalar: TypeAlias = str | int | float | bool | None
 JsonValue: TypeAlias = JsonScalar | tuple["JsonValue", ...] | Mapping[str, "JsonValue"]
 FrozenJsonMapping: TypeAlias = Mapping[str, JsonValue]
+UnifiedDiffPreview: TypeAlias = str
 
 
 def _freeze_json(value: object) -> JsonValue:
@@ -255,7 +256,7 @@ class PreparedToolCall:
     call: ToolCall
     requires_approval: bool
     target: str | None = None
-    preview: str | None = None
+    preview: UnifiedDiffPreview | None = None
     baseline_sha256: str | None = None
     metadata: FrozenJsonMapping = field(default_factory=dict)
 
