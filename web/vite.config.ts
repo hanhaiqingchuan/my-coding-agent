@@ -15,5 +15,9 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     passWithNoTests: true,
+    // Vitest empties every CSS import while CSS processing is off, `?raw` included.
+    // Only that raw form is let through, so a test can assert the stylesheet's own
+    // state treatments; plain CSS imports stay stubbed and inject nothing.
+    css: { include: [/\.css\?raw$/] },
   },
 });

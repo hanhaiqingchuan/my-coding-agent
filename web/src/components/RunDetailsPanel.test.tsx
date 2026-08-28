@@ -7,9 +7,14 @@ import type {
   RunTotalsDto,
   SessionSnapshotDto,
 } from "../api/types";
+import stylesheet from "../styles.css?raw";
 import { RunDetailsPanel } from "./RunDetailsPanel";
 
 afterEach(cleanup);
+
+// vitest applies no CSS in jsdom, so the pill treatments are asserted against the
+// stylesheet source, read with its comments removed.
+const CSS_RULES = stylesheet.replaceAll(/\/\*[\s\S]*?\*\//g, "");
 
 // The backend stores `asdict(AppSettings)`, so `config_snapshot.model` is a nested
 // mapping and never a bare model name.
@@ -104,8 +109,14 @@ function finishedRunSnapshot(run: Partial<RunDto> = {}): SessionSnapshotDto {
 }
 
 function rowValue(label: string): string | undefined {
-  return screen.getByText(label).parentElement?.querySelector("dd")
-    ?.textContent;
+  return rowCell(label)?.textContent ?? undefined;
+}
+
+function rowCell(label: string): HTMLElement | null {
+  return (
+    screen.getByText(label).parentElement?.querySelector<HTMLElement>("dd") ??
+    null
+  );
 }
 
 test("shows the run state, model, rounds, retries and stop reason the backend published", () => {
@@ -217,3 +228,61 @@ test("reports no run at all when the session never finished one", () => {
   expect(screen.getByText("No active run.")).not.toBeNull();
   expect(screen.queryByText("State")).toBeNull();
 });
+
+// Spec 5.2 pairs each terminal state with the stop reasons that can produce it.
+const TERMINAL_RUNS = [
+  ["completed", "completed"],
+  ["stopped", "max_rounds"],
+  ["cancelled", "user_stop"],
+  ["failed", "retry_exhausted"],
+  ["interrupted", "server_restart"],
+] as const;
+
+test.each(TERMINAL_RUNS)(
+  "marks a %s run with its own state class",
+  (state, stopReason) => {
+    const snapshot = finishedRunSnapshot({ state, stop_reason: stopReason });
+
+    render(<RunDetailsPanel snapshot={snapshot} />);
+
+    const pill = rowCell("State");
+    expect(pill?.textContent).toBe(state);
+    expect(pill?.className).toBe(`run-state run-state-${state}`);
+  },
+);
+
+test("gives every terminal run state its own pill treatment", () => {
+  const treatments = TERMINAL_RUNS.map(([state]) => {
+    const selector = `.run-state-${state}`;
+    const declarations = declarationsFor(selector);
+    expect(declarations, selector).not.toBeNull();
+    // Without both of these the pill falls back to the shared neutral fill.
+    expect(Object.keys(declarations ?? {}), selector).toEqual(
+      expect.arrayContaining(["color", "background"]),
+    );
+    return JSON.stringify([
+      declarations?.color,
+      declarations?.background,
+      declarations?.["border-color"],
+      declarations?.["border-style"],
+    ]);
+  });
+
+  expect(new Set(treatments).size).toBe(TERMINAL_RUNS.length);
+});
+
+function declarationsFor(selector: string): Record<string, string> | null {
+  for (const rule of CSS_RULES.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    const selectors = rule[1].split(",").map((item) => item.trim());
+    if (!selectors.includes(selector)) continue;
+    const declarations: Record<string, string> = {};
+    for (const declaration of rule[2].split(";")) {
+      const separator = declaration.indexOf(":");
+      if (separator === -1) continue;
+      const property = declaration.slice(0, separator).trim();
+      declarations[property] = declaration.slice(separator + 1).trim();
+    }
+    return declarations;
+  }
+  return null;
+}
