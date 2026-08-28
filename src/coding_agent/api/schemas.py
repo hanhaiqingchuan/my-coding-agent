@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from datetime import datetime
 from typing import Annotated, Any, Literal, TypeAlias
 
@@ -97,7 +98,7 @@ class RunDto(StrictDto):
             stop_reason=run.stop_reason,
             error_kind=run.error_kind,
             cancellation_requested_at=run.cancellation_requested_at,
-            config_snapshot=dict(run.config_snapshot),
+            config_snapshot=_thaw_json(run.config_snapshot),
             started_at=run.started_at,
             finished_at=run.finished_at,
         )
@@ -157,7 +158,7 @@ class MessageDto(StrictDto):
                     ToolUsePartDto(
                         id=part.call.id,
                         name=part.call.name,
-                        input=dict(part.call.input),
+                        input=_thaw_json(part.call.input),
                     )
                 )
             elif isinstance(part, ToolResult):
@@ -171,7 +172,7 @@ class MessageDto(StrictDto):
                             if part.error is not None
                             else None
                         ),
-                        data=dict(part.data),
+                        data=_thaw_json(part.data),
                         truncated=part.truncated,
                     )
                 )
@@ -213,7 +214,7 @@ class ToolExecutionDto(StrictDto):
             assistant_message_id=execution.assistant_message_id,
             call_order=execution.call_order,
             name=execution.name,
-            input=dict(execution.input),
+            input=_thaw_json(execution.input),
             requires_approval=execution.requires_approval,
             approval_status=execution.approval_status,
             approval_decision=execution.approval_decision,
@@ -229,7 +230,7 @@ class ToolExecutionDto(StrictDto):
                         if result.error is not None
                         else None
                     ),
-                    data=dict(result.data),
+                    data=_thaw_json(result.data),
                     truncated=result.truncated,
                 )
                 if result is not None
@@ -254,10 +255,10 @@ class PendingApprovalDto(StrictDto):
             run_id=approval.run_id,
             tool_call_id=approval.tool_call_id,
             name=approval.name,
-            input=dict(approval.input),
+            input=_thaw_json(approval.input),
             target=approval.target,
             preview=approval.preview,
-            metadata=dict(approval.metadata),
+            metadata=_thaw_json(approval.metadata),
         )
 
 
@@ -412,7 +413,7 @@ class DurableEventDto(StrictDto):
             session_id=event.session_id,
             run_id=event.run_id,
             type=event.type,
-            payload=dict(event.payload),
+            payload=_thaw_json(event.payload),
             created_at=event.created_at,
         )
 
@@ -468,6 +469,17 @@ ServerMessage: TypeAlias = (
     | AssistantDeltaEnvelope
     | ToolOutputDeltaEnvelope
 )
+
+
+def _thaw_json(value: object) -> Any:
+    """Convert recursively frozen domain JSON into plain JSON containers."""
+    if value is None or type(value) in {str, int, float, bool}:
+        return value
+    if isinstance(value, Mapping):
+        return {str(key): _thaw_json(item) for key, item in value.items()}
+    if isinstance(value, Sequence):
+        return [_thaw_json(item) for item in value]
+    raise TypeError(f"expected a JSON value, got {type(value).__name__}")
 
 
 __all__ = [

@@ -39,15 +39,11 @@ class ApiDependencies:
     def allowed_hosts(self) -> frozenset[str]:
         return frozenset({f"127.0.0.1:{self.server_port}", f"localhost:{self.server_port}"})
 
-    @property
-    def allowed_origins(self) -> frozenset[str]:
-        origins = {
-            f"http://127.0.0.1:{self.server_port}",
-            f"http://localhost:{self.server_port}",
-        }
-        if self.development_origin is not None:
-            origins.add(self.development_origin)
-        return frozenset(origins)
+    def origin_allowed(self, origin: str | None, *, host: str | None, scheme: str) -> bool:
+        if origin is None or host is None:
+            return False
+        http_scheme = "https" if scheme in {"https", "wss"} else "http"
+        return origin == f"{http_scheme}://{host}" or origin == self.development_origin
 
     def token_matches(self, candidate: str | None) -> bool:
         return candidate is not None and hmac.compare_digest(candidate, self.process_token)
@@ -68,7 +64,11 @@ def require_process_token(request: Request) -> None:
             },
         )
     origin = request.headers.get("origin")
-    if origin is not None and origin not in dependencies.allowed_origins:
+    if origin is not None and not dependencies.origin_allowed(
+        origin,
+        host=request.headers.get("host"),
+        scheme=request.url.scheme,
+    ):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail={"code": "ORIGIN_FORBIDDEN", "message": "request origin is not allowed"},

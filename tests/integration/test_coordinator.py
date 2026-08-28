@@ -298,6 +298,38 @@ async def test_start_command_id_rejects_a_different_payload(store: SQLiteStore) 
 
 
 @pytest.mark.asyncio
+async def test_start_replay_after_restart_ignores_changed_server_config(
+    store: SQLiteStore,
+) -> None:
+    """Server configuration isn't client payload and must not conflict with a replayed command."""
+    session = store.create_session("/tmp/workspace", "restart-replay")
+    first_gate = RunMutationGate(store, EventPublisher())
+    restarted_gate = RunMutationGate(store, EventPublisher())
+
+    first = await first_gate.begin_run(
+        session.id,
+        "same task",
+        {"model": "before-restart", "nested": {"max_tokens": 100}},
+        "stable-command-id",
+    )
+    replay = await restarted_gate.begin_run(
+        session.id,
+        "same task",
+        {"model": "after-restart", "nested": {"max_tokens": 200}},
+        "stable-command-id",
+    )
+
+    assert replay.id == first.id
+    assert replay.config_snapshot == {
+        "model": "before-restart",
+        "nested": {"max_tokens": 100},
+    }
+    with store.connection() as connection:
+        assert connection.execute("SELECT count(*) FROM runs").fetchone()[0] == 1
+        assert connection.execute("SELECT count(*) FROM client_commands").fetchone()[0] == 1
+
+
+@pytest.mark.asyncio
 async def test_stop_command_replay_emits_one_cancellation_event(store: SQLiteStore) -> None:
     """Replaying Stop must not create a second durable cancellation or second token owner."""
     session = store.create_session("/tmp/workspace", "stop-replay")

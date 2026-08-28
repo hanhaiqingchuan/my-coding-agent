@@ -7,6 +7,7 @@ from coding_agent.runtime.publisher import (
     AssistantDelta,
     EventPublisher,
     EventSubscription,
+    SubscriptionOverflow,
     ToolOutputDelta,
 )
 
@@ -18,5 +19,6 @@ __all__ = [
     "EventSubscription",
     "RunCoordinator",
     "RunMutationGate",
+    "SubscriptionOverflow",
     "ToolOutputDelta",
 ]

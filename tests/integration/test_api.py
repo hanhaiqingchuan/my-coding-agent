@@ -1,15 +1,17 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from pathlib import Path
 
 from fastapi.testclient import TestClient
 
 from coding_agent.api.app import create_app
-from coding_agent.api.schemas import SessionSnapshotDto
+from coding_agent.api.schemas import DurableEventDto, SessionSnapshotDto
 from coding_agent.core.models import (
     ApprovalDecision,
     ApprovalStatus,
     AssistantTurn,
+    DurableEvent,
     ModelStopReason,
     PreparedToolCall,
     RunState,
@@ -63,9 +65,12 @@ def test_health_bootstrap_and_public_config_expose_only_browser_safe_values(tmp_
     client, _, _ = _make_client(tmp_path)
 
     assert client.get("/api/health").json() == {"status": "ok"}
-    bootstrap = client.get("/api/bootstrap").json()
+    bootstrap_response = client.get("/api/bootstrap")
+    bootstrap = bootstrap_response.json()
     assert bootstrap["csrf_token"]
     assert bootstrap["websocket_url"] == f"ws://127.0.0.1:{SERVER_PORT}/api/ws"
+    assert bootstrap_response.headers["cache-control"] == "no-store"
+    assert bootstrap_response.headers["pragma"] == "no-cache"
     assert client.get("/api/config/public").json() == {
         "model": "claude-test",
         "context_window": 64_000,
@@ -181,6 +186,20 @@ def test_session_creation_requires_same_origin_process_token_and_valid_directory
         ).status_code
         == 403
     )
+    assert (
+        client.post(
+            "/api/sessions",
+            json=body,
+            headers=_mutation_headers(token, origin=f"http://localhost:{SERVER_PORT}"),
+        ).status_code
+        == 403
+    )
+    reverse_alias_headers = _mutation_headers(
+        token,
+        origin=f"http://127.0.0.1:{SERVER_PORT}",
+    )
+    reverse_alias_headers["Host"] = f"localhost:{SERVER_PORT}"
+    assert client.post("/api/sessions", json=body, headers=reverse_alias_headers).status_code == 403
     invalid = client.post(
         "/api/sessions",
         json={"workspace": str(tmp_path / "missing"), "title": None},
@@ -194,11 +213,22 @@ def test_snapshot_includes_frozen_tools_and_the_current_pending_approval(tmp_pat
     """Omitting pending tools would make a refreshed approval prompt impossible to restore."""
     client, store, _ = _make_client(tmp_path)
     session = store.create_session(str(tmp_path.resolve()), "Approval")
-    run = store.begin_run(session.id, "change file", {}, "start", "start-hash")
+    run = store.begin_run(
+        session.id,
+        "change file",
+        {"model": {"routing": [{"tier": "nested"}]}},
+        "start",
+        "start-hash",
+    )
     call = ToolCall(
         "call-1",
         "write_file",
-        {"operation": "write", "path": "demo.txt", "content": "hello\n"},
+        {
+            "operation": "write",
+            "path": "demo.txt",
+            "content": "hello\n",
+            "options": {"labels": [{"name": "nested"}]},
+        },
     )
     turn = AssistantTurn(
         "assistant-1",
@@ -215,7 +245,7 @@ def test_snapshot_includes_frozen_tools_and_the_current_pending_approval(tmp_pat
             target=str((tmp_path / "demo.txt").resolve()),
             preview="--- /dev/null\n+++ demo.txt\n+hello",
             baseline_sha256=None,
-            metadata={"operation": "write"},
+            metadata={"operation": "write", "review": {"owners": ["local"]}},
         ),
     )
 
@@ -223,6 +253,7 @@ def test_snapshot_includes_frozen_tools_and_the_current_pending_approval(tmp_pat
 
     assert response.status_code == 200
     snapshot = response.json()
+    assert snapshot["active_run"]["config_snapshot"] == {"model": {"routing": [{"tier": "nested"}]}}
     assert snapshot["tools"] == [
         {
             "tool_call_id": "call-1",
@@ -234,6 +265,7 @@ def test_snapshot_includes_frozen_tools_and_the_current_pending_approval(tmp_pat
                 "operation": "write",
                 "path": "demo.txt",
                 "content": "hello\n",
+                "options": {"labels": [{"name": "nested"}]},
             },
             "requires_approval": True,
             "approval_status": "pending",
@@ -252,10 +284,11 @@ def test_snapshot_includes_frozen_tools_and_the_current_pending_approval(tmp_pat
             "operation": "write",
             "path": "demo.txt",
             "content": "hello\n",
+            "options": {"labels": [{"name": "nested"}]},
         },
         "target": str((tmp_path / "demo.txt").resolve()),
         "preview": "--- /dev/null\n+++ demo.txt\n+hello",
-        "metadata": {"operation": "write"},
+        "metadata": {"operation": "write", "review": {"owners": ["local"]}},
     }
     assert snapshot["interrupted_banner"] is None
 
@@ -269,6 +302,22 @@ def test_snapshot_json_schema_freezes_domain_enums_for_the_frontend() -> None:
     assert definitions["ApprovalStatus"]["enum"] == [item.value for item in ApprovalStatus]
     assert definitions["ApprovalDecision"]["enum"] == [item.value for item in ApprovalDecision]
     assert definitions["ToolExecutionState"]["enum"] == [item.value for item in ToolExecutionState]
+
+
+def test_durable_event_dto_recursively_thaws_nested_frozen_payload() -> None:
+    """A shallow event payload copy fails when WebSocket JSON serialization reaches nesting."""
+    event = DurableEvent(
+        1,
+        "session-a",
+        "run-a",
+        "nested.event",
+        {"details": {"items": [{"value": 7}]}},
+        datetime.now(UTC),
+    )
+
+    assert DurableEventDto.from_domain(event).model_dump(mode="json")["payload"] == {
+        "details": {"items": [{"value": 7}]}
+    }
 
 
 def test_host_must_be_loopback_at_the_actual_server_port(tmp_path: Path) -> None:

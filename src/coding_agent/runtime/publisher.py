@@ -45,8 +45,13 @@ class ToolOutputDelta:
             raise ValueError("tool output delta requires a tool call id")
 
 
+@dataclass(frozen=True, slots=True)
+class SubscriptionOverflow:
+    session_id: str
+
+
 TransientDelta: TypeAlias = AssistantDelta | ToolOutputDelta
-PublishedMessage: TypeAlias = DurableEvent | TransientDelta
+PublishedMessage: TypeAlias = DurableEvent | TransientDelta | SubscriptionOverflow
 
 
 @dataclass(eq=False, slots=True)
@@ -107,8 +112,7 @@ class EventPublisher:
                 try:
                     subscription._queue.put_nowait(event)
                 except asyncio.QueueFull:
-                    subscription._closed = True
-                    subscribers.discard(subscription)
+                    _signal_overflow(subscription, subscribers)
                 else:
                     subscription._last_seq = event.seq
 
@@ -120,8 +124,7 @@ class EventPublisher:
                 try:
                     subscription._queue.put_nowait(delta)
                 except asyncio.QueueFull:
-                    subscription._closed = True
-                    subscribers.discard(subscription)
+                    _signal_overflow(subscription, subscribers)
 
     async def unsubscribe(self, subscription: EventSubscription) -> None:
         async with self.session_guard(subscription.session_id):
@@ -133,11 +136,26 @@ class EventPublisher:
             subscription._closed = True
 
 
+def _signal_overflow(
+    subscription: EventSubscription,
+    subscribers: set[EventSubscription],
+) -> None:
+    subscription._closed = True
+    subscribers.discard(subscription)
+    while True:
+        try:
+            subscription._queue.get_nowait()
+        except asyncio.QueueEmpty:
+            break
+    subscription._queue.put_nowait(SubscriptionOverflow(subscription.session_id))
+
+
 __all__ = [
     "AssistantDelta",
     "EventPublisher",
     "EventSubscription",
     "PublishedMessage",
+    "SubscriptionOverflow",
     "ToolOutputDelta",
     "TransientDelta",
 ]

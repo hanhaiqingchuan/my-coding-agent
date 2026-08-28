@@ -1,16 +1,27 @@
 from __future__ import annotations
 
+import socket
 import threading
+import time
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
+import httpx
 import pytest
+import uvicorn
+import websockets
 from fastapi.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
+from websockets.exceptions import ConnectionClosed
 
 from coding_agent.api.app import create_app
-from coding_agent.api.websocket import WS_CLOSE_AUTH_EXPIRED, WS_CLOSE_FORBIDDEN
+from coding_agent.api.websocket import (
+    WS_CLOSE_AUTH_EXPIRED,
+    WS_CLOSE_FORBIDDEN,
+    WS_CLOSE_SUBSCRIBER_OVERFLOW,
+)
 from coding_agent.core.cancellation import CancellationToken
 from coding_agent.core.events import RunOutcome
 from coding_agent.core.models import (
@@ -56,11 +67,17 @@ class _Runtime:
     runner: _ImmediateRunner
 
 
-def _runtime(tmp_path: Path, *, store: SQLiteStore | None = None) -> _Runtime:
+def _runtime(
+    tmp_path: Path,
+    *,
+    store: SQLiteStore | None = None,
+    server_port: int = SERVER_PORT,
+    publisher_queue_size: int = 256,
+) -> _Runtime:
     actual_store = store or SQLiteStore(tmp_path / "state.db")
     if store is None:
         actual_store.initialize()
-    publisher = EventPublisher()
+    publisher = EventPublisher(queue_size=publisher_queue_size)
     runner = _ImmediateRunner()
     coordinator = RunCoordinator(
         store=actual_store,
@@ -72,9 +89,45 @@ def _runtime(tmp_path: Path, *, store: SQLiteStore | None = None) -> _Runtime:
         actual_store,
         coordinator,
         {"model": "test"},
-        server_port=SERVER_PORT,
+        server_port=server_port,
     )
     return _Runtime(app, actual_store, publisher, runner)
+
+
+@contextmanager
+def _run_real_asgi_server(app):
+    listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    listener.bind(("127.0.0.1", 0))
+    listener.listen()
+    port = listener.getsockname()[1]
+    app.state.api_dependencies.server_port = port
+    server = uvicorn.Server(
+        uvicorn.Config(app, log_level="error", access_log=False, lifespan="off")
+    )
+    thread = threading.Thread(
+        target=server.run,
+        kwargs={"sockets": [listener]},
+        name="task13-real-asgi",
+        daemon=True,
+    )
+    thread.start()
+    deadline = time.monotonic() + 3
+    while not server.started and thread.is_alive() and time.monotonic() < deadline:
+        time.sleep(0.01)
+    if not server.started:
+        server.should_exit = True
+        thread.join(timeout=1)
+        listener.close()
+        raise RuntimeError("real ASGI test server did not start")
+    try:
+        yield port
+    finally:
+        server.should_exit = True
+        thread.join(timeout=3)
+        listener.close()
+        if thread.is_alive():
+            raise RuntimeError("real ASGI test server did not stop")
 
 
 def _token(client: TestClient) -> str:
@@ -462,20 +515,22 @@ def test_websocket_rejects_bad_host_origin_and_expired_process_token(tmp_path: P
             with client.websocket_connect(
                 "/api/ws",
                 headers={"Origin": ORIGIN, "Host": f"127.0.0.1:{SERVER_PORT}"},
-            ):
-                pass
+            ) as websocket:
+                websocket.receive_json()
         with pytest.raises(WebSocketDisconnect) as malicious_origin:
-            with _connect(client, token, headers={"Origin": "https://attacker.invalid"}):
-                pass
+            with _connect(
+                client, token, headers={"Origin": "https://attacker.invalid"}
+            ) as websocket:
+                websocket.receive_json()
         with pytest.raises(WebSocketDisconnect) as wrong_host:
-            with _connect(client, token, headers={"Host": "127.0.0.1:8124"}):
-                pass
+            with _connect(client, token, headers={"Host": "127.0.0.1:8124"}) as websocket:
+                websocket.receive_json()
 
     restarted = _runtime(tmp_path, store=runtime.store)
     with TestClient(restarted.app, base_url=BASE_URL) as client:
         with pytest.raises(WebSocketDisconnect) as expired:
-            with _connect(client, token):
-                pass
+            with _connect(client, token) as websocket:
+                websocket.receive_json()
         fresh = _token(client)
         with _connect(client, fresh) as websocket:
             websocket.send_json(
@@ -492,6 +547,88 @@ def test_websocket_rejects_bad_host_origin_and_expired_process_token(tmp_path: P
     assert expired.value.code == WS_CLOSE_AUTH_EXPIRED
     assert malicious_origin.value.code == WS_CLOSE_FORBIDDEN
     assert wrong_host.value.code == WS_CLOSE_FORBIDDEN
+
+
+@pytest.mark.asyncio
+async def test_real_asgi_server_exposes_dedicated_auth_host_and_origin_close_codes(
+    tmp_path: Path,
+) -> None:
+    """Pre-accept ASGI rejection becomes HTTP 403 and hides the required browser close code."""
+    runtime = _runtime(tmp_path)
+    with _run_real_asgi_server(runtime.app) as port:
+        http_url = f"http://127.0.0.1:{port}"
+        websocket_url = f"ws://127.0.0.1:{port}/api/ws"
+        async with httpx.AsyncClient(trust_env=False) as client:
+            response = await client.get(f"{http_url}/api/bootstrap")
+        assert response.status_code == 200
+        token = response.json()["csrf_token"]
+
+        async def observed_close_code(
+            uri: str,
+            *,
+            origin: str,
+            protocols: list[str],
+            **connection_overrides,
+        ) -> int | None:
+            async with websockets.connect(
+                uri,
+                origin=origin,
+                subprotocols=protocols,
+                proxy=None,
+                **connection_overrides,
+            ) as websocket:
+                with pytest.raises(ConnectionClosed) as closed:
+                    await websocket.recv()
+                assert closed.value.rcvd is not None
+                return closed.value.rcvd.code
+
+        expired_code = await observed_close_code(
+            websocket_url,
+            origin=http_url,
+            protocols=["coding-agent", "expired-token"],
+        )
+        origin_code = await observed_close_code(
+            websocket_url,
+            origin="https://attacker.invalid",
+            protocols=["coding-agent", token],
+        )
+        host_code = await observed_close_code(
+            f"ws://attacker.invalid:{port}/api/ws",
+            origin=http_url,
+            protocols=["coding-agent", token],
+            host="127.0.0.1",
+            port=port,
+        )
+        with pytest.raises(ConnectionClosed) as cross_alias:
+            async with websockets.connect(
+                websocket_url,
+                origin=f"http://localhost:{port}",
+                subprotocols=["coding-agent", token],
+                proxy=None,
+            ) as websocket:
+                await websocket.send("{}")
+                response = await websocket.recv()
+                pytest.fail(f"cross-host Origin remained connected: {response}")
+        with pytest.raises(ConnectionClosed) as reverse_cross_alias:
+            async with websockets.connect(
+                f"ws://localhost:{port}/api/ws",
+                origin=http_url,
+                subprotocols=["coding-agent", token],
+                proxy=None,
+                host="127.0.0.1",
+                port=port,
+            ) as websocket:
+                await websocket.send("{}")
+                response = await websocket.recv()
+                pytest.fail(f"reverse cross-host Origin remained connected: {response}")
+
+    assert expired_code == WS_CLOSE_AUTH_EXPIRED
+    assert origin_code == WS_CLOSE_FORBIDDEN
+    assert host_code == WS_CLOSE_FORBIDDEN
+    assert cross_alias.value.rcvd is not None
+    assert cross_alias.value.rcvd.code == WS_CLOSE_FORBIDDEN
+    assert reverse_cross_alias.value.rcvd is not None
+    assert reverse_cross_alias.value.rcvd.code == WS_CLOSE_FORBIDDEN
 
 
 def test_development_origin_is_normalized_and_must_remain_loopback(tmp_path: Path) -> None:
@@ -562,6 +699,35 @@ def test_delta_envelopes_always_identify_run_and_draft_epoch(tmp_path: Path) -> 
         "tool_call_id": "call-1",
         "text": "line\n",
     }
+
+
+def test_high_frequency_delta_overflow_closes_socket_for_snapshot_recovery(tmp_path: Path) -> None:
+    """Silently dropping a full subscription would leave a connected client missing events."""
+    runtime = _runtime(tmp_path, publisher_queue_size=1)
+    session = runtime.store.create_session(str(tmp_path), "overflow")
+
+    with TestClient(runtime.app, base_url=BASE_URL) as client:
+        with _connect(client, _token(client)) as websocket:
+            _subscribe(websocket, session.id)
+
+            async def publish_burst() -> None:
+                for index in range(3):
+                    await runtime.publisher.publish_transient(
+                        AssistantDelta(
+                            session.id,
+                            "run-overflow",
+                            "epoch-overflow",
+                            index,
+                            f"chunk-{index}",
+                        )
+                    )
+
+            assert client.portal is not None
+            client.portal.call(publish_burst)
+            with pytest.raises(WebSocketDisconnect) as closed:
+                websocket.receive_json()
+
+    assert closed.value.code == WS_CLOSE_SUBSCRIBER_OVERFLOW
 
 
 def test_disconnect_unsubscribes_without_cancelling_the_active_run(tmp_path: Path) -> None:

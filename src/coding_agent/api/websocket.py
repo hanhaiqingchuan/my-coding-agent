@@ -35,11 +35,13 @@ from coding_agent.core.models import DurableEvent
 from coding_agent.runtime.publisher import (
     AssistantDelta,
     EventSubscription,
+    SubscriptionOverflow,
     ToolOutputDelta,
 )
 
 WS_CLOSE_AUTH_EXPIRED = 4401
 WS_CLOSE_FORBIDDEN = 4403
+WS_CLOSE_SUBSCRIBER_OVERFLOW = 4408
 WS_SUBPROTOCOL = "coding-agent"
 
 router = APIRouter()
@@ -50,10 +52,14 @@ _COMMAND_ADAPTER = TypeAdapter(ClientCommand)
 async def websocket_endpoint(websocket: WebSocket) -> None:
     dependencies: ApiDependencies = websocket.app.state.api_dependencies
     if websocket.headers.get("host") not in dependencies.allowed_hosts:
-        await websocket.close(code=WS_CLOSE_FORBIDDEN, reason="Host is not allowed")
+        await _accept_then_close(websocket, WS_CLOSE_FORBIDDEN, "Host is not allowed")
         return
-    if websocket.headers.get("origin") not in dependencies.allowed_origins:
-        await websocket.close(code=WS_CLOSE_FORBIDDEN, reason="Origin is not allowed")
+    if not dependencies.origin_allowed(
+        websocket.headers.get("origin"),
+        host=websocket.headers.get("host"),
+        scheme=websocket.scope.get("scheme", "ws"),
+    ):
+        await _accept_then_close(websocket, WS_CLOSE_FORBIDDEN, "Origin is not allowed")
         return
     protocols = websocket.scope.get("subprotocols", [])
     if (
@@ -62,7 +68,7 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
         or protocols[0] != WS_SUBPROTOCOL
         or not dependencies.token_matches(protocols[1])
     ):
-        await websocket.close(code=WS_CLOSE_AUTH_EXPIRED, reason="Process token is invalid")
+        await _accept_then_close(websocket, WS_CLOSE_AUTH_EXPIRED, "Process token is invalid")
         return
 
     await websocket.accept(subprotocol=WS_SUBPROTOCOL)
@@ -90,6 +96,13 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
         pass
     finally:
         await connection.close()
+
+
+async def _accept_then_close(websocket: WebSocket, code: int, reason: str) -> None:
+    protocols = websocket.scope.get("subprotocols", [])
+    selected = WS_SUBPROTOCOL if WS_SUBPROTOCOL in protocols else None
+    await websocket.accept(subprotocol=selected)
+    await websocket.close(code=code, reason=reason)
 
 
 class _SessionConnection:
@@ -213,8 +226,15 @@ class _SessionConnection:
 
     async def _forward(self, subscription: EventSubscription) -> None:
         try:
-            while not subscription.closed:
+            while True:
                 message = await subscription.receive()
+                if isinstance(message, SubscriptionOverflow):
+                    async with self._send_lock:
+                        await self._websocket.close(
+                            code=WS_CLOSE_SUBSCRIBER_OVERFLOW,
+                            reason="subscriber queue overflow; reconnect for a fresh snapshot",
+                        )
+                    return
                 if isinstance(message, DurableEvent):
                     envelope: StrictDto = DurableEnvelope(
                         event=DurableEventDto.from_domain(message)
@@ -278,6 +298,7 @@ def _command_identity(raw: Any) -> tuple[str | None, str | None]:
 __all__ = [
     "WS_CLOSE_AUTH_EXPIRED",
     "WS_CLOSE_FORBIDDEN",
+    "WS_CLOSE_SUBSCRIBER_OVERFLOW",
     "WS_SUBPROTOCOL",
     "router",
 ]

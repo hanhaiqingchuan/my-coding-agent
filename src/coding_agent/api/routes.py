@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 
 from coding_agent.api.dependencies import (
     ApiDependencies,
@@ -35,8 +35,11 @@ def health() -> HealthDto:
 @router.get("/bootstrap", response_model=BootstrapDto)
 def bootstrap(
     request: Request,
+    response: Response,
     dependencies: ApiDependencies = Depends(get_api_dependencies),
 ) -> BootstrapDto:
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Pragma"] = "no-cache"
     scheme = "wss" if request.url.scheme == "https" else "ws"
     return BootstrapDto(
         csrf_token=dependencies.process_token,

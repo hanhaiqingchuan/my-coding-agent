@@ -87,7 +87,7 @@ class RunMutationGate:
         async with self._lock:
             previous_seq = _latest_seq(self._store, session_id)
             payload = json.dumps(
-                {"content": content, "config": config_snapshot},
+                {"content": content},
                 sort_keys=True,
                 separators=(",", ":"),
                 ensure_ascii=False,
