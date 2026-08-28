@@ -1,3 +1,5 @@
+import { Fragment } from "react";
+
 import type {
   InterruptedBannerDto,
   MessageDto,
@@ -23,6 +25,18 @@ export function ConversationTimeline({
   interruptedBanner = null,
   onAcknowledgeRecovery,
 }: ConversationTimelineProps) {
+  // The backend already returns the authoritative order (run start, assistant message,
+  // call order). `call_order` only indexes the calls inside one assistant message and
+  // restarts at 0 every round, so re-sorting by it would invent an execution order.
+  const { grouped, uncommitted } = groupToolsByMessage(messages, tools);
+  const toolCard = (tool: ToolExecutionDto) => (
+    <ToolCard
+      key={tool.tool_call_id}
+      tool={tool}
+      outputDraft={toolOutputDrafts[tool.tool_call_id]}
+    />
+  );
+
   return (
     <section
       className="conversation-timeline"
@@ -36,7 +50,10 @@ export function ConversationTimeline({
       ) : null}
       <div className="timeline-scroll">
         {messages.map((message) => (
-          <MessageBubble key={message.id} message={message} />
+          <Fragment key={message.id}>
+            <MessageBubble message={message} />
+            {(grouped.get(message.id) ?? []).map(toolCard)}
+          </Fragment>
         ))}
         {Object.entries(assistantDrafts).map(([epoch, text]) => (
           <MessageBubble
@@ -55,18 +72,38 @@ export function ConversationTimeline({
             transient
           />
         ))}
-        {[...tools]
-          .sort((left, right) => left.call_order - right.call_order)
-          .map((tool) => (
-            <ToolCard
-              key={tool.tool_call_id}
-              tool={tool}
-              outputDraft={toolOutputDrafts[tool.tool_call_id]}
-            />
-          ))}
+        {/* Tool calls of an assistant message that is still pending_tools: the snapshot
+            only carries committed and interrupted messages, so these belong after the
+            streaming draft that requested them. */}
+        {uncommitted.map(toolCard)}
       </div>
     </section>
   );
+}
+
+function groupToolsByMessage(
+  messages: MessageDto[],
+  tools: ToolExecutionDto[],
+): {
+  grouped: Map<string, ToolExecutionDto[]>;
+  uncommitted: ToolExecutionDto[];
+} {
+  const messageIds = new Set(messages.map((message) => message.id));
+  const grouped = new Map<string, ToolExecutionDto[]>();
+  const uncommitted: ToolExecutionDto[] = [];
+  for (const tool of tools) {
+    if (!messageIds.has(tool.assistant_message_id)) {
+      uncommitted.push(tool);
+      continue;
+    }
+    const group = grouped.get(tool.assistant_message_id);
+    if (group === undefined) {
+      grouped.set(tool.assistant_message_id, [tool]);
+    } else {
+      group.push(tool);
+    }
+  }
+  return { grouped, uncommitted };
 }
 
 function InterruptedBanner({

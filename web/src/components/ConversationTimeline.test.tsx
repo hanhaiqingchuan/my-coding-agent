@@ -45,6 +45,117 @@ function tool(state: ToolExecutionState): ToolExecutionDto {
   };
 }
 
+function commandTool(
+  toolCallId: string,
+  assistantMessageId: string,
+  callOrder: number,
+  marker: string,
+): ToolExecutionDto {
+  return {
+    ...tool("succeeded"),
+    tool_call_id: toolCallId,
+    assistant_message_id: assistantMessageId,
+    call_order: callOrder,
+    input: {
+      command: `echo ${marker}`,
+      cwd: "/workspace",
+      reason: "Check directory",
+      timeout_seconds: 1,
+    },
+  };
+}
+
+function assistantMessageWith(id: string, marker: string): MessageDto {
+  return {
+    ...assistantMessage,
+    id,
+    seq: Number(id.split("-")[1] ?? 0),
+    parts: [{ type: "text", text: marker }],
+  };
+}
+
+/** Marker token of every rendered timeline entry, in DOM order. */
+function timelineMarkers(): string[] {
+  return screen
+    .getAllByRole("article")
+    .map(
+      (entry) => /(round-\d+-[a-z]+)/.exec(entry.textContent ?? "")?.[1] ?? "",
+    )
+    .filter((marker) => marker.length > 0);
+}
+
+test("renders tool cards in the server order even when call_order restarts each round", () => {
+  // call_order is the index inside one assistant message, so a later round starts at 0
+  // again; only the backend's array order describes the real execution sequence.
+  render(
+    <ConversationTimeline
+      messages={[]}
+      tools={[
+        commandTool("call-a", "message-1", 0, "round-1-first"),
+        commandTool("call-b", "message-1", 1, "round-1-second"),
+        commandTool("call-c", "message-2", 0, "round-2-first"),
+        commandTool("call-d", "message-3", 0, "round-3-first"),
+      ]}
+      assistantDrafts={{}}
+      toolOutputDrafts={{}}
+    />,
+  );
+
+  expect(timelineMarkers()).toEqual([
+    "round-1-first",
+    "round-1-second",
+    "round-2-first",
+    "round-3-first",
+  ]);
+});
+
+test("interleaves every tool card with the assistant message that requested it", () => {
+  render(
+    <ConversationTimeline
+      messages={[
+        assistantMessageWith("message-1", "round-1-answer"),
+        assistantMessageWith("message-2", "round-2-answer"),
+      ]}
+      tools={[
+        commandTool("call-a", "message-1", 0, "round-1-first"),
+        commandTool("call-b", "message-1", 1, "round-1-second"),
+        commandTool("call-c", "message-2", 0, "round-2-first"),
+      ]}
+      assistantDrafts={{}}
+      toolOutputDrafts={{}}
+    />,
+  );
+
+  expect(timelineMarkers()).toEqual([
+    "round-1-answer",
+    "round-1-first",
+    "round-1-second",
+    "round-2-answer",
+    "round-2-first",
+  ]);
+});
+
+test("keeps the streaming draft ahead of the tools its uncommitted message requested", () => {
+  render(
+    <ConversationTimeline
+      messages={[assistantMessageWith("message-1", "round-1-answer")]}
+      tools={[
+        commandTool("call-a", "message-1", 0, "round-1-first"),
+        commandTool("call-b", "message-2", 0, "round-2-first"),
+      ]}
+      assistantDrafts={{ "attempt-2": "round-2-draft" }}
+      toolOutputDrafts={{}}
+    />,
+  );
+
+  expect(timelineMarkers()).toEqual([
+    "round-1-answer",
+    "round-1-first",
+    "round-2-draft",
+    "round-2-first",
+  ]);
+});
+
 test("renders committed messages separately from transient assistant drafts", () => {
   render(
     <ConversationTimeline
