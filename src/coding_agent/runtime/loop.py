@@ -50,7 +50,7 @@ from coding_agent.runtime.coordinator import RunMutationGate
 from coding_agent.runtime.metrics import model_config_hash
 from coding_agent.runtime.publisher import AssistantDelta, EventPublisher, ToolOutputDelta
 from coding_agent.storage.sqlite import SQLiteStore
-from coding_agent.tools import ToolContext
+from coding_agent.tools import ToolContext, error_result
 from coding_agent.tools.paths import WorkspaceBoundary
 from coding_agent.tools.registry import ToolRegistry
 
@@ -279,6 +279,21 @@ class AgentLoop:
                 argument_error = False
                 for call in group.calls:
                     cancellation.raise_if_cancelled()
+                    unusable = turn.invalid_tool_arguments.get(call.call.id)
+                    if unusable is not None:
+                        # Spec 8.3: the identity is valid, so the model gets a tool error to
+                        # correct rather than a dead run, and the call is never prepared.
+                        argument_error = True
+                        rejected = error_result(
+                            call.call.id, call.call.name, unusable.code, unusable.message
+                        )
+                        await self._mutate(
+                            session_id,
+                            lambda result=rejected: self._store.settle_tool_group(
+                                group.id, (result,)
+                            ),
+                        )
+                        continue
                     prepared = self._tools.prepare(call.call, workspace)
                     if isinstance(prepared, ToolResult):
                         if prepared.error is not None and prepared.error.code.startswith("INVALID"):

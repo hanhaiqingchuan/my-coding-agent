@@ -216,7 +216,6 @@ def test_duplicate_tool_use_id_is_rejected() -> None:
         ("missing_block_stop", "UNCLOSED_CONTENT_BLOCK"),
         ("missing_message_delta", "MISSING_MESSAGE_DELTA"),
         ("missing_message_stop", "MISSING_MESSAGE_STOP"),
-        ("invalid_json", "INVALID_TOOL_INPUT_JSON"),
     ],
 )
 def test_incomplete_streams_never_form_assistant_turns(mutation: str, code: str) -> None:
@@ -226,12 +225,8 @@ def test_incomplete_streams_never_form_assistant_turns(mutation: str, code: str)
         events = [event for index, event in enumerate(events) if index != 10]
     elif mutation == "missing_message_delta":
         events = [event for event in events if event["type"] != "message_delta"]
-    elif mutation == "missing_message_stop":
-        events = [event for event in events if event["type"] != "message_stop"]
     else:
-        delta = events[9]
-        assert isinstance(delta["delta"], dict)
-        delta["delta"]["partial_json"] = '{"command":'
+        events = [event for event in events if event["type"] != "message_stop"]
 
     assembler = MessageStreamAssembler()
     try:
@@ -243,6 +238,32 @@ def test_incomplete_streams_never_form_assistant_turns(mutation: str, code: str)
     with pytest.raises(ModelProtocolError) as raised:
         assembler.finish()
     assert raised.value.code == code
+
+
+@pytest.mark.parametrize(
+    ("partial_json", "code"),
+    [
+        ('{"command":', "INVALID_TOOL_INPUT_JSON"),
+        ("[1, 2]", "TOOL_INPUT_NOT_OBJECT"),
+    ],
+)
+def test_complete_but_unusable_tool_input_stays_correctable(partial_json: str, code: str) -> None:
+    """Spec 8.3 answers a valid call identity with a tool error the model can fix itself."""
+    events = list(two_tool_use_event_stream())
+    delta = events[9]
+    assert isinstance(delta["delta"], dict)
+    delta["delta"]["partial_json"] = partial_json
+    assembler = MessageStreamAssembler()
+    feed_all(assembler, events)
+
+    turn = assembler.finish()
+
+    assert [call.id for call in turn.tool_calls] == ["tool-1", "tool-2"]
+    assert dict(turn.tool_calls[0].input) == {"path": "a.py"}
+    assert dict(turn.tool_calls[1].input) == {}
+    assert set(turn.invalid_tool_arguments) == {"tool-2"}
+    assert turn.invalid_tool_arguments["tool-2"].code == code
+    assert turn.invalid_tool_arguments["tool-2"].message
 
 
 def test_max_tokens_with_tool_use_is_never_returned_as_executable() -> None:

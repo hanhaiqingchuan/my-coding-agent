@@ -29,12 +29,13 @@ from coding_agent.core.models import (
     StopReason,
     TextPart,
     ToolCall,
+    ToolError,
     ToolResult,
     ToolUsePart,
     Usage,
 )
 from coding_agent.model import ModelMessage, anthropic_messages
-from coding_agent.model.anthropic_messages import AnthropicMessagesModel
+from coding_agent.model.anthropic_messages import AnthropicMessagesModel, _compile_messages
 from coding_agent.model.protocol import (
     ModelAPIError,
     ModelProtocolError,
@@ -828,6 +829,123 @@ async def test_tool_arguments_can_recover_on_the_second_correction(
     assert outcome == RunOutcome.complete()
     assert model.call_count == 4
     assert tools.executed == ["valid-call"]
+
+
+@pytest.mark.asyncio
+async def test_unusable_tool_arguments_become_a_correctable_tool_error(
+    tmp_path: Path, valid_settings: AppSettings
+) -> None:
+    """Failing the run on complete but unusable arguments would deny the model its own fix."""
+    unusable = AssistantTurn(
+        "unusable-turn",
+        (
+            TextPart("running the suite"),
+            ToolUsePart(ToolCall("call-read", "read_file", {"path": "seed.txt"})),
+            ToolUsePart(ToolCall("call-unusable", "run_command", {})),
+        ),
+        ModelStopReason.TOOL_USE,
+        Usage(20, 5),
+        invalid_tool_arguments={
+            "call-unusable": ToolError(
+                "INVALID_TOOL_INPUT_JSON", "tool input is not valid JSON: Expecting value"
+            )
+        },
+    )
+    script = [
+        unusable,
+        _turn(
+            "corrected-turn",
+            ModelStopReason.TOOL_USE,
+            ToolUsePart(ToolCall("call-corrected", "run_command", {"command": "pytest"})),
+        ),
+        _final_turn("verified"),
+    ]
+    loop, store, session_id, run_id, model, tools, _ = _make_loop(tmp_path, valid_settings, script)
+
+    outcome = await loop.run(run_id, session_id, CancellationToken())
+
+    assert outcome == RunOutcome.complete()
+    assert model.call_count == 3
+    assert tools.executed == ["call-read", "call-corrected"]
+    approvals = [
+        event.payload["tool_call_id"]
+        for event in store.events_after(session_id, 0)
+        if event.type == "approval.requested"
+    ]
+    assert approvals == ["call-corrected"]
+    returned = [
+        part
+        for message in model.requests[1].messages
+        for part in message.parts
+        if isinstance(part, ToolResult)
+    ]
+    assert [(part.tool_call_id, part.ok) for part in returned] == [
+        ("call-read", True),
+        ("call-unusable", False),
+    ]
+    assert returned[1].error is not None
+    assert returned[1].error.code == "INVALID_TOOL_INPUT_JSON"
+    wire = _compile_messages(model.requests[1])
+    assert wire[-1] == {
+        "role": "user",
+        "content": [
+            {
+                "type": "tool_result",
+                "tool_use_id": "call-read",
+                "content": returned[0].content,
+            },
+            {
+                "type": "tool_result",
+                "tool_use_id": "call-unusable",
+                "content": returned[1].content,
+                "is_error": True,
+            },
+        ],
+    }
+    with store.connection() as connection:
+        status = connection.execute(
+            "SELECT status FROM messages WHERE id = 'unusable-turn'"
+        ).fetchone()[0]
+    assert status == MessageStatus.COMMITTED.value
+
+
+@pytest.mark.asyncio
+async def test_repeated_unusable_tool_arguments_end_the_run_terminally(
+    tmp_path: Path, valid_settings: AppSettings
+) -> None:
+    """Answering every unusable input with a tool error forever would never end the run."""
+    script = [
+        AssistantTurn(
+            f"unusable-turn-{index}",
+            (ToolUsePart(ToolCall(f"call-unusable-{index}", name, {})),),
+            ModelStopReason.TOOL_USE,
+            Usage(20, 5),
+            invalid_tool_arguments={
+                f"call-unusable-{index}": ToolError(
+                    "TOOL_INPUT_NOT_OBJECT", "tool input must be a JSON object"
+                )
+            },
+        )
+        for index, name in enumerate(("read_file", "run_command", "write_file"), start=1)
+    ]
+    loop, store, session_id, run_id, model, tools, _ = _make_loop(tmp_path, valid_settings, script)
+
+    outcome = await loop.run(run_id, session_id, CancellationToken())
+
+    assert outcome == RunOutcome.stop(StopReason.DOOM_LOOP)
+    assert model.call_count == 3
+    assert tools.execution_count == 0
+    run = store.get_run(run_id)
+    assert run.state is RunState.STOPPED
+    assert run.stop_reason is StopReason.DOOM_LOOP
+    assert "approval.requested" not in [event.type for event in store.events_after(session_id, 0)]
+    errors = [
+        part.error.code
+        for message in store.load_committed_transcript(session_id)
+        for part in message.parts
+        if isinstance(part, ToolResult) and part.error is not None
+    ]
+    assert errors == ["TOOL_INPUT_NOT_OBJECT"] * 3
 
 
 @pytest.mark.asyncio

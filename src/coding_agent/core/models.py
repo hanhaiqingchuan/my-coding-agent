@@ -216,6 +216,13 @@ class AssistantTurn:
     parts: tuple[AssistantPart, ...]
     stop_reason: ModelStopReason
     usage: Usage
+    invalid_tool_arguments: Mapping[str, ToolError] = field(default_factory=dict)
+    """Calls whose arguments arrived complete but unusable, keyed by tool call id.
+
+    Spec 8.3 keeps such a call correctable: the identity is valid, so the loop commits a
+    tool error result for it and lets the model fix its own arguments. A flagged call
+    carries no usable input and must never be prepared or executed.
+    """
 
     def __post_init__(self) -> None:
         if not self.id:
@@ -224,7 +231,13 @@ class AssistantTurn:
         call_ids = [part.call.id for part in parts if isinstance(part, ToolUsePart)]
         if len(call_ids) != len(set(call_ids)):
             raise ValueError("tool call ids must be unique within an assistant turn")
+        invalid_tool_arguments = dict(self.invalid_tool_arguments)
+        if not set(invalid_tool_arguments).issubset(call_ids):
+            raise ValueError("invalid tool arguments must reference a tool call in this turn")
+        if not all(isinstance(error, ToolError) for error in invalid_tool_arguments.values()):
+            raise ValueError("invalid tool arguments must carry a stable ToolError")
         object.__setattr__(self, "parts", parts)
+        object.__setattr__(self, "invalid_tool_arguments", MappingProxyType(invalid_tool_arguments))
 
     @property
     def tool_calls(self) -> tuple[ToolCall, ...]:

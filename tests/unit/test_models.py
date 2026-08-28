@@ -75,6 +75,27 @@ def test_assistant_turn_rejects_duplicate_tool_call_ids() -> None:
 
 
 @pytest.mark.parametrize(
+    ("invalid_tool_arguments", "match"),
+    [
+        ({"call-2": ToolError("INVALID_TOOL_INPUT_JSON", "unusable")}, "reference a tool call"),
+        ({"call-1": "unusable"}, "stable ToolError"),
+    ],
+)
+def test_assistant_turn_rejects_unpairable_invalid_tool_arguments(
+    invalid_tool_arguments: object, match: str
+) -> None:
+    """A flagged error without a matching call would be committed as an unpairable tool result."""
+    with pytest.raises(ValueError, match=match):
+        AssistantTurn(
+            id="assistant-1",
+            parts=(ToolUsePart(ToolCall(id="call-1", name="read_file", input={})),),
+            stop_reason=ModelStopReason.TOOL_USE,
+            usage=Usage(),
+            invalid_tool_arguments=invalid_tool_arguments,  # type: ignore[arg-type]
+        )
+
+
+@pytest.mark.parametrize(
     "input_value",
     [
         {"payload": bytearray(b"mutable")},

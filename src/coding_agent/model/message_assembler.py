@@ -12,6 +12,7 @@ from coding_agent.core.models import (
     ModelStopReason,
     TextPart,
     ToolCall,
+    ToolError,
     ToolUsePart,
     Usage,
 )
@@ -183,7 +184,14 @@ class MessageStreamAssembler:
                 "max_tokens ended a response containing tool use",
                 usage=self._usage,
             )
-        parts = tuple(self._build_part(block) for block in self._blocks)
+        parts: list[AssistantPart] = []
+        invalid_tool_arguments: dict[str, ToolError] = {}
+        for block in self._blocks:
+            part, argument_error = self._build_part(block)
+            parts.append(part)
+            if argument_error is not None:
+                assert isinstance(part, ToolUsePart)
+                invalid_tool_arguments[part.call.id] = argument_error
         if self._stop_reason is ModelStopReason.TOOL_USE and not has_tool_use:
             raise ModelProtocolError(
                 "TOOL_USE_WITHOUT_BLOCK", "tool_use stop reason has no tool_use block"
@@ -195,9 +203,10 @@ class MessageStreamAssembler:
             self._diagnostics.append("TOOL_USE_STOP_REASON_MISMATCH")
         self._finished_turn = AssistantTurn(
             id=self._message_id,
-            parts=parts,
+            parts=tuple(parts),
             stop_reason=self._stop_reason,
             usage=self._usage,
+            invalid_tool_arguments=invalid_tool_arguments,
         )
         return self._finished_turn
 
@@ -372,22 +381,36 @@ class MessageStreamAssembler:
                 "TOOL_USE_NAME_CONFLICT", "tool_use name changed after block start"
             )
 
-    def _build_part(self, block: _ContentBlock) -> AssistantPart:
+    def _build_part(self, block: _ContentBlock) -> tuple[AssistantPart, ToolError | None]:
+        """Assemble one block, reporting unusable tool arguments instead of failing the turn.
+
+        Spec 8.3 splits three cases apart: a valid input enters the tool phase, a complete
+        but unusable input becomes a tool error the model can correct, and a truncated
+        response never reaches this method because ``finish`` already refused it. A call is
+        only correctable while its identity is intact, so a missing id or name stays a
+        protocol error and the flagged call keeps an empty input that nothing may execute.
+        """
         if block.type == "text":
-            return TextPart("".join(block.fragments))
+            return TextPart("".join(block.fragments)), None
+        if not block.id or not block.name:  # pragma: no cover - guarded at block start
+            raise ModelProtocolError(
+                "MISSING_TOOL_USE_ID", "tool_use block requires an id and a name"
+            )
         raw_input = "".join(block.fragments)
+        argument_error: ToolError | None = None
+        parsed: object = block.initial_input
         if raw_input:
             try:
                 parsed = json.loads(raw_input)
             except json.JSONDecodeError as error:
-                raise ModelProtocolError(
-                    "INVALID_TOOL_INPUT_JSON", f"tool input is incomplete or invalid: {error.msg}"
-                ) from error
-        else:
-            parsed = block.initial_input
+                argument_error = ToolError(
+                    "INVALID_TOOL_INPUT_JSON", f"tool input is not valid JSON: {error.msg}"
+                )
+                parsed = {}
         if not isinstance(parsed, Mapping):
-            raise ModelProtocolError("TOOL_INPUT_NOT_OBJECT", "tool input must be a JSON object")
-        return ToolUsePart(ToolCall(id=block.id or "", name=block.name or "", input=parsed))
+            argument_error = ToolError("TOOL_INPUT_NOT_OBJECT", "tool input must be a JSON object")
+            parsed = {}
+        return ToolUsePart(ToolCall(id=block.id, name=block.name, input=parsed)), argument_error
 
 
 def _mapping(value: object) -> Mapping[str, object]:
