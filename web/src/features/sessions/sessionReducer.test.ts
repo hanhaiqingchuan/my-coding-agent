@@ -419,6 +419,7 @@ test("an expired authentication token is bootstrapped at most once before resubs
 });
 
 test("each non-user socket close bootstraps again and resubscribes", async () => {
+  vi.useFakeTimers();
   const sockets: BrowserSocket[] = [];
   let bootstraps = 0;
   const connections: string[] = [];
@@ -447,7 +448,7 @@ test("each non-user socket close bootstraps again and resubscribes", async () =>
   await socket.connect("session-a");
   sockets[0].open();
   sockets[0].closeFromServer(4408);
-  await Promise.resolve();
+  await vi.advanceTimersByTimeAsync(250);
 
   expect(sockets).toHaveLength(2);
   expect(bootstraps).toBe(2);
@@ -458,12 +459,71 @@ test("each non-user socket close bootstraps again and resubscribes", async () =>
   });
 
   sockets[1].closeFromServer(1006);
-  await Promise.resolve();
+  await vi.advanceTimersByTimeAsync(500);
   expect(sockets).toHaveLength(3);
   expect(connections.at(-1)).toBe("reconnecting");
   sockets[2].open();
   expect(connections.at(-1)).toBe("connected");
   socket.close();
+});
+
+test("a server that closes right after accepting is retried on the bounded backoff", async () => {
+  vi.useFakeTimers();
+  const sockets: BrowserSocket[] = [];
+  let bootstraps = 0;
+  const api = {
+    bootstrap: async () => {
+      bootstraps += 1;
+      return {
+        csrf_token: `token-${bootstraps}`,
+        websocket_url: "ws://local.test/api/ws",
+      };
+    },
+    clearToken: () => undefined,
+  } as unknown as ApiClient;
+  const socket = new SessionSocket({
+    api,
+    onMessage: () => undefined,
+    onConnection: () => undefined,
+    onToken: () => undefined,
+    createSocket: () => {
+      const connection = new BrowserSocket();
+      sockets.push(connection);
+      return connection;
+    },
+  });
+
+  await socket.connect("session-a");
+  sockets[0].open();
+  sockets[0].closeFromServer(1006);
+  await Promise.resolve();
+
+  // No reconnect inside the same tick, so an accept-then-close server cannot spin
+  // the bootstrap endpoint.
+  expect(bootstraps).toBe(1);
+  expect(vi.getTimerCount()).toBe(1);
+  await vi.advanceTimersByTimeAsync(250);
+  expect(bootstraps).toBe(2);
+  expect(sockets).toHaveLength(2);
+
+  // The next wait is longer than the first one.
+  sockets[1].open();
+  sockets[1].closeFromServer(1006);
+  await vi.advanceTimersByTimeAsync(250);
+  expect(bootstraps).toBe(2);
+  await vi.advanceTimersByTimeAsync(250);
+  expect(bootstraps).toBe(3);
+  expect(sockets).toHaveLength(3);
+
+  // Teardown leaves no timer behind.
+  sockets[2].open();
+  sockets[2].closeFromServer(1006);
+  await Promise.resolve();
+  expect(vi.getTimerCount()).toBe(1);
+  socket.close();
+  expect(vi.getTimerCount()).toBe(0);
+  await vi.advanceTimersByTimeAsync(2_000);
+  expect(bootstraps).toBe(3);
 });
 
 test("a temporary bootstrap failure during restart keeps retrying until the server returns", async () => {
@@ -498,6 +558,10 @@ test("a temporary bootstrap failure during restart keeps retrying until the serv
   sockets[0].open();
   sockets[0].closeFromServer(1006);
   await Promise.resolve();
+  expect(bootstraps).toBe(1);
+
+  // The first backoff reconnects; that bootstrap is the one the restart fails.
+  await vi.runOnlyPendingTimersAsync();
   expect(bootstraps).toBe(2);
 
   await vi.runOnlyPendingTimersAsync();

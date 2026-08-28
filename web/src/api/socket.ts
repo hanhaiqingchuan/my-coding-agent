@@ -135,8 +135,9 @@ export class SessionSocket {
         this.options.onConnection("offline");
         return;
       }
-      this.options.onConnection("reconnecting");
-      void this.open(sessionId, authRetries, reconnects + 1, generation);
+      // Every ordinary reconnect goes through the bounded backoff: a server that
+      // accepts a connection and closes it at once would otherwise spin this loop.
+      this.scheduleReconnect(sessionId, authRetries, reconnects, generation);
     };
   }
 
