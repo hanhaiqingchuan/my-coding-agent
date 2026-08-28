@@ -1,4 +1,10 @@
-import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
 
 type AppShellProps = {
   sidebar: ReactNode;
@@ -85,7 +91,11 @@ export function AppShell({
           aria-modal="true"
           onKeyDown={handleDrawerKeyDown}
         >
-          <button type="button" className="drawer-close" onClick={() => setDrawer(false)}>
+          <button
+            type="button"
+            className="drawer-close"
+            onClick={() => setDrawer(false)}
+          >
             Close run details
           </button>
           {runDetails}

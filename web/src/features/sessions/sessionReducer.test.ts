@@ -33,7 +33,10 @@ const activeRun = {
   finished_at: null,
 } as const;
 
-function snapshot(snapshotSeq: number, state: RunState = activeRun.state): SessionSnapshotDto {
+function snapshot(
+  snapshotSeq: number,
+  state: RunState = activeRun.state,
+): SessionSnapshotDto {
   return {
     session: {
       id: "session-1",
@@ -92,8 +95,14 @@ test("a snapshot replaces locally inferred state and resets the durable cursor",
 
 test("ignores an already-applied durable event", () => {
   const initial = { ...createInitialSessionViewState(), lastSeq: 3 };
-  const once = reduceServerMessage(initial, { type: "durable", event: eventWithSeq(4) });
-  const twice = reduceServerMessage(once, { type: "durable", event: eventWithSeq(4) });
+  const once = reduceServerMessage(initial, {
+    type: "durable",
+    event: eventWithSeq(4),
+  });
+  const twice = reduceServerMessage(once, {
+    type: "durable",
+    event: eventWithSeq(4),
+  });
 
   expect(twice).toEqual(once);
 });
@@ -199,7 +208,10 @@ test("connection changes retain an active run until a server snapshot says other
     connection: "connected" as const,
   };
 
-  const offline = sessionViewReducer(connected, { type: "connection.changed", connection: "offline" });
+  const offline = sessionViewReducer(connected, {
+    type: "connection.changed",
+    connection: "offline",
+  });
 
   expect(offline.connection).toBe("offline");
   expect(offline.snapshot?.active_run?.id).toBe("run-1");
@@ -247,7 +259,10 @@ afterEach(() => {
 test("switching or reconnecting a session closes the old transport and subscribes again", async () => {
   const sockets: BrowserSocket[] = [];
   const api = {
-    bootstrap: async () => ({ csrf_token: "token", websocket_url: "ws://local.test/api/ws" }),
+    bootstrap: async () => ({
+      csrf_token: "token",
+      websocket_url: "ws://local.test/api/ws",
+    }),
     clearToken: () => undefined,
   } as unknown as ApiClient;
   const socket = new SessionSocket({
@@ -285,7 +300,10 @@ test("a stale bootstrap 403 after switching sessions cannot clear the new sessio
     bootstrap: () => {
       bootstrapCalls += 1;
       if (bootstrapCalls === 1) return oldBootstrap.promise;
-      return Promise.resolve({ csrf_token: "new-token", websocket_url: "ws://local.test/api/ws" });
+      return Promise.resolve({
+        csrf_token: "new-token",
+        websocket_url: "ws://local.test/api/ws",
+      });
     },
     clearToken: () => {
       clearCalls += 1;
@@ -356,7 +374,10 @@ test("an expired authentication token is bootstrapped at most once before resubs
   const api = {
     bootstrap: async () => {
       bootstraps += 1;
-      return { csrf_token: `token-${bootstraps}`, websocket_url: "ws://local.test/api/ws" };
+      return {
+        csrf_token: `token-${bootstraps}`,
+        websocket_url: "ws://local.test/api/ws",
+      };
     },
     clearToken: () => undefined,
   } as unknown as ApiClient;
@@ -395,7 +416,10 @@ test("each non-user socket close bootstraps again and resubscribes", async () =>
   const api = {
     bootstrap: async () => {
       bootstraps += 1;
-      return { csrf_token: `token-${bootstraps}`, websocket_url: "ws://local.test/api/ws" };
+      return {
+        csrf_token: `token-${bootstraps}`,
+        websocket_url: "ws://local.test/api/ws",
+      };
     },
     clearToken: () => undefined,
   } as unknown as ApiClient;

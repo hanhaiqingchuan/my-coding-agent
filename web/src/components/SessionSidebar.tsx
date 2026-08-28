@@ -6,7 +6,11 @@ type SessionSidebarProps = {
   onSelect(sessionId: string): void;
 };
 
-export function SessionSidebar({ sessions, selectedSessionId, onSelect }: SessionSidebarProps) {
+export function SessionSidebar({
+  sessions,
+  selectedSessionId,
+  onSelect,
+}: SessionSidebarProps) {
   return (
     <section aria-labelledby="sessions-heading">
       <h2 id="sessions-heading">Sessions</h2>
@@ -16,7 +20,9 @@ export function SessionSidebar({ sessions, selectedSessionId, onSelect }: Sessio
             <button
               type="button"
               className="session-row"
-              aria-current={session.id === selectedSessionId ? "page" : undefined}
+              aria-current={
+                session.id === selectedSessionId ? "page" : undefined
+              }
               onClick={() => onSelect(session.id)}
             >
               <span>{session.title ?? "Untitled session"}</span>

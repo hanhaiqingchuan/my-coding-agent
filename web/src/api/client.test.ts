@@ -38,14 +38,20 @@ test("a state-changing 403 clears the old token then bootstraps and retries once
   globalThis.fetch = async (_input, init) => {
     requestCount += 1;
     if (requestCount === 1) {
-      return jsonResponse({ csrf_token: "old-token", websocket_url: "ws://local.test/api/ws" });
+      return jsonResponse({
+        csrf_token: "old-token",
+        websocket_url: "ws://local.test/api/ws",
+      });
     }
     if (requestCount === 2) {
       postTokens.push(new Headers(init?.headers).get("X-CSRF-Token"));
       return jsonResponse({}, 403);
     }
     if (requestCount === 3) {
-      return jsonResponse({ csrf_token: "fresh-token", websocket_url: "ws://local.test/api/ws" });
+      return jsonResponse({
+        csrf_token: "fresh-token",
+        websocket_url: "ws://local.test/api/ws",
+      });
     }
     postTokens.push(new Headers(init?.headers).get("X-CSRF-Token"));
     return jsonResponse({

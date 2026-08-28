@@ -1,10 +1,5 @@
 export type JsonValue =
-  | string
-  | number
-  | boolean
-  | null
-  | JsonValue[]
-  | { [key: string]: JsonValue };
+  string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
 
 export const RUN_STATES = [
   "starting",
@@ -42,7 +37,12 @@ export const STOP_REASONS = [
 ] as const;
 export type StopReason = (typeof STOP_REASONS)[number];
 
-export const APPROVAL_STATUSES = ["pending", "approved", "rejected", "cancelled"] as const;
+export const APPROVAL_STATUSES = [
+  "pending",
+  "approved",
+  "rejected",
+  "cancelled",
+] as const;
 export type ApprovalStatus = (typeof APPROVAL_STATUSES)[number];
 
 export const APPROVAL_DECISIONS = ["approve", "reject"] as const;
@@ -183,7 +183,16 @@ export const REQUIRED_DTO_FIELDS = {
     "started_at",
     "finished_at",
   ],
-  MessageDto: ["id", "session_id", "run_id", "seq", "role", "parts", "status", "tool_call_id"],
+  MessageDto: [
+    "id",
+    "session_id",
+    "run_id",
+    "seq",
+    "role",
+    "parts",
+    "status",
+    "tool_call_id",
+  ],
   ToolExecutionDto: [
     "tool_call_id",
     "run_id",
@@ -199,7 +208,15 @@ export const REQUIRED_DTO_FIELDS = {
     "result",
     "duration_ms",
   ],
-  PendingApprovalDto: ["run_id", "tool_call_id", "name", "input", "target", "preview", "metadata"],
+  PendingApprovalDto: [
+    "run_id",
+    "tool_call_id",
+    "name",
+    "input",
+    "target",
+    "preview",
+    "metadata",
+  ],
   SessionSnapshotDto: [
     "session",
     "active_run",
@@ -209,7 +226,14 @@ export const REQUIRED_DTO_FIELDS = {
     "interrupted_banner",
     "snapshot_seq",
   ],
-  DurableEvent: ["seq", "session_id", "run_id", "type", "payload", "created_at"],
+  DurableEvent: [
+    "seq",
+    "session_id",
+    "run_id",
+    "type",
+    "payload",
+    "created_at",
+  ],
 } as const;
 
 type RequiredDtoMap = {
@@ -221,14 +245,12 @@ type RequiredDtoMap = {
   DurableEvent: DurableEvent;
 };
 
-type ExactFieldSet<Dto, Fields extends readonly PropertyKey[]> = Exclude<
-  keyof Dto,
-  Fields[number]
-> extends never
-  ? Exclude<Fields[number], keyof Dto> extends never
-    ? true
-    : never
-  : never;
+type ExactFieldSet<Dto, Fields extends readonly PropertyKey[]> =
+  Exclude<keyof Dto, Fields[number]> extends never
+    ? Exclude<Fields[number], keyof Dto> extends never
+      ? true
+      : never
+    : never;
 
 const requiredDtoFieldsMatchTypes: {
   [Name in keyof RequiredDtoMap]: ExactFieldSet<
@@ -246,16 +268,40 @@ const requiredDtoFieldsMatchTypes: {
 void requiredDtoFieldsMatchTypes;
 
 export type ClientCommand =
-  | { type: "session.subscribe"; client_command_id: string; session_id: string; payload: Record<string, never> }
-  | { type: "run.start"; client_command_id: string; session_id: string; payload: { content: string } }
-  | { type: "run.stop"; client_command_id: string; session_id: string; payload: { run_id: string } }
+  | {
+      type: "session.subscribe";
+      client_command_id: string;
+      session_id: string;
+      payload: Record<string, never>;
+    }
+  | {
+      type: "run.start";
+      client_command_id: string;
+      session_id: string;
+      payload: { content: string };
+    }
+  | {
+      type: "run.stop";
+      client_command_id: string;
+      session_id: string;
+      payload: { run_id: string };
+    }
   | {
       type: "approval.resolve";
       client_command_id: string;
       session_id: string;
-      payload: { run_id: string; tool_call_id: string; decision: ApprovalDecision };
+      payload: {
+        run_id: string;
+        tool_call_id: string;
+        decision: ApprovalDecision;
+      };
     }
-  | { type: "session.ack_recovery"; client_command_id: string; session_id: string; payload: Record<string, never> };
+  | {
+      type: "session.ack_recovery";
+      client_command_id: string;
+      session_id: string;
+      payload: Record<string, never>;
+    };
 
 export type ServerMessage =
   | {
@@ -273,7 +319,12 @@ export type ServerMessage =
       code: string;
       message: string;
     }
-  | { type: "snapshot"; client_command_id: string; session_id: string; snapshot: SessionSnapshotDto }
+  | {
+      type: "snapshot";
+      client_command_id: string;
+      session_id: string;
+      snapshot: SessionSnapshotDto;
+    }
   | { type: "durable"; event: DurableEvent }
   | {
       type: "assistant.delta";

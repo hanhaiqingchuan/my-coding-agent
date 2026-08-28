@@ -30,11 +30,18 @@ export function WorkspacePicker({ onCreate }: WorkspacePickerProps) {
       <h1>My Coding Agent</h1>
       <label>
         Workspace
-        <input value={workspace} onChange={(event) => setWorkspace(event.target.value)} placeholder="/absolute/path" />
+        <input
+          value={workspace}
+          onChange={(event) => setWorkspace(event.target.value)}
+          placeholder="/absolute/path"
+        />
       </label>
       <label>
         Session title <span aria-hidden="true">(optional)</span>
-        <input value={title} onChange={(event) => setTitle(event.target.value)} />
+        <input
+          value={title}
+          onChange={(event) => setTitle(event.target.value)}
+        />
       </label>
       {error ? <p role="alert">{error}</p> : null}
       <button type="submit">Open workspace</button>

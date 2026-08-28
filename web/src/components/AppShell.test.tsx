@@ -15,11 +15,16 @@ test("renders semantic session, conversation, and run-details regions", () => {
     />,
   );
 
-  expect(screen.getByRole("navigation", { name: "Sessions and workspace" }).textContent).toContain(
-    "Sessions",
-  );
-  expect(screen.getByRole("main", { name: "Conversation" }).textContent).toContain("Conversation");
-  expect(screen.getByRole("complementary", { name: "Run details" }).textContent).toContain("Idle");
+  expect(
+    screen.getByRole("navigation", { name: "Sessions and workspace" })
+      .textContent,
+  ).toContain("Sessions");
+  expect(
+    screen.getByRole("main", { name: "Conversation" }).textContent,
+  ).toContain("Conversation");
+  expect(
+    screen.getByRole("complementary", { name: "Run details" }).textContent,
+  ).toContain("Idle");
 });
 
 test("opens run details in an accessible drawer on a narrow layout", async () => {
@@ -34,7 +39,9 @@ test("opens run details in an accessible drawer on a narrow layout", async () =>
 
   await user.click(screen.getByRole("button", { name: "Open run details" }));
 
-  expect(screen.getByRole("dialog", { name: "Run details" }).textContent).toContain("Idle");
+  expect(
+    screen.getByRole("dialog", { name: "Run details" }).textContent,
+  ).toContain("Idle");
 });
 
 test("does not infer a completed run from a shell interaction", async () => {
@@ -69,7 +76,9 @@ test("drawer manages focus, traps Tab, and restores focus after Escape", async (
   await user.click(trigger);
 
   const drawer = screen.getByRole("dialog", { name: "Run details" });
-  const close = within(drawer).getByRole("button", { name: "Close run details" });
+  const close = within(drawer).getByRole("button", {
+    name: "Close run details",
+  });
   const inspect = within(drawer).getByRole("button", { name: "Inspect run" });
   expect(document.activeElement).toBe(close);
   await user.tab();
