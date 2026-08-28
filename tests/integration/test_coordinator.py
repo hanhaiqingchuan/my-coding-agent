@@ -76,6 +76,178 @@ class _CancellationRunner:
         return await self._gate.finish_run(run_id, RunOutcome.cancel())
 
 
+class _FailingPublisher(EventPublisher):
+    async def publish_committed(self, event) -> None:
+        _ = event
+        raise RuntimeError("publisher unavailable")
+
+
+async def _wait_for_active_run(store: SQLiteStore, session_id: str) -> str:
+    for _ in range(100):
+        active = store.load_snapshot(session_id).active_run
+        if active is not None:
+            return active.id
+        await asyncio.sleep(0)
+    raise AssertionError("run was not durably created")
+
+
+async def _wait_for_approval_status(
+    store: SQLiteStore,
+    tool_call_id: str,
+    status: str,
+) -> None:
+    for _ in range(100):
+        with store.connection() as connection:
+            row = connection.execute(
+                "SELECT approval_status FROM tool_executions WHERE tool_call_id = ?",
+                (tool_call_id,),
+            ).fetchone()
+        if row is not None and row[0] == status:
+            return
+        await asyncio.sleep(0)
+    raise AssertionError(f"approval did not reach {status}")
+
+
+def _pending_approval(store: SQLiteStore, suffix: str):
+    session = store.create_session("/tmp/workspace", f"approval-{suffix}")
+    run = store.begin_run(session.id, "task", {}, f"start-{suffix}", f"start-hash-{suffix}")
+    store.transition_run(run.id, {RunState.STARTING}, RunState.BUILDING_CONTEXT, None, None)
+    store.transition_run(run.id, {RunState.BUILDING_CONTEXT}, RunState.MODEL_STREAMING, None, None)
+    turn = AssistantTurn(
+        f"turn-{suffix}",
+        (
+            ToolUsePart(
+                ToolCall(
+                    f"call-{suffix}",
+                    "write_file",
+                    {"operation": "write", "path": "a.txt", "content": "new"},
+                )
+            ),
+        ),
+        ModelStopReason.TOOL_USE,
+        Usage(),
+    )
+    prepared = store.stage_tool_group(run.id, turn).calls[0]
+    store.request_approval(run.id, prepared)
+    return session, run, prepared
+
+
+@pytest.mark.asyncio
+async def test_cancelled_start_caller_cannot_leave_a_committed_run_without_owner(
+    store: SQLiteStore,
+) -> None:
+    """Cancellation during blocked publication must not strand a committed active run."""
+    session = store.create_session("/tmp/workspace", "cancelled-start")
+    publisher = EventPublisher()
+    gate = RunMutationGate(store, publisher)
+    runner = _CancellationRunner(gate)
+    coordinator = RunCoordinator(
+        store=store,
+        mutation_gate=gate,
+        runner=runner,
+        config_snapshot={},
+    )
+
+    async with publisher.session_guard(session.id):
+        starting = asyncio.create_task(coordinator.start_run(session.id, "task", "start"))
+        run_id = await _wait_for_active_run(store, session.id)
+        starting.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await starting
+
+    await asyncio.wait_for(runner.started.wait(), timeout=0.1)
+    await coordinator.stop_run(run_id, "stop")
+    finished = await coordinator.wait_for_run(run_id)
+    assert finished.state is RunState.CANCELLED
+
+
+@pytest.mark.asyncio
+async def test_failed_start_broadcast_does_not_prevent_run_ownership(
+    store: SQLiteStore,
+) -> None:
+    """A transient publisher failure cannot turn a committed Run into an ownerless Run."""
+    session = store.create_session("/tmp/workspace", "failed-start-publish")
+    gate = RunMutationGate(store, _FailingPublisher())
+    runner = _CancellationRunner(gate)
+    coordinator = RunCoordinator(
+        store=store,
+        mutation_gate=gate,
+        runner=runner,
+        config_snapshot={},
+    )
+
+    run = await coordinator.start_run(session.id, "task", "start")
+
+    await asyncio.wait_for(runner.started.wait(), timeout=0.1)
+    await coordinator.stop_run(run.id, "stop")
+    finished = await coordinator.wait_for_run(run.id)
+    assert finished.state is RunState.CANCELLED
+
+
+@pytest.mark.asyncio
+async def test_cancelled_approval_caller_cannot_lose_a_committed_decision(
+    store: SQLiteStore,
+) -> None:
+    """Cancellation during blocked publication must still wake the registered waiter."""
+    session, run, prepared = _pending_approval(store, "cancelled-publish")
+    publisher = EventPublisher()
+    gate = RunMutationGate(store, publisher)
+    approvals = ApprovalGate()
+    coordinator = RunCoordinator(
+        store=store,
+        mutation_gate=gate,
+        runner=_CancellationRunner(gate),
+        config_snapshot={},
+        approval_gate=approvals,
+    )
+    waiting = asyncio.create_task(approvals.request(prepared, CancellationToken()))
+    await approvals.next_request()
+
+    async with publisher.session_guard(session.id):
+        resolving = asyncio.create_task(
+            coordinator.resolve_approval(
+                run.id,
+                prepared.call.id,
+                ApprovalDecision.APPROVE,
+                "approve",
+            )
+        )
+        await _wait_for_approval_status(store, prepared.call.id, "approved")
+        resolving.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await resolving
+
+    assert await asyncio.wait_for(waiting, timeout=0.1) is ApprovalDecision.APPROVE
+
+
+@pytest.mark.asyncio
+async def test_failed_approval_broadcast_does_not_prevent_decision_delivery(
+    store: SQLiteStore,
+) -> None:
+    """A publisher exception after commit must not leave the approval waiter blocked."""
+    _, run, prepared = _pending_approval(store, "failed-publish")
+    gate = RunMutationGate(store, _FailingPublisher())
+    approvals = ApprovalGate()
+    coordinator = RunCoordinator(
+        store=store,
+        mutation_gate=gate,
+        runner=_CancellationRunner(gate),
+        config_snapshot={},
+        approval_gate=approvals,
+    )
+    waiting = asyncio.create_task(approvals.request(prepared, CancellationToken()))
+    await approvals.next_request()
+
+    await coordinator.resolve_approval(
+        run.id,
+        prepared.call.id,
+        ApprovalDecision.APPROVE,
+        "approve",
+    )
+
+    assert await asyncio.wait_for(waiting, timeout=0.1) is ApprovalDecision.APPROVE
+
+
 @pytest.mark.asyncio
 async def test_start_command_replay_owns_only_one_loop(store: SQLiteStore) -> None:
     """Starting a second loop for one command replay would duplicate model and tool effects."""
@@ -148,6 +320,36 @@ async def test_stop_command_replay_emits_one_cancellation_event(store: SQLiteSto
     assert replay.cancellation_requested_at == first.cancellation_requested_at
     event_types = [event.type for event in store.events_after(session.id, 0)]
     assert event_types.count("run.cancellation_requested") == 1
+
+
+@pytest.mark.asyncio
+async def test_stop_command_id_rejects_a_different_run_payload(store: SQLiteStore) -> None:
+    """A stop receipt from an earlier Run must not be replayed for a later Run."""
+    session = store.create_session("/tmp/workspace", "stop-conflict")
+    gate = RunMutationGate(store, EventPublisher())
+    runner = _CancellationRunner(gate)
+    coordinator = RunCoordinator(
+        store=store,
+        mutation_gate=gate,
+        runner=runner,
+        config_snapshot={},
+    )
+    first = await coordinator.start_run(session.id, "first", "start-1")
+    await runner.started.wait()
+    await coordinator.stop_run(first.id, "same-stop")
+    await coordinator.wait_for_run(first.id)
+    second = await coordinator.start_run(session.id, "second", "start-2")
+    for _ in range(100):
+        if runner.calls == [first.id, second.id]:
+            break
+        await asyncio.sleep(0)
+    assert runner.calls == [first.id, second.id]
+
+    with pytest.raises(CommandIdConflict):
+        await coordinator.stop_run(second.id, "same-stop")
+
+    await coordinator.stop_run(second.id, "stop-2")
+    await coordinator.wait_for_run(second.id)
 
 
 @pytest.mark.asyncio

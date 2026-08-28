@@ -5,7 +5,8 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
-from collections.abc import Mapping
+import logging
+from collections.abc import Callable, Mapping
 from typing import Protocol
 
 from coding_agent.core.cancellation import CancellationToken
@@ -20,6 +21,8 @@ from coding_agent.core.models import (
 )
 from coding_agent.runtime.publisher import EventPublisher
 from coding_agent.storage.sqlite import SQLiteStore
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class RunExecutor(Protocol):
@@ -50,10 +53,18 @@ class RunMutationGate:
         """Register a token and observe persisted Stop under the mutation lock."""
         async with self._lock:
             run = self._store.get_run(run_id)
-            self._cancellations[run_id] = cancellation
-            if run.state is RunState.CANCELLING or run.cancellation_requested_at is not None:
-                cancellation.cancel()
+            self._register_committed_cancellation(run, cancellation)
             return run
+
+    def _register_committed_cancellation(
+        self,
+        run: Run,
+        cancellation: CancellationToken,
+    ) -> None:
+        """Attach a token synchronously while the mutation lock still guards the commit."""
+        self._cancellations[run.id] = cancellation
+        if run.state is RunState.CANCELLING or run.cancellation_requested_at is not None:
+            cancellation.cancel()
 
     async def unregister_cancellation(self, run_id: str) -> None:
         async with self._lock:
@@ -65,6 +76,7 @@ class RunMutationGate:
         content: str,
         config_snapshot: Mapping[str, object],
         client_command_id: str,
+        on_committed: Callable[[Run], None] | None = None,
     ) -> Run:
         """Serialize the process-wide active-run claim and publish only after commit."""
         async with self._lock:
@@ -79,6 +91,8 @@ class RunMutationGate:
             run = self._store.begin_run(
                 session_id, content, config_snapshot, client_command_id, digest
             )
+            if on_committed is not None:
+                on_committed(run)
             await self._publish_after(session_id, previous_seq)
             return run
 
@@ -108,6 +122,7 @@ class RunMutationGate:
         tool_call_id: str,
         decision: ApprovalDecision,
         client_command_id: str,
+        on_committed: Callable[[ApprovalRecord], None] | None = None,
     ) -> ApprovalRecord:
         async with self._lock:
             current = self._store.get_run(run_id)
@@ -122,6 +137,8 @@ class RunMutationGate:
                 client_command_id,
                 digest,
             )
+            if on_committed is not None:
+                on_committed(approval)
             await self._publish_after(current.session_id, previous_seq)
             return approval
 
@@ -171,7 +188,14 @@ class RunMutationGate:
 
     async def _publish_after(self, session_id: str, previous_seq: int) -> None:
         for event in self._store.events_after(session_id, previous_seq):
-            await self._publisher.publish_committed(event)
+            try:
+                await self._publisher.publish_committed(event)
+            except Exception:
+                _LOGGER.exception(
+                    "durable event broadcast failed",
+                    extra={"session_id": session_id, "event_seq": event.seq},
+                )
+                return
 
 
 class RunCoordinator:
@@ -202,19 +226,24 @@ class RunCoordinator:
     ) -> Run:
         """Claim the global run slot and start one background owner for a new run."""
         async with self._ownership_lock:
+
+            def own_committed_run(run: Run) -> None:
+                if run.id in self._tasks or run.finished_at is not None:
+                    return
+                cancellation = CancellationToken()
+                self._mutation_gate._register_committed_cancellation(run, cancellation)
+                self._tasks[run.id] = asyncio.create_task(
+                    self._runner.run(run.id, run.session_id, cancellation),
+                    name=f"coding-agent-run-{run.id}",
+                )
+
             run = await self._mutation_gate.begin_run(
                 session_id,
                 content,
                 self._config_snapshot,
                 client_command_id,
+                on_committed=own_committed_run,
             )
-            if run.id not in self._tasks and run.finished_at is None:
-                cancellation = CancellationToken()
-                await self._mutation_gate.register_cancellation(run.id, cancellation)
-                self._tasks[run.id] = asyncio.create_task(
-                    self._runner.run(run.id, run.session_id, cancellation),
-                    name=f"coding-agent-run-{run.id}",
-                )
             return run
 
     async def stop_run(self, run_id: str, client_command_id: str) -> Run:
@@ -236,14 +265,18 @@ class RunCoordinator:
         client_command_id: str,
     ) -> None:
         """Persist an approval command before waking the in-memory loop waiter."""
+
+        def deliver_committed_approval(_: ApprovalRecord) -> None:
+            if self._approval_gate is not None:
+                self._approval_gate.resolve_persisted(tool_call_id, decision)
+
         await self._mutation_gate.resolve_approval(
             run_id,
             tool_call_id,
             decision,
             client_command_id,
+            on_committed=deliver_committed_approval,
         )
-        if self._approval_gate is not None:
-            self._approval_gate.resolve_persisted(tool_call_id, decision)
 
 
 def _latest_seq(store: SQLiteStore, session_id: str) -> int:

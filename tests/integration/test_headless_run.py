@@ -321,12 +321,34 @@ def test_injected_runtime_still_enforces_cli_command_policy(tmp_path: Path) -> N
     assert returned_results[0].error.code == "COMMAND_NOT_ALLOWED"
 
 
-def test_parser_has_serve_and_run_without_a_scripted_model_switch() -> None:
+def test_parser_has_serve_and_run_without_a_scripted_model_switch(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     """A product flag selecting the deterministic test model could expose a test backdoor."""
     parser = cli.build_parser()
 
     serve = parser.parse_args(["serve", "--config", "config.toml", "--port", "8123"])
     assert serve.command == "serve"
     assert serve.port == 8123
-    with pytest.raises(SystemExit):
-        parser.parse_args(["run", "--scripted-model"])
+    with pytest.raises(SystemExit) as raised:
+        parser.parse_args(
+            [
+                "run",
+                "--config",
+                "config.toml",
+                "--workspace",
+                "workspace",
+                "--data-dir",
+                "data",
+                "--prompt-file",
+                "prompt.txt",
+                "--report-out",
+                "report.json",
+                "--scripted-model",
+            ]
+        )
+
+    error = capsys.readouterr().err
+    assert raised.value.code == 2
+    assert "unrecognized arguments: --scripted-model" in error
+    assert "the following arguments are required" not in error
