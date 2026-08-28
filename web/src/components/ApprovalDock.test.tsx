@@ -17,11 +17,17 @@ const pendingCommand: PendingApprovalDto = {
     command: "git status --short",
     cwd: "/workspace",
     reason: "Inspect changes",
-    timeout_ms: 120000,
+    timeout_seconds: 120,
   },
   target: null,
   preview: null,
-  metadata: { sandboxed: false },
+  metadata: {
+    command: "git status --short",
+    cwd: "/workspace",
+    relative_cwd: ".",
+    reason: "Inspect changes",
+    timeout_seconds: 120,
+  },
 };
 
 const resolvedTool: ToolExecutionDto = {
@@ -39,6 +45,60 @@ const resolvedTool: ToolExecutionDto = {
   result: null,
   duration_ms: 12,
 };
+
+const pendingRunCommand: PendingApprovalDto = {
+  run_id: "run-1",
+  tool_call_id: "call-2",
+  name: "run_command",
+  input: {
+    command: "pytest -q",
+    cwd: ".",
+    reason: "Run the offline suite",
+    timeout_seconds: 10,
+  },
+  target: "/workspace",
+  preview: null,
+  metadata: {
+    command: "pytest -q",
+    cwd: "/workspace",
+    relative_cwd: ".",
+    reason: "Run the offline suite",
+    timeout_seconds: 10,
+  },
+};
+
+test("shows the frozen run_command timeout in seconds and always warns that the command is not sandboxed", () => {
+  render(
+    <ApprovalDock pendingApproval={pendingRunCommand} onResolve={vi.fn()} />,
+  );
+
+  const dock = screen.getByRole("region", { name: "Pending approval" });
+  expect(dock.textContent).toContain("pytest -q");
+  expect(dock.textContent).toContain("Run the offline suite");
+  expect(screen.getByText("10s")).not.toBeNull();
+  expect(dock.textContent).toContain("This command is not sandboxed");
+});
+
+test("marks the timeout as absent instead of inventing the schema default", () => {
+  render(
+    <ApprovalDock
+      pendingApproval={{
+        ...pendingRunCommand,
+        input: {
+          command: "pytest -q",
+          cwd: ".",
+          reason: "Run the offline suite",
+        },
+      }}
+      onResolve={vi.fn()}
+    />,
+  );
+
+  const dock = screen.getByRole("region", { name: "Pending approval" });
+  expect(dock.textContent).not.toContain("120");
+  expect(screen.getByText("—")).not.toBeNull();
+  expect(dock.textContent).toContain("This command is not sandboxed");
+});
 
 test("docks the current approval above the composer and resolves by call id and decision only", async () => {
   const user = userEvent.setup();
@@ -71,7 +131,7 @@ test("docks the current approval above the composer and resolves by call id and 
   expect(dock.textContent).toContain("git status --short");
   expect(dock.textContent).toContain("/workspace");
   expect(dock.textContent).toContain("Inspect changes");
-  expect(dock.textContent).toContain("120000");
+  expect(dock.textContent).toContain("120s");
   expect(dock.textContent).toContain("This command is not sandboxed");
 
   await user.click(screen.getByRole("button", { name: "Approve" }));

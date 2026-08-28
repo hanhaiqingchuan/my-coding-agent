@@ -9,7 +9,6 @@ export function ToolCard({ tool, outputDraft }: ToolCardProps) {
   const command = stringValue(tool.input.command);
   const cwd = stringValue(tool.input.cwd);
   const reason = stringValue(tool.input.reason);
-  const timeout = tool.input.timeout_ms ?? tool.input.timeout;
   const diff =
     stringValue(tool.input.diff) ??
     stringValue(tool.input.patch) ??
@@ -33,8 +32,7 @@ export function ToolCard({ tool, outputDraft }: ToolCardProps) {
             command={command}
             cwd={cwd}
             reason={reason}
-            timeout={timeout}
-            unsandboxed={tool.input.sandboxed === false}
+            timeoutSeconds={tool.input.timeout_seconds}
           />
         ) : null}
         {isWrite && diff !== null ? (
@@ -64,14 +62,12 @@ export function CommandDetails({
   command,
   cwd,
   reason,
-  timeout,
-  unsandboxed = false,
+  timeoutSeconds,
 }: {
   command: string | null;
   cwd: string | null;
   reason: string | null;
-  timeout: JsonValue | undefined;
-  unsandboxed?: boolean;
+  timeoutSeconds: JsonValue | undefined;
 }) {
   return (
     <dl className="tool-command-details">
@@ -89,16 +85,26 @@ export function CommandDetails({
       </div>
       <div>
         <dt>Timeout</dt>
-        <dd>{timeout === undefined ? "—" : String(timeout)}</dd>
+        <dd>{timeoutLabel(timeoutSeconds)}</dd>
       </div>
-      {unsandboxed ? (
-        <div className="tool-risk">
-          <dt>Warning</dt>
-          <dd>This command is not sandboxed</dd>
-        </div>
-      ) : null}
+      {/* run_command is never a security sandbox: an approved command runs with
+          the current operating system user's privileges, so the warning belongs
+          to every command card and no backend flag may switch it off. */}
+      <div className="tool-risk">
+        <dt>Warning</dt>
+        <dd>
+          This command is not sandboxed and runs with your operating system
+          user&apos;s full privileges.
+        </dd>
+      </div>
     </dl>
   );
+}
+
+function timeoutLabel(timeoutSeconds: JsonValue | undefined): string {
+  // Only the frozen `timeout_seconds` argument is shown; when the model omitted
+  // it the backend default stays invisible rather than being guessed here.
+  return typeof timeoutSeconds === "number" ? `${timeoutSeconds}s` : "—";
 }
 
 export function statusLabel(

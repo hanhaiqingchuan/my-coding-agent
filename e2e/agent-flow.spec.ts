@@ -31,6 +31,15 @@ test("creates a session, approves write and command, then restores final history
   await expect(
     writeApproval.getByRole("heading", { name: "run_command" }),
   ).toBeVisible();
+  await expect(
+    writeApproval.getByText(
+      "test -f agent-output.txt && printf verified > command-marker.txt",
+    ),
+  ).toBeVisible();
+  await expect(writeApproval.getByText("10s")).toBeVisible();
+  await expect(
+    writeApproval.getByText(/This command is not sandboxed/),
+  ).toBeVisible();
   await writeApproval.getByRole("button", { name: "Approve" }).click();
 
   await expect(page.getByText("All scripted steps completed.")).toBeVisible();

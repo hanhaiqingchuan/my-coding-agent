@@ -33,7 +33,7 @@ function tool(state: ToolExecutionState): ToolExecutionDto {
       command: "pwd",
       cwd: "/workspace",
       reason: "Check directory",
-      timeout_ms: 1000,
+      timeout_seconds: 1,
     },
     requires_approval: state === "awaiting_approval",
     approval_status: state === "awaiting_approval" ? "pending" : "approved",

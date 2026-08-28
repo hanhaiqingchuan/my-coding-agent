@@ -15,7 +15,6 @@ export function ApprovalDock({
     pendingApproval.name.includes("command") ||
     stringValue(pendingApproval.input.command) !== null;
   const isWrite = pendingApproval.name.includes("write");
-  const sandboxed = pendingApproval.metadata.sandboxed;
 
   return (
     <section className="approval-dock" aria-label="Pending approval">
@@ -31,10 +30,7 @@ export function ApprovalDock({
           command={stringValue(pendingApproval.input.command)}
           cwd={stringValue(pendingApproval.input.cwd)}
           reason={stringValue(pendingApproval.input.reason)}
-          timeout={
-            pendingApproval.input.timeout_ms ?? pendingApproval.input.timeout
-          }
-          unsandboxed={sandboxed === false}
+          timeoutSeconds={pendingApproval.input.timeout_seconds}
         />
       ) : null}
       {!isCommand && !isWrite ? (

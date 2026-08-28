@@ -52,7 +52,7 @@ const snapshot: SessionSnapshotDto = {
       command: "pwd",
       cwd: "/workspace",
       reason: "Check workspace",
-      timeout_ms: 1000,
+      timeout_seconds: 1,
     },
     target: null,
     preview: null,
