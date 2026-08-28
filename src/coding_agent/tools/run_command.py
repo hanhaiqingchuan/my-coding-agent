@@ -18,6 +18,20 @@ from coding_agent.core.models import PreparedToolCall, ToolCall, ToolError, Tool
 from coding_agent.tools import OutputSink, ToolContext, ToolInputError, result
 from coding_agent.tools.paths import WorkspaceBoundary, WorkspacePathError
 
+_LOCALE_ENV_NAMES = frozenset(
+    {
+        "LANG",
+        "LC_ALL",
+        "LC_COLLATE",
+        "LC_CTYPE",
+        "LC_MESSAGES",
+        "LC_MONETARY",
+        "LC_NUMERIC",
+        "LC_TIME",
+    }
+)
+_TEMP_ENV_NAMES = frozenset({"TMPDIR", "TMP", "TEMP"})
+
 
 @dataclass(frozen=True, slots=True)
 class AllowedCommand:
@@ -351,9 +365,7 @@ class RunCommandTool:
         environ = os.environ
         child = {"PATH": environ.get("PATH", os.defpath), "HOME": isolated_home}
         for name in environ:
-            if name in {"LANG", "LANGUAGE", "LC_ALL", "TMPDIR", "TMP", "TEMP"} or name.startswith(
-                "LC_"
-            ):
+            if name in _LOCALE_ENV_NAMES or name in _TEMP_ENV_NAMES:
                 child[name] = environ[name]
         for name in self.pass_env:
             if name in environ and name != self.model_api_key_env:

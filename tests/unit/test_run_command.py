@@ -271,6 +271,23 @@ async def test_child_environment_is_minimal_and_model_key_is_never_allowed(
 
 
 @pytest.mark.asyncio
+async def test_locale_prefix_does_not_bypass_environment_allowlist(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Allowing arbitrary LC_* names would leak a credential disguised as locale data."""
+    variable = "LC_CREDENTIAL_SENTINEL"
+    monkeypatch.setenv(variable, "fake-locale-prefixed-secret")
+    source = f"import json, os; print(json.dumps({{'present': {variable!r} in os.environ}}))"
+
+    result, _ = await execute_command(
+        RunCommandTool(), WorkspaceBoundary(tmp_path), python_command(source)
+    )
+
+    assert result.ok is True
+    assert json.loads(result.data["output"]) == {"present": False}
+
+
+@pytest.mark.asyncio
 async def test_command_policy_requires_exact_command_and_canonical_cwd(tmp_path: Path) -> None:
     """Matching only command text could run a headless evaluation command in the wrong cwd."""
     (tmp_path / "allowed").mkdir()
