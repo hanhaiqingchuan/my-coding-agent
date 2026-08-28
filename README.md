@@ -89,7 +89,7 @@ uv run --python 3.12 coding-agent serve \
 
 | 参数 | 说明 |
 |---|---|
-| `--config PATH` | 配置文件路径（必填） |
+| `--config PATH` | 配置文件路径；省略时读取启动目录下的 `config.toml` |
 | `--workspace PATH` | 初始 Session 的工作目录 |
 | `--data-dir PATH` | SQLite 与运行数据目录；默认启动目录下的 `.coding-agent/` |
 | `--port PORT` | 覆盖 `server.port` |
@@ -119,7 +119,7 @@ uv run --python 3.12 coding-agent run \
   --report-out run.json
 ```
 
-`--config`、`--workspace`、`--data-dir`、`--prompt-file`、`--report-out` 均为必填。默认仍逐次审批，因此无人值守运行需要显式声明风险：
+`--workspace`、`--data-dir`、`--prompt-file`、`--report-out` 均为必填；`--config` 省略时读取启动目录下的 `config.toml`。配置文件不存在时以 `CONFIG_ERROR` 退出（退出码 2）并指出缺少的路径，不会退回内置默认值。默认仍逐次审批，因此无人值守运行需要显式声明风险：
 
 | 参数 | 说明 |
 |---|---|
@@ -256,9 +256,11 @@ uv run --python 3.12 coding-agent-eval run \
   --manifest evaluation/tasks/public/manifest.toml \
   --config config.toml --repeats 1 --serial --out /path/outside/this/repo
 
-# 重新聚合一个已有 campaign 目录
+# 聚合 campaign 的运行记录，写出 summary.json、summary.csv 与 report.md
 uv run --python 3.12 coding-agent-eval summarize --input /path/outside/this/repo
 ```
+
+`run` 只写它拥有的不可变记录：`runs.jsonl` 与每次 repeat 的 `run.json`；`summarize` 负责聚合，默认写到 `<campaign>/reports/`（也可用 `--out` 指定目录）。两条命令都不覆盖已存在的产物，因此再次聚合到同一目录会直接报错而不是改写已发布结果。
 
 每次 run 使用**全新临时 workspace 和独立 `--data-dir`**，不复用用户的默认数据库；隐藏 oracle 在 workspace 外运行，模型无法影响自己的评分。原始 transcript 和完整结果按约定写到仓库外（`--out` 指向仓库外目录），公开仓库只保留框架、schema、四个可再分发的公开任务和 `evaluation/examples/` 中的**脱敏**示例结果。默认导出不含 prompt 原文、工具参数、命令输出和绝对路径——工具参数只以 `args_hash` 出现。细节见 [`evaluation/README.md`](evaluation/README.md)。
 

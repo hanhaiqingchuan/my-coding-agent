@@ -13,13 +13,20 @@ from coding_agent.config import ConfigurationError, load_settings
 from coding_agent.main import RuntimeDependencies, load_command_policy, run_headless, serve_web
 from coding_agent.tools.paths import WorkspacePathError
 
+DEFAULT_CONFIG_PATH = Path("config.toml")
+"""Read from the startup directory when ``--config`` is absent, as documented in README §3.
+
+A missing file is never replaced by built-in defaults: ``load_settings`` raises a
+``ConfigurationError`` naming this path, which :func:`main` reports as ``CONFIG_ERROR``.
+"""
+
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="coding-agent")
     commands = parser.add_subparsers(dest="command", required=True)
 
     serve = commands.add_parser("serve", help="start the local browser service")
-    serve.add_argument("--config", type=Path, required=True)
+    serve.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH)
     serve.add_argument("--workspace", type=Path)
     serve.add_argument("--data-dir", type=Path)
     serve.add_argument("--port", type=int)
@@ -27,7 +34,7 @@ def build_parser() -> argparse.ArgumentParser:
     serve.add_argument("--yes", action="store_true")
 
     run = commands.add_parser("run", help="run one prompt without browser delivery")
-    run.add_argument("--config", type=Path, required=True)
+    run.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH)
     run.add_argument("--workspace", type=Path, required=True)
     run.add_argument("--data-dir", type=Path, required=True)
     run.add_argument("--prompt-file", type=Path, required=True)
@@ -97,4 +104,4 @@ if __name__ == "__main__":  # pragma: no cover - console script calls main direc
     raise SystemExit(main())
 
 
-__all__ = ["build_parser", "main"]
+__all__ = ["DEFAULT_CONFIG_PATH", "build_parser", "main"]

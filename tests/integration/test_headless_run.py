@@ -298,6 +298,142 @@ def test_report_projects_tool_statistics_with_hashed_arguments(tmp_path: Path) -
     assert str(paths["workspace"]) not in json.dumps(report)
 
 
+def test_run_reads_the_default_config_from_the_startup_directory(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """README §3 promises a default config file, so requiring the flag contradicts the delivery."""
+    paths = _task_files(tmp_path)
+    paths["config"].write_text(
+        '[model]\nmodel = "claude-default-directory-2026"\n', encoding="utf-8"
+    )
+    dependencies = _dependencies(paths["data_dir"])
+    monkeypatch.chdir(tmp_path)
+
+    exit_code = cli.main(
+        [
+            "run",
+            "--workspace",
+            str(paths["workspace"]),
+            "--data-dir",
+            str(paths["data_dir"]),
+            "--prompt-file",
+            str(paths["prompt"]),
+            "--yes",
+            "--ack-unsafe-auto-approve",
+            "--command-policy",
+            str(paths["policy"]),
+            "--report-out",
+            str(paths["report"]),
+        ],
+        dependencies=dependencies,
+    )
+
+    report = json.loads(paths["report"].read_text(encoding="utf-8"))
+    assert exit_code == 0
+    assert report["model_identity"]["name"] == "claude-default-directory-2026"
+
+
+def test_explicit_config_path_wins_over_the_startup_directory_default(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A default that silently overrode an explicit path would run an unrequested configuration."""
+    paths = _task_files(tmp_path)
+    paths["config"].write_text(
+        '[model]\nmodel = "claude-default-directory-2026"\n', encoding="utf-8"
+    )
+    explicit = tmp_path / "explicit-config.toml"
+    explicit.write_text('[model]\nmodel = "claude-explicit-config-2026"\n', encoding="utf-8")
+    dependencies = _dependencies(paths["data_dir"])
+    monkeypatch.chdir(tmp_path)
+
+    exit_code = cli.main(
+        [
+            "run",
+            "--config",
+            str(explicit),
+            "--workspace",
+            str(paths["workspace"]),
+            "--data-dir",
+            str(paths["data_dir"]),
+            "--prompt-file",
+            str(paths["prompt"]),
+            "--yes",
+            "--ack-unsafe-auto-approve",
+            "--command-policy",
+            str(paths["policy"]),
+            "--report-out",
+            str(paths["report"]),
+        ],
+        dependencies=dependencies,
+    )
+
+    report = json.loads(paths["report"].read_text(encoding="utf-8"))
+    assert exit_code == 0
+    assert report["model_identity"]["name"] == "claude-explicit-config-2026"
+
+
+@pytest.mark.parametrize("command", ["serve", "run"])
+def test_missing_configuration_file_is_a_named_configuration_error(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    command: str,
+) -> None:
+    """Falling back to built-in defaults, or a bare traceback, would hide an unusable setup."""
+    paths = _task_files(tmp_path)
+    dependencies = _dependencies(paths["data_dir"])
+    startup = tmp_path / "startup"
+    startup.mkdir()
+    monkeypatch.chdir(startup)
+    argv = [command]
+    if command == "run":
+        argv += [
+            "--workspace",
+            str(paths["workspace"]),
+            "--data-dir",
+            str(paths["data_dir"]),
+            "--prompt-file",
+            str(paths["prompt"]),
+            "--report-out",
+            str(paths["report"]),
+        ]
+
+    exit_code = cli.main(argv, dependencies=dependencies)
+
+    error = capsys.readouterr().err
+    assert exit_code == 2
+    assert error.startswith("CONFIG_ERROR: ")
+    assert "config.toml" in error
+    assert "Traceback" not in error
+    assert dependencies.store.list_sessions() == []
+    assert not paths["report"].exists()
+
+
+def test_config_defaults_to_the_startup_directory_for_both_commands() -> None:
+    """A default on only one subcommand would make the documented flag half true."""
+    parser = cli.build_parser()
+
+    serve = parser.parse_args(["serve"])
+    run = parser.parse_args(
+        [
+            "run",
+            "--workspace",
+            "workspace",
+            "--data-dir",
+            "data",
+            "--prompt-file",
+            "prompt.txt",
+            "--report-out",
+            "report.json",
+        ]
+    )
+
+    assert serve.config == Path("config.toml")
+    assert run.config == Path("config.toml")
+
+
 @pytest.mark.parametrize(
     "omitted",
     ["--ack-unsafe-auto-approve", "--command-policy"],

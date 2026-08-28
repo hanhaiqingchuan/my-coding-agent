@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from coding_agent.evaluation import cli as evaluation_cli
 from coding_agent.evaluation.manifest import validate_manifest
 from coding_agent.evaluation.runner import (
     AGENT_ARGV_OPTIONS,
@@ -654,9 +655,48 @@ def test_public_task_set_scores_end_to_end_with_a_stub_agent(
     assert [run.forbidden_changes for run in result.runs] == [[], [], [], []]
     assert all(run.detected_workspace_escape is False for run in result.runs)
     assert (output_dir / "runs.jsonl").is_file()
-    assert (output_dir / "reports" / "summary.json").is_file()
-    assert (output_dir / "reports" / "summary.csv").is_file()
-    assert (output_dir / "reports" / "report.md").is_file()
+    assert all(
+        (output_dir / "runs" / task.task_id / "repeat-1" / "run.json").is_file()
+        for task in manifest.tasks
+    )
+    assert (output_dir / "reports").exists() is False
+
+
+def test_documented_summarize_command_aggregates_a_campaign_produced_by_run(
+    manifest_root: Path,
+    config_file: Path,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """A documented aggregation command that always exits 2 makes the campaign unreportable."""
+    manifest = _manifest(manifest_root)
+    output_dir = tmp_path / "campaign"
+    run_campaign(
+        manifest,
+        config_file,
+        1,
+        output_dir,
+        False,
+        agent_launcher=RecordingLauncher(mutate=_apply_gold),
+        agent_executable=("fake-agent",),
+    )
+
+    exit_code = evaluation_cli.main(["summarize", "--input", str(output_dir)])
+
+    reports = output_dir / "reports"
+    document = json.loads((reports / "summary.json").read_text(encoding="utf-8"))
+    assert exit_code == 0
+    assert (output_dir / "runs.jsonl").is_file()
+    assert (reports / "summary.csv").is_file()
+    assert (reports / "report.md").is_file()
+    assert document["schema_version"] == "summary-v1"
+    assert document["strict_success_runs"] == 1
+
+    repeated = evaluation_cli.main(["summarize", "--input", str(output_dir)])
+
+    assert repeated == 2
+    assert "already exists" in capsys.readouterr().err
+    assert document == json.loads((reports / "summary.json").read_text(encoding="utf-8"))
 
 
 def _invocation(argv: tuple[str, ...], tmp_path: Path) -> AgentInvocation:

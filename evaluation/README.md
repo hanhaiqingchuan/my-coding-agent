@@ -26,13 +26,19 @@ uv run --python 3.12 coding-agent-eval run \
   --manifest evaluation/tasks/public/manifest.toml \
   --config config.toml --repeats 1 --serial --out /path/outside/this/repo
 
-# Re-aggregate an existing campaign directory.
+# Aggregate a campaign's run records into summary.json, summary.csv and report.md.
 uv run --python 3.12 coding-agent-eval summarize --input /path/outside/this/repo
 ```
 
 `--dry-run` prints the task count, the upper bound on main model requests, the
 workspace root and the output location. It creates nothing and calls no model, so it
 does not need the auto-approve acknowledgement.
+
+`run` writes only the records it owns — `runs.jsonl` and one `run.json` per repeat — and
+`summarize` owns the aggregates, so the two commands never compete for a file. `summarize`
+writes `summary.json`, `summary.csv` and `report.md` into `<campaign>/reports/` unless `--out`
+names another directory, and refuses to write any of them where one already exists rather than
+rewriting a published result.
 
 P0 always runs a campaign serially; `--serial` records that intent explicitly.
 Results are written outside this repository by convention: raw campaign directories
@@ -87,9 +93,10 @@ the agent process knows what actually served its requests. The evaluator never o
 agent's database and never re-derives an agent fact.
 
 A written `run-v1` document is the immutable record of that run. `summarize` re-reads
-those documents exactly as written: it never recomputes `strict_success` or
-`artifact_correct`, and it never derives an oracle outcome from a score flag. Scoring
-happens once, when the run finishes.
+those documents exactly as written: it never recomputes `strict_success`, `artifact_correct`
+or the `failure_stage` and `failure_kind` pair, and it never derives an oracle outcome from a
+score flag. A record that carries no failure kind contributes none. Scoring happens once, when
+the run finishes.
 
 ## Task manifest
 
@@ -132,6 +139,19 @@ workspace, an isolated `HOME`, and a minimal environment.
 Oracles never run inside the workspace, so the agent cannot influence its own grade,
 and their stdout and stderr are discarded rather than exported.
 
+## Campaign layout
+
+```text
+<out>/
+├── runs.jsonl                   every run-v1 document, one per line, written by run
+├── runs/<task-id>/repeat-<n>/   one directory per repeat, described below
+├── setup/<task-id>/             the baseline, gold and error workspaces used to verify the task
+└── reports/                     written by summarize, never by run
+    ├── summary.json
+    ├── summary.csv
+    └── report.md
+```
+
 ## Per-run isolation
 
 Each repeat gets its own directory under `<out>/runs/<task-id>/repeat-<n>/`:
@@ -141,7 +161,7 @@ workspace/              fresh copy of the read-only baseline
 data/                   isolated --data-dir (its own SQLite database)
 prompt.md               the task prompt, outside the workspace
 command-policy.json     generated command-policy-v1 file, outside the workspace
-canary.txt             guards against writes outside the workspace
+canary.txt              guards against writes outside the workspace
 oracle/                 oracle working directory
 agent-report.json       the agent's run-report-v1 document
 run.json                the evaluator's run-v1 document

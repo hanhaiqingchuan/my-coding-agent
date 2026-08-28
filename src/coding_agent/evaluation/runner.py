@@ -45,7 +45,7 @@ from coding_agent.evaluation.report import (
     UsageFacts,
     run_document,
     score_result,
-    summarize_campaign,
+    summarize,
     write_run_document,
 )
 from coding_agent.runtime.metrics import canonical_hash
@@ -312,7 +312,13 @@ def run_campaign(
     agent_commit: str | None = None,
     campaign_id: str | None = None,
 ) -> CampaignResult:
-    """Run every task and repeat serially through the public headless CLI."""
+    """Run every task and repeat serially through the public headless CLI.
+
+    A campaign writes only the records it owns: one immutable ``run-v1`` document per repeat
+    plus ``runs.jsonl``. The derived aggregates belong to ``summarize``, which refuses to
+    overwrite an existing artifact, so pre-writing them here would make the documented
+    aggregation command impossible to run.
+    """
     if repeats < 1:
         raise CampaignError("repeats: must be at least 1")
     settings = _settings(config, dry_run=dry_run)
@@ -368,7 +374,7 @@ def run_campaign(
             )
 
     _write_jsonl(output_dir / "runs.jsonl", runs, identifier)
-    summary = summarize_campaign(output_dir, output_dir / "reports")
+    summary = summarize(runs, campaign_id=identifier, agent_commit=commit)
     return CampaignResult(
         campaign_id=identifier,
         dry_run=False,
