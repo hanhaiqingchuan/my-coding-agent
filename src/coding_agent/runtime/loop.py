@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import sys
 from dataclasses import replace
 from importlib.resources import files
 from pathlib import Path
@@ -412,6 +413,30 @@ class AgentLoop:
             Path(self._store.load_snapshot(session_id).session.workspace_realpath)
         )
 
+    def _compiled_system(self, session_id: str) -> str:
+        """Compile the developer instructions with the current environment.
+
+        Spec 7.2 and 7.3 item 1 make environment information mandatory in every model
+        view, so it belongs in the system string the context estimator measures. Only
+        facts this process already owns appear here: the session workspace root, the
+        platform and the configured tool limits, never a credential or its value.
+        """
+        tools = self._settings.tools
+        workspace_root = self._store.load_snapshot(session_id).session.workspace_realpath
+        return "\n".join(
+            (
+                self._system_prompt.rstrip(),
+                "",
+                "Current environment:",
+                f"- workspace root: {workspace_root}",
+                f"- platform: {sys.platform}",
+                f"- read_file returns at most {tools.read_max_lines} lines"
+                f" or {tools.read_max_bytes} bytes per call",
+                f"- run_command times out after {tools.command_timeout_seconds}s"
+                f" and truncates output at {tools.command_output_bytes} bytes",
+            )
+        )
+
     async def _build_context(
         self,
         run_id: str,
@@ -422,7 +447,7 @@ class AgentLoop:
         force_compaction: bool = False,
     ) -> ReadyContext | RunOutcome:
         base_request = ContextRequest(
-            system=self._system_prompt,
+            system=self._compiled_system(session_id),
             context_window=self._settings.model.context_window,
             max_output_tokens=self._settings.model.max_output_tokens,
             safety_margin_tokens=self._settings.context.safety_margin_tokens,

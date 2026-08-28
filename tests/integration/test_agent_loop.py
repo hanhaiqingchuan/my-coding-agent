@@ -4,16 +4,18 @@ import asyncio
 import inspect
 import json
 import logging
+import sys
 from collections.abc import AsyncIterator
 from dataclasses import replace
 from datetime import UTC, datetime
+from importlib.resources import files
 from pathlib import Path
 
 import pytest
 
 from coding_agent.config import AppSettings, ConfigurationError
 from coding_agent.context import Compactor, ContextBuilder
-from coding_agent.context.estimator import ESTIMATOR_ID
+from coding_agent.context.estimator import ESTIMATOR_ID, estimate_input_tokens
 from coding_agent.core.cancellation import CancellationToken
 from coding_agent.core.events import RunOutcome
 from coding_agent.core.models import (
@@ -1253,3 +1255,45 @@ async def test_renamed_workspace_root_fails_the_run_without_a_pending_group(
             == 0
         )
     store.begin_run(session_id, "next request", {}, "start-again", "hash-again")
+
+
+@pytest.mark.asyncio
+async def test_model_view_carries_the_current_environment_within_the_estimate(
+    tmp_path: Path, valid_settings: AppSettings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Without the workspace root, the platform and the tool limits the model works blind.
+
+    Spec 7.2 and 7.3 item 1 make the current environment mandatory content, so it has to
+    sit in the very system string the context estimator measures, not be appended later.
+    """
+    measured: list[str] = []
+    original_build = ContextBuilder.build
+
+    def recording_build(self, transcript, snapshot, request):
+        measured.append(request.system)
+        return original_build(self, transcript, snapshot, request)
+
+    monkeypatch.setattr(ContextBuilder, "build", recording_build)
+    loop, store, session_id, run_id, model, _, _ = _make_loop(
+        tmp_path, valid_settings, [_final_turn()]
+    )
+    workspace_root = store.load_snapshot(session_id).session.workspace_realpath
+
+    outcome = await loop.run(run_id, session_id, CancellationToken())
+
+    assert outcome == RunOutcome.complete()
+    system = measured[0]
+    assert model.requests[0].system.startswith(system)
+    assert workspace_root in system
+    assert sys.platform in system
+    assert str(valid_settings.tools.read_max_lines) in system
+    assert str(valid_settings.tools.read_max_bytes) in system
+    assert str(valid_settings.tools.command_timeout_seconds) in system
+    assert str(valid_settings.tools.command_output_bytes) in system
+    assert valid_settings.model.api_key_env not in system
+    assert valid_settings.model.base_url not in system
+    static_prompt = files("coding_agent.prompts").joinpath("system.md").read_text(encoding="utf-8")
+    environment_cost = estimate_input_tokens(system, (), ()) - estimate_input_tokens(
+        static_prompt, (), ()
+    )
+    assert 0 < environment_cost <= 200
