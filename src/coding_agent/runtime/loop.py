@@ -296,12 +296,13 @@ class AgentLoop:
                             lambda: self._store.request_approval(run_id, prepared),
                         )
                         decision = await self._approval_gate.request(prepared, cancellation)
-                        await self._mutation_gate.resolve_approval(
-                            run_id,
-                            prepared.call.id,
-                            decision,
-                            f"loop-approval-{prepared.call.id}",
-                        )
+                        if not self._approval_gate.is_persisted(prepared.call.id):
+                            await self._mutation_gate.resolve_approval(
+                                run_id,
+                                prepared.call.id,
+                                decision,
+                                f"loop-approval-{prepared.call.id}",
+                            )
                         if decision is ApprovalDecision.REJECT:
                             break
                     effect = await self._mutation_gate.begin_effect(run_id, prepared.call.id)

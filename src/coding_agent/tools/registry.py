@@ -6,7 +6,7 @@ from coding_agent.core.models import PreparedToolCall, ToolCall, ToolResult
 from coding_agent.tools import ToolContext, ToolInputError, error_result
 from coding_agent.tools.paths import WorkspaceBoundary, WorkspacePathError
 from coding_agent.tools.read_file import ReadFileTool
-from coding_agent.tools.run_command import RunCommandTool
+from coding_agent.tools.run_command import CommandPolicy, RunCommandTool
 from coding_agent.tools.write_file import WriteFileTool
 
 
@@ -77,6 +77,10 @@ class ToolRegistry:
                 },
             },
         ]
+
+    def configure_command_policy(self, policy: CommandPolicy | None) -> None:
+        """Apply the headless policy at the composition boundary, including injected runtimes."""
+        self._run_command.command_policy = policy
 
     def prepare(
         self, call: ToolCall, workspace: WorkspaceBoundary

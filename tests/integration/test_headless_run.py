@@ -1,0 +1,332 @@
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import pytest
+
+from coding_agent import cli
+from coding_agent.config import ConfigurationError
+from coding_agent.context import Compactor, ContextBuilder
+from coding_agent.core.models import (
+    AssistantTurn,
+    ModelStopReason,
+    TextPart,
+    ToolCall,
+    ToolResult,
+    ToolUsePart,
+    Usage,
+)
+from coding_agent.main import RuntimeDependencies, load_command_policy
+from coding_agent.model import ModelMessage
+from coding_agent.runtime.approval import ApprovalGate
+from coding_agent.runtime.publisher import EventPublisher
+from coding_agent.storage.sqlite import SQLiteStore
+from coding_agent.tools.registry import ToolRegistry
+from tests.fakes.model import ScriptedModel
+
+
+def _final_turn(text: str = "done") -> AssistantTurn:
+    return AssistantTurn(
+        "turn-final",
+        (TextPart(text),),
+        ModelStopReason.END_TURN,
+        Usage(12, 3),
+    )
+
+
+def _task_files(tmp_path: Path) -> dict[str, Path]:
+    paths = {
+        "config": tmp_path / "config.toml",
+        "workspace": tmp_path / "workspace",
+        "data_dir": tmp_path / "data",
+        "prompt": tmp_path / "prompt.txt",
+        "policy": tmp_path / "command-policy.json",
+        "report": tmp_path / "report.json",
+    }
+    paths["workspace"].mkdir()
+    paths["data_dir"].mkdir()
+    paths["config"].write_text("", encoding="utf-8")
+    paths["prompt"].write_text("finish the task", encoding="utf-8")
+    paths["policy"].write_text(
+        json.dumps(
+            {
+                "schema_version": "command-policy-v1",
+                "allowed": [{"command": "pwd", "cwd": "."}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    return paths
+
+
+def _dependencies(
+    data_dir: Path,
+    model: ScriptedModel | None = None,
+) -> RuntimeDependencies:
+    store = SQLiteStore(data_dir / "state.db")
+    store.initialize()
+    model = model or ScriptedModel([_final_turn()])
+    return RuntimeDependencies(
+        store=store,
+        model=model,
+        context_builder=ContextBuilder(),
+        compactor=Compactor(ScriptedModel([]), store, model="scripted-compactor"),
+        tool_registry=ToolRegistry(),
+        approval_gate=ApprovalGate(auto_approve=True),
+        clock=lambda: 0.0,
+        sleeper=_no_sleep,
+        event_publisher=EventPublisher(),
+    )
+
+
+async def _no_sleep(_: float) -> None:
+    return None
+
+
+def test_headless_run_uses_injected_runtime_and_writes_versioned_report(tmp_path: Path) -> None:
+    """A separate headless loop could bypass the durable runtime or emit an unusable report."""
+    paths = _task_files(tmp_path)
+    dependencies = _dependencies(paths["data_dir"])
+
+    exit_code = cli.main(
+        [
+            "run",
+            "--config",
+            str(paths["config"]),
+            "--workspace",
+            str(paths["workspace"]),
+            "--data-dir",
+            str(paths["data_dir"]),
+            "--prompt-file",
+            str(paths["prompt"]),
+            "--yes",
+            "--ack-unsafe-auto-approve",
+            "--command-policy",
+            str(paths["policy"]),
+            "--report-out",
+            str(paths["report"]),
+        ],
+        dependencies=dependencies,
+    )
+
+    report = json.loads(paths["report"].read_text(encoding="utf-8"))
+    assert exit_code == 0
+    assert report["schema_version"] == "run-report-v1"
+    assert report["state"] == "COMPLETED"
+    assert report["stop_reason"] == "COMPLETED"
+    assert report["error_kind"] is None
+    assert set(report) == {
+        "schema_version",
+        "run_id",
+        "session_id",
+        "state",
+        "stop_reason",
+        "error_kind",
+        "started_at",
+        "finished_at",
+    }
+
+
+@pytest.mark.parametrize(
+    "omitted",
+    ["--ack-unsafe-auto-approve", "--command-policy"],
+)
+def test_auto_approve_preflight_fails_before_session_creation(
+    tmp_path: Path,
+    omitted: str,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Unsafe auto-approval without both gates must not leave any durable run artifacts."""
+    paths = _task_files(tmp_path)
+    dependencies = _dependencies(paths["data_dir"])
+    argv = [
+        "run",
+        "--config",
+        str(paths["config"]),
+        "--workspace",
+        str(paths["workspace"]),
+        "--data-dir",
+        str(paths["data_dir"]),
+        "--prompt-file",
+        str(paths["prompt"]),
+        "--yes",
+        "--ack-unsafe-auto-approve",
+        "--command-policy",
+        str(paths["policy"]),
+        "--report-out",
+        str(paths["report"]),
+    ]
+    option_index = argv.index(omitted)
+    del argv[option_index : option_index + (2 if omitted == "--command-policy" else 1)]
+
+    exit_code = cli.main(argv, dependencies=dependencies)
+
+    assert exit_code == 2
+    assert "CONFIG_ERROR" in capsys.readouterr().err
+    assert dependencies.store.list_sessions() == []
+    assert not paths["report"].exists()
+
+
+@pytest.mark.parametrize(
+    "policy_value",
+    [
+        {"schema_version": "command-policy-v1", "allowed": []},
+        {
+            "schema_version": "command-policy-v1",
+            "allowed": [{"command": "   ", "cwd": "."}],
+        },
+        {
+            "schema_version": "command-policy-v1",
+            "allowed": [{"command": "pwd", "cwd": "../outside"}],
+        },
+        {
+            "schema_version": "command-policy-v1",
+            "allowed": [{"command_prefix": "py", "cwd": "."}],
+        },
+    ],
+)
+def test_auto_approve_rejects_unsafe_policy_before_session_creation(
+    tmp_path: Path,
+    policy_value: object,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Empty, escaping, or prefix policies must never enable unattended effects."""
+    paths = _task_files(tmp_path)
+    paths["policy"].write_text(json.dumps(policy_value), encoding="utf-8")
+    dependencies = _dependencies(paths["data_dir"])
+
+    exit_code = cli.main(
+        [
+            "run",
+            "--config",
+            str(paths["config"]),
+            "--workspace",
+            str(paths["workspace"]),
+            "--data-dir",
+            str(paths["data_dir"]),
+            "--prompt-file",
+            str(paths["prompt"]),
+            "--yes",
+            "--ack-unsafe-auto-approve",
+            "--command-policy",
+            str(paths["policy"]),
+            "--report-out",
+            str(paths["report"]),
+        ],
+        dependencies=dependencies,
+    )
+
+    assert exit_code == 2
+    assert "CONFIG_ERROR" in capsys.readouterr().err
+    assert dependencies.store.list_sessions() == []
+
+
+def test_command_policy_rejects_absolute_cwd_even_inside_workspace(tmp_path: Path) -> None:
+    """Accepting machine-specific absolute cwd values would make an evaluation non-portable."""
+    paths = _task_files(tmp_path)
+    paths["policy"].write_text(
+        json.dumps(
+            {
+                "schema_version": "command-policy-v1",
+                "allowed": [{"command": "pwd", "cwd": str(paths["workspace"])}],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ConfigurationError, match="relative"):
+        load_command_policy(paths["policy"], paths["workspace"])
+
+
+def test_loaded_command_policy_matches_only_exact_command_and_relative_cwd(
+    tmp_path: Path,
+) -> None:
+    """Treating policy strings as prefixes or globs would authorize unlisted commands."""
+    paths = _task_files(tmp_path)
+    (paths["workspace"] / "nested").mkdir()
+    paths["policy"].write_text(
+        json.dumps(
+            {
+                "schema_version": "command-policy-v1",
+                "allowed": [{"command": "pytest tests/unit", "cwd": "nested"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    policy = load_command_policy(paths["policy"], paths["workspace"])
+
+    assert policy.allows("pytest tests/unit", Path("nested")) is True
+    assert policy.allows("pytest tests/unit -q", Path("nested")) is False
+    assert policy.allows("pytest tests/unit", Path(".")) is False
+
+
+def test_injected_runtime_still_enforces_cli_command_policy(tmp_path: Path) -> None:
+    """Injecting a model for offline runs must not bypass the evaluator's effect allowlist."""
+    paths = _task_files(tmp_path)
+    forbidden = paths["workspace"] / "forbidden.txt"
+    model = ScriptedModel(
+        [
+            AssistantTurn(
+                "turn-command",
+                (
+                    ToolUsePart(
+                        ToolCall(
+                            "call-command",
+                            "run_command",
+                            {"command": "printf forbidden > forbidden.txt", "cwd": "."},
+                        )
+                    ),
+                ),
+                ModelStopReason.TOOL_USE,
+                Usage(10, 4),
+            ),
+            _final_turn(),
+        ]
+    )
+    dependencies = _dependencies(paths["data_dir"], model)
+
+    exit_code = cli.main(
+        [
+            "run",
+            "--config",
+            str(paths["config"]),
+            "--workspace",
+            str(paths["workspace"]),
+            "--data-dir",
+            str(paths["data_dir"]),
+            "--prompt-file",
+            str(paths["prompt"]),
+            "--yes",
+            "--ack-unsafe-auto-approve",
+            "--command-policy",
+            str(paths["policy"]),
+            "--report-out",
+            str(paths["report"]),
+        ],
+        dependencies=dependencies,
+    )
+
+    returned_results = [
+        part
+        for message in model.requests[1].messages
+        if isinstance(message, ModelMessage)
+        for part in message.parts
+        if isinstance(part, ToolResult)
+    ]
+    assert exit_code == 0
+    assert forbidden.exists() is False
+    assert returned_results[0].error is not None
+    assert returned_results[0].error.code == "COMMAND_NOT_ALLOWED"
+
+
+def test_parser_has_serve_and_run_without_a_scripted_model_switch() -> None:
+    """A product flag selecting the deterministic test model could expose a test backdoor."""
+    parser = cli.build_parser()
+
+    serve = parser.parse_args(["serve", "--config", "config.toml", "--port", "8123"])
+    assert serve.command == "serve"
+    assert serve.port == 8123
+    with pytest.raises(SystemExit):
+        parser.parse_args(["run", "--scripted-model"])

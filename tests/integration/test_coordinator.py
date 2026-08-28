@@ -6,13 +6,14 @@ import sqlite3
 import pytest
 
 from coding_agent.core.cancellation import CancellationToken
-from coding_agent.core.errors import StoreError
+from coding_agent.core.errors import CommandIdConflict, StoreError
 from coding_agent.core.events import RunOutcome
 from coding_agent.core.models import (
     ApprovalDecision,
     AssistantTurn,
     EffectStartResult,
     ModelStopReason,
+    PreparedToolCall,
     RunState,
     TextPart,
     ToolCall,
@@ -21,7 +22,8 @@ from coding_agent.core.models import (
     ToolUsePart,
     Usage,
 )
-from coding_agent.runtime.coordinator import RunMutationGate
+from coding_agent.runtime.approval import ApprovalGate
+from coding_agent.runtime.coordinator import RunCoordinator, RunMutationGate
 from coding_agent.runtime.publisher import EventPublisher
 from coding_agent.storage.sqlite import SQLiteStore
 
@@ -54,6 +56,255 @@ def _approved_call(store: SQLiteStore, tool_name: str) -> tuple[str, str, str]:
         f"approve-hash-{tool_name}",
     )
     return session.id, run.id, call_id
+
+
+class _CancellationRunner:
+    def __init__(self, gate: RunMutationGate) -> None:
+        self._gate = gate
+        self.calls: list[str] = []
+        self.started = asyncio.Event()
+
+    async def run(
+        self,
+        run_id: str,
+        session_id: str,
+        cancellation: CancellationToken,
+    ) -> RunOutcome:
+        self.calls.append(run_id)
+        self.started.set()
+        await cancellation.wait()
+        return await self._gate.finish_run(run_id, RunOutcome.cancel())
+
+
+@pytest.mark.asyncio
+async def test_start_command_replay_owns_only_one_loop(store: SQLiteStore) -> None:
+    """Starting a second loop for one command replay would duplicate model and tool effects."""
+    session = store.create_session("/tmp/workspace", "idempotent")
+    gate = RunMutationGate(store, EventPublisher())
+    runner = _CancellationRunner(gate)
+    coordinator = RunCoordinator(
+        store=store,
+        mutation_gate=gate,
+        runner=runner,
+        config_snapshot={"model": "scripted"},
+    )
+
+    first, replay = await asyncio.gather(
+        coordinator.start_run(session.id, "task", "start-1"),
+        coordinator.start_run(session.id, "task", "start-1"),
+    )
+    await runner.started.wait()
+
+    assert replay.id == first.id
+    assert runner.calls == [first.id]
+
+    await coordinator.stop_run(first.id, "stop-1")
+    await coordinator.wait_for_run(first.id)
+
+
+@pytest.mark.asyncio
+async def test_start_command_id_rejects_a_different_payload(store: SQLiteStore) -> None:
+    """Reusing an id for changed content must not silently return or start the wrong run."""
+    session = store.create_session("/tmp/workspace", "conflict")
+    gate = RunMutationGate(store, EventPublisher())
+    runner = _CancellationRunner(gate)
+    coordinator = RunCoordinator(
+        store=store,
+        mutation_gate=gate,
+        runner=runner,
+        config_snapshot={},
+    )
+    run = await coordinator.start_run(session.id, "first", "start-1")
+
+    with pytest.raises(CommandIdConflict):
+        await coordinator.start_run(session.id, "changed", "start-1")
+
+    await runner.started.wait()
+    assert runner.calls == [run.id]
+    await coordinator.stop_run(run.id, "stop-1")
+    await coordinator.wait_for_run(run.id)
+
+
+@pytest.mark.asyncio
+async def test_stop_command_replay_emits_one_cancellation_event(store: SQLiteStore) -> None:
+    """Replaying Stop must not create a second durable cancellation or second token owner."""
+    session = store.create_session("/tmp/workspace", "stop-replay")
+    gate = RunMutationGate(store, EventPublisher())
+    runner = _CancellationRunner(gate)
+    coordinator = RunCoordinator(
+        store=store,
+        mutation_gate=gate,
+        runner=runner,
+        config_snapshot={},
+    )
+    run = await coordinator.start_run(session.id, "task", "start")
+    await runner.started.wait()
+
+    first = await coordinator.stop_run(run.id, "same-stop")
+    replay = await coordinator.stop_run(run.id, "same-stop")
+    await coordinator.wait_for_run(run.id)
+
+    assert replay.id == first.id
+    assert replay.cancellation_requested_at == first.cancellation_requested_at
+    event_types = [event.type for event in store.events_after(session.id, 0)]
+    assert event_types.count("run.cancellation_requested") == 1
+
+
+@pytest.mark.asyncio
+async def test_approval_command_replay_delivers_one_decision(store: SQLiteStore) -> None:
+    """Replaying an approval receipt must not resolve the in-memory waiter twice."""
+    session = store.create_session("/tmp/workspace", "approval")
+    run = store.begin_run(session.id, "task", {}, "start", "start-hash")
+    store.transition_run(run.id, {RunState.STARTING}, RunState.BUILDING_CONTEXT, None, None)
+    store.transition_run(run.id, {RunState.BUILDING_CONTEXT}, RunState.MODEL_STREAMING, None, None)
+    turn = AssistantTurn(
+        "turn-approval",
+        (
+            ToolUsePart(
+                ToolCall(
+                    "call-write",
+                    "write_file",
+                    {"operation": "write", "path": "a.txt", "content": "new"},
+                )
+            ),
+        ),
+        ModelStopReason.TOOL_USE,
+        Usage(),
+    )
+    prepared = store.stage_tool_group(run.id, turn).calls[0]
+    assert isinstance(prepared, PreparedToolCall)
+    store.request_approval(run.id, prepared)
+    gate = RunMutationGate(store, EventPublisher())
+    approvals = ApprovalGate()
+    coordinator = RunCoordinator(
+        store=store,
+        mutation_gate=gate,
+        runner=_CancellationRunner(gate),
+        config_snapshot={},
+        approval_gate=approvals,
+    )
+    waiting = asyncio.create_task(approvals.request(prepared, CancellationToken()))
+    await approvals.next_request()
+
+    first = await coordinator.resolve_approval(
+        run.id,
+        prepared.call.id,
+        ApprovalDecision.APPROVE,
+        "approval-1",
+    )
+    replay = await coordinator.resolve_approval(
+        run.id,
+        prepared.call.id,
+        ApprovalDecision.APPROVE,
+        "approval-1",
+    )
+
+    assert first is None
+    assert replay is None
+    assert await waiting is ApprovalDecision.APPROVE
+    event_types = [event.type for event in store.events_after(session.id, 0)]
+    assert event_types.count("approval.resolved") == 1
+
+
+@pytest.mark.asyncio
+async def test_approval_command_id_rejects_a_changed_decision(store: SQLiteStore) -> None:
+    """Changing a replayed approval payload must not reinterpret the audited decision."""
+    session = store.create_session("/tmp/workspace", "approval-conflict")
+    run = store.begin_run(session.id, "task", {}, "start", "start-hash")
+    store.transition_run(run.id, {RunState.STARTING}, RunState.BUILDING_CONTEXT, None, None)
+    store.transition_run(run.id, {RunState.BUILDING_CONTEXT}, RunState.MODEL_STREAMING, None, None)
+    turn = AssistantTurn(
+        "turn-approval-conflict",
+        (
+            ToolUsePart(
+                ToolCall(
+                    "call-write-conflict",
+                    "write_file",
+                    {"operation": "write", "path": "a.txt", "content": "new"},
+                )
+            ),
+        ),
+        ModelStopReason.TOOL_USE,
+        Usage(),
+    )
+    prepared = store.stage_tool_group(run.id, turn).calls[0]
+    store.request_approval(run.id, prepared)
+    gate = RunMutationGate(store, EventPublisher())
+    approvals = ApprovalGate()
+    coordinator = RunCoordinator(
+        store=store,
+        mutation_gate=gate,
+        runner=_CancellationRunner(gate),
+        config_snapshot={},
+        approval_gate=approvals,
+    )
+    waiting = asyncio.create_task(approvals.request(prepared, CancellationToken()))
+    await approvals.next_request()
+    await coordinator.resolve_approval(
+        run.id,
+        prepared.call.id,
+        ApprovalDecision.APPROVE,
+        "approval-conflict",
+    )
+
+    with pytest.raises(CommandIdConflict):
+        await coordinator.resolve_approval(
+            run.id,
+            prepared.call.id,
+            ApprovalDecision.REJECT,
+            "approval-conflict",
+        )
+
+    assert await waiting is ApprovalDecision.APPROVE
+
+
+@pytest.mark.asyncio
+async def test_persisted_approval_is_not_lost_before_waiter_registration(
+    store: SQLiteStore,
+) -> None:
+    """A fast client may approve after the durable event but before the loop starts waiting."""
+    session = store.create_session("/tmp/workspace", "early-approval")
+    run = store.begin_run(session.id, "task", {}, "start", "start-hash")
+    store.transition_run(run.id, {RunState.STARTING}, RunState.BUILDING_CONTEXT, None, None)
+    store.transition_run(run.id, {RunState.BUILDING_CONTEXT}, RunState.MODEL_STREAMING, None, None)
+    turn = AssistantTurn(
+        "turn-early-approval",
+        (
+            ToolUsePart(
+                ToolCall(
+                    "call-early-write",
+                    "write_file",
+                    {"operation": "write", "path": "a.txt", "content": "new"},
+                )
+            ),
+        ),
+        ModelStopReason.TOOL_USE,
+        Usage(),
+    )
+    prepared = store.stage_tool_group(run.id, turn).calls[0]
+    store.request_approval(run.id, prepared)
+    gate = RunMutationGate(store, EventPublisher())
+    approvals = ApprovalGate()
+    coordinator = RunCoordinator(
+        store=store,
+        mutation_gate=gate,
+        runner=_CancellationRunner(gate),
+        config_snapshot={},
+        approval_gate=approvals,
+    )
+
+    await coordinator.resolve_approval(
+        run.id,
+        prepared.call.id,
+        ApprovalDecision.APPROVE,
+        "early-approval",
+    )
+
+    decision = await asyncio.wait_for(
+        approvals.request(prepared, CancellationToken()),
+        timeout=0.02,
+    )
+    assert decision is ApprovalDecision.APPROVE
 
 
 @pytest.mark.asyncio
