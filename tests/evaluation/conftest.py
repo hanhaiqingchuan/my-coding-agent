@@ -11,6 +11,8 @@ from pathlib import Path
 
 import pytest
 
+from coding_agent.evaluation.manifest import content_hash, tree_files, tree_hash
+
 TARGET_ORACLE = '''"""Fail unless the candidate workspace exposes VALUE == 2."""
 
 import sys
@@ -70,21 +72,26 @@ def write_task_tree(root: Path, task_id: str, *, with_error_overlay: bool = True
 
 def task_table(
     task_id: str,
+    root: Path,
     *,
     category: str = "local_edit",
     overrides: dict[str, object] | None = None,
     drop: tuple[str, ...] = (),
 ) -> str:
     """Render one ``[[tasks]]`` table so tests can mutate a single field."""
+    base = root / task_id
     values: dict[str, object] = {
         "task_id": task_id,
         "category": category,
         "prompt": f"{task_id}/prompt.md",
         "baseline": f"{task_id}/baseline",
+        "baseline_tree_hash": tree_hash(tree_files(base / "baseline")),
         "gold_overlay": f"{task_id}/gold",
         "error_overlay": f"{task_id}/error",
         "target_oracle": f"{task_id}/oracle/target.py",
+        "target_oracle_hash": content_hash((base / "oracle" / "target.py").read_bytes()),
         "regression_oracle": f"{task_id}/oracle/regression.py",
+        "regression_oracle_hash": content_hash((base / "oracle" / "regression.py").read_bytes()),
         "allowed_paths": ["src"],
         "forbidden_paths": ["README.md"],
         "timeout_seconds": 60,
@@ -129,7 +136,7 @@ def write_manifest(
     if extra:
         body.append(extra)
     body.append("")
-    body.append(tasks if tasks is not None else task_table("demo-task"))
+    body.append(tasks if tasks is not None else task_table("demo-task", root))
     path = root / "manifest.toml"
     path.write_text("\n".join(body), encoding="utf-8")
     return path

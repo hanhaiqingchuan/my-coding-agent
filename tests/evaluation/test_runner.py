@@ -36,6 +36,12 @@ def _agent_report(**overrides: object) -> dict[str, object]:
         "started_at": "2026-08-27T00:00:00+00:00",
         "finished_at": "2026-08-27T00:00:01+00:00",
         "tool_schema_hash": "abc123",
+        "model_identity": {
+            "name": "claude-stub-model-2026",
+            "context_window": 64000,
+            "max_output_tokens": 8192,
+            "stream": True,
+        },
         "model": {
             "main": {
                 "requests": 2,
@@ -346,6 +352,7 @@ def test_generated_command_policy_matches_the_manifest_allowlist(
         manifest_root,
         tasks=task_table(
             "demo-task",
+            manifest_root,
             overrides={"commands": [{"command": "python3 -V", "cwd": "src"}]},
         ),
     )
@@ -384,7 +391,9 @@ def test_dry_run_reports_the_plan_without_calling_the_model(
     write_task_tree(manifest_root, "second-task")
     manifest = _manifest(
         manifest_root,
-        tasks=task_table("demo-task") + "\n" + task_table("second-task"),
+        tasks=task_table("demo-task", manifest_root)
+        + "\n"
+        + task_table("second-task", manifest_root),
     )
     output_dir = tmp_path / "out"
 
@@ -550,6 +559,37 @@ def test_successful_campaign_records_diff_and_tree_hashes_without_absolute_paths
     assert document["modifications"]["files_modified"] == 1
     assert str(tmp_path) not in serialized
     assert "Change VALUE" not in serialized
+
+
+def test_run_document_copies_the_model_identity_from_the_agent_report(
+    manifest_root: Path,
+    config_file: Path,
+    tmp_path: Path,
+) -> None:
+    """A published run must name the model that served it, taken from the process that ran."""
+    manifest = _manifest(manifest_root)
+    output_dir = tmp_path / "out"
+
+    result = run_campaign(
+        manifest,
+        config_file,
+        1,
+        output_dir,
+        False,
+        agent_launcher=RecordingLauncher(mutate=_apply_gold),
+        agent_executable=("fake-agent",),
+    )
+
+    document = json.loads(
+        (output_dir / "runs" / "demo-task" / "repeat-1" / "run.json").read_text(encoding="utf-8")
+    )
+    assert result.runs[0].model_identity == {
+        "name": "claude-stub-model-2026",
+        "context_window": 64000,
+        "max_output_tokens": 8192,
+        "stream": True,
+    }
+    assert document["model_identity"] == document["agent_report"]["model_identity"]
 
 
 def test_all_campaign_durations_come_from_the_injected_monotonic_clock(

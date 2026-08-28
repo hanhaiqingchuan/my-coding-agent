@@ -13,6 +13,7 @@
     "repeat",
     "provider",
     "agent_commit",
+    "model_identity",
     "outcome",
     "strict_success",
     "artifact_correct",
@@ -40,6 +41,17 @@
     "repeat": { "type": "integer", "minimum": 1 },
     "provider": { "const": "anthropic_messages" },
     "agent_commit": { "type": ["string", "null"] },
+    "model_identity": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "description": "The model that served this run, copied verbatim from the agent report, which projects it from the run's own configuration snapshot. Never contains the credential or the API endpoint. Null when the agent produced no report.",
+      "properties": {
+        "name": { "type": ["string", "null"] },
+        "context_window": { "type": ["integer", "null"] },
+        "max_output_tokens": { "type": ["integer", "null"] },
+        "stream": { "type": ["boolean", "null"] }
+      }
+    },
     "outcome": { "enum": ["OK", "HARNESS_SETUP", "HARNESS_ORACLE_ERROR"] },
     "strict_success": { "type": "boolean" },
     "artifact_correct": { "type": "boolean" },

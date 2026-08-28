@@ -46,7 +46,7 @@ def test_path_escapes_are_rejected(manifest_root: Path, field: str, escape: str)
     """A manifest path outside its own directory could exfiltrate unrelated files."""
     path = write_manifest(
         manifest_root,
-        tasks=task_table("demo-task", overrides={field: escape}),
+        tasks=task_table("demo-task", manifest_root, overrides={field: escape}),
     )
 
     with pytest.raises(ManifestError, match=field):
@@ -61,7 +61,7 @@ def test_missing_baseline_or_oracle_is_rejected(manifest_root: Path, field: str)
     """A campaign that starts without its baseline or oracle cannot be scored."""
     path = write_manifest(
         manifest_root,
-        tasks=task_table("demo-task", overrides={field: "demo-task/absent"}),
+        tasks=task_table("demo-task", manifest_root, overrides={field: "demo-task/absent"}),
     )
 
     with pytest.raises(ManifestError, match=field):
@@ -70,11 +70,24 @@ def test_missing_baseline_or_oracle_is_rejected(manifest_root: Path, field: str)
 
 @pytest.mark.parametrize(
     "field",
-    ["prompt", "baseline", "gold_overlay", "target_oracle", "regression_oracle", "allowed_paths"],
+    [
+        "prompt",
+        "baseline",
+        "gold_overlay",
+        "target_oracle",
+        "regression_oracle",
+        "allowed_paths",
+        "baseline_tree_hash",
+        "target_oracle_hash",
+        "regression_oracle_hash",
+    ],
 )
 def test_required_task_fields_must_be_present(manifest_root: Path, field: str) -> None:
     """Defaulting a missing field would hide an incomplete task definition."""
-    path = write_manifest(manifest_root, tasks=task_table("demo-task", drop=(field,)))
+    path = write_manifest(
+        manifest_root,
+        tasks=task_table("demo-task", manifest_root, drop=(field,)),
+    )
 
     with pytest.raises(ManifestError, match=field):
         validate_manifest(path)
@@ -84,7 +97,7 @@ def test_empty_command_allowlist_is_rejected(manifest_root: Path) -> None:
     """An empty allowlist with --yes would leave the effect gate undefined."""
     path = write_manifest(
         manifest_root,
-        tasks=task_table("demo-task", overrides={"commands": []}),
+        tasks=task_table("demo-task", manifest_root, overrides={"commands": []}),
     )
 
     with pytest.raises(ManifestError, match="commands"):
@@ -108,7 +121,7 @@ def test_out_of_bounds_command_allowlist_entries_are_rejected(
     """Prefix or escaping allowlist entries would authorize unlisted effects."""
     path = write_manifest(
         manifest_root,
-        tasks=task_table("demo-task", overrides={"commands": [entry]}),
+        tasks=task_table("demo-task", manifest_root, overrides={"commands": [entry]}),
     )
 
     with pytest.raises(ManifestError, match="commands"):
@@ -120,7 +133,9 @@ def test_duplicate_task_ids_are_rejected(manifest_root: Path) -> None:
     write_task_tree(manifest_root, "other-task")
     path = write_manifest(
         manifest_root,
-        tasks=task_table("demo-task") + "\n" + task_table("demo-task"),
+        tasks=task_table("demo-task", manifest_root)
+        + "\n"
+        + task_table("demo-task", manifest_root),
     )
 
     with pytest.raises(ManifestError, match="task_id"):
@@ -131,7 +146,7 @@ def test_unknown_category_is_rejected(manifest_root: Path) -> None:
     """An unknown category would break per-category reporting in the summary."""
     path = write_manifest(
         manifest_root,
-        tasks=task_table("demo-task", overrides={"category": "refactor"}),
+        tasks=task_table("demo-task", manifest_root, overrides={"category": "refactor"}),
     )
 
     with pytest.raises(ManifestError, match="category"):
@@ -142,7 +157,7 @@ def test_unknown_task_field_is_rejected(manifest_root: Path) -> None:
     """Silently ignoring an unknown field would hide a misspelled constraint."""
     path = write_manifest(
         manifest_root,
-        tasks=task_table("demo-task", overrides={"protected_paths": ["src"]}),
+        tasks=task_table("demo-task", manifest_root, overrides={"protected_paths": ["src"]}),
     )
 
     with pytest.raises(ManifestError, match="protected_paths"):
@@ -164,7 +179,10 @@ def test_out_of_bounds_scope_and_timeout_are_rejected(
     overrides: dict[str, object],
 ) -> None:
     """Unbounded scope or timeout would make a run neither comparable nor safe."""
-    path = write_manifest(manifest_root, tasks=task_table("demo-task", overrides=overrides))
+    path = write_manifest(
+        manifest_root,
+        tasks=task_table("demo-task", manifest_root, overrides=overrides),
+    )
 
     with pytest.raises(ManifestError):
         validate_manifest(path)
@@ -179,6 +197,7 @@ def test_oracle_and_gold_must_live_outside_the_read_only_baseline(manifest_root:
         manifest_root,
         tasks=task_table(
             "demo-task",
+            manifest_root,
             overrides={"target_oracle": "demo-task/baseline/oracle/target.py"},
         ),
     )
@@ -203,6 +222,60 @@ def test_manifest_without_tasks_is_rejected(manifest_root: Path) -> None:
         validate_manifest(path)
 
 
+@pytest.mark.parametrize("edit", ["modify", "add"])
+def test_edited_baseline_no_longer_matches_its_recorded_tree_hash(
+    manifest_root: Path,
+    edit: str,
+) -> None:
+    """An unpinned baseline could drift between campaigns and silently change the task."""
+    path = write_manifest(manifest_root)
+    baseline = manifest_root / "demo-task" / "baseline"
+    if edit == "modify":
+        (baseline / "src" / "mod.py").write_text("VALUE = 7\n", encoding="utf-8")
+    else:
+        (baseline / "src" / "extra.py").write_text("EXTRA = 1\n", encoding="utf-8")
+
+    with pytest.raises(ManifestError, match="baseline_tree_hash"):
+        validate_manifest(path)
+
+
+@pytest.mark.parametrize(
+    "field, entry",
+    [
+        ("target_oracle_hash", "target.py"),
+        ("regression_oracle_hash", "regression.py"),
+    ],
+)
+def test_edited_oracle_no_longer_matches_its_recorded_hash(
+    manifest_root: Path,
+    field: str,
+    entry: str,
+) -> None:
+    """An unpinned oracle could be relaxed after publication without leaving a trace."""
+    path = write_manifest(manifest_root)
+    (manifest_root / "demo-task" / "oracle" / entry).write_text(
+        "import sys\nsys.exit(0)\n", encoding="utf-8"
+    )
+
+    with pytest.raises(ManifestError, match=field):
+        validate_manifest(path)
+
+
+@pytest.mark.parametrize(
+    "field",
+    ["baseline_tree_hash", "target_oracle_hash", "regression_oracle_hash"],
+)
+def test_recorded_hashes_must_be_sha256_digests(manifest_root: Path, field: str) -> None:
+    """A truncated or placeholder digest would make the pin unverifiable."""
+    path = write_manifest(
+        manifest_root,
+        tasks=task_table("demo-task", manifest_root, overrides={field: "not-a-digest"}),
+    )
+
+    with pytest.raises(ManifestError, match=field):
+        validate_manifest(path)
+
+
 def test_public_manifest_declares_one_task_per_category() -> None:
     """The delivered P0 task set must cover all four spec categories exactly once."""
     manifest = validate_manifest(PUBLIC_MANIFEST / "manifest.toml")
@@ -211,3 +284,14 @@ def test_public_manifest_declares_one_task_per_category() -> None:
     assert categories == ["large_file_edit", "local_edit", "locate_and_modify", "new_file"]
     assert all(task.error_overlay is not None for task in manifest.tasks)
     assert all(task.commands for task in manifest.tasks)
+    pinned = [
+        digest
+        for task in manifest.tasks
+        for digest in (
+            task.baseline_tree_hash,
+            task.target_oracle_hash,
+            task.regression_oracle_hash,
+        )
+    ]
+    assert len(pinned) == 12
+    assert all(len(digest) == 64 for digest in pinned)

@@ -7,17 +7,27 @@ from pathlib import Path
 import pytest
 
 from coding_agent.evaluation.report import (
+    CompactionFacts,
+    DurationFacts,
+    ModelFacts,
+    ModificationFacts,
+    OracleFacts,
     ReportError,
     RunResult,
+    ToolFacts,
+    UsageFacts,
     classify_failure,
     compute_artifact_correct,
     compute_strict_success,
+    result_from_document,
     run_document,
+    score_result,
     summarize,
     summarize_campaign,
 )
 
 SCHEMAS = Path(__file__).resolve().parents[2] / "evaluation" / "schemas"
+EXAMPLES = Path(__file__).resolve().parents[2] / "evaluation" / "examples"
 
 
 @pytest.fixture
@@ -40,6 +50,89 @@ def run_result() -> RunResult:
         "workspace_tree": "w",
         "diff": "d",
     }
+    return result
+
+
+@pytest.fixture
+def recorded_run() -> RunResult:
+    """One run whose recorded facts all differ from their defaults, as the runner stores them."""
+    result = RunResult(task_id="demo-task", category="local_edit", repeat=2)
+    result.state = "STOPPED"
+    result.stop_reason = "MAX_ROUNDS"
+    result.agent_commit = "0123456789abcdef"
+    result.agent_exit_code = 1
+    result.started_at = "2026-08-28T12:15:53.932466+00:00"
+    result.finished_at = "2026-08-28T12:15:54.182792+00:00"
+    result.hashes = {
+        "config": "c",
+        "task": "t",
+        "prompt": "p",
+        "tool_schema": "s",
+        "baseline_tree": "b",
+        "workspace_tree": "w",
+        "diff": "d",
+    }
+    result.model = ModelFacts(
+        usage=UsageFacts(
+            input_tokens=11,
+            output_tokens=22,
+            cache_creation_input_tokens=33,
+            cache_read_input_tokens=44,
+        ),
+        main_requests=4,
+        compaction_requests=1,
+        attempts=6,
+        network_retries=2,
+        usage_coverage=0.75,
+    )
+    result.tools = ToolFacts(
+        proposed=5,
+        executed=4,
+        succeeded=3,
+        failed=1,
+        skipped=1,
+        duplicate_calls=2,
+        output_bytes=812,
+        truncated=1,
+    )
+    result.compaction = CompactionFacts(
+        count=1,
+        requests=1,
+        above_target=True,
+        input_tokens_before=9000,
+        input_tokens_after=4000,
+        estimated_summary_tokens=700,
+        provider_summary_output_tokens=640,
+        estimated_minus_provider_tokens=60,
+    )
+    result.target_oracle = OracleFacts(passed=True, exit_code=0, duration_ms=117, errored=False)
+    result.regression_oracle = OracleFacts(
+        passed=False, exit_code=1, duration_ms=118, errored=False
+    )
+    result.oracle_passed = True
+    result.regressions_passed = False
+    result.modifications = ModificationFacts(
+        files_added=1,
+        files_modified=2,
+        files_deleted=1,
+        lines_added=16,
+        lines_removed=3,
+        out_of_scope_paths=["docs/notes.md"],
+    )
+    result.forbidden_changes = ["README.md"]
+    result.detected_workspace_escape = True
+    result.durations = DurationFacts(
+        workspace_prepare_ms=7,
+        agent_process_ms=4,
+        oracle_ms=239,
+        total_ms=250,
+        agent_monotonic_ms=41277,
+        retry_wait_monotonic_ms=13,
+        tool_execution_monotonic_ms=1904,
+    )
+    result.agent_report = {"schema_version": "run-report-v1", "state": "STOPPED"}
+    result.model_identity = {"name": "claude-test-model-2026", "max_output_tokens": 4096}
+    score_result(result)
     return result
 
 
@@ -109,6 +202,7 @@ def test_harness_outcomes_stay_out_of_the_capability_denominator(
     run_result.oracle_passed = True
     run_result.regressions_passed = True
     run_result.state = "COMPLETED"
+    score_result(run_result)
     setup = RunResult(task_id="setup-task", category="new_file", repeat=1, outcome="HARNESS_SETUP")
     oracle = RunResult(
         task_id="oracle-task",
@@ -148,6 +242,8 @@ def test_robust_tasks_require_a_majority_of_repeats(run_result: RunResult) -> No
     second.regressions_passed = True
     second.state = "COMPLETED"
     third = RunResult(task_id="demo-task", category="local_edit", repeat=3)
+    for entry in (run_result, second, third):
+        score_result(entry)
 
     summary = summarize([run_result, second, third])
 
@@ -205,6 +301,28 @@ def test_successful_run_has_no_failure_classification(run_result: RunResult) -> 
     assert classify_failure(run_result) == (None, None)
 
 
+def test_summary_names_the_model_that_produced_its_numbers(run_result: RunResult) -> None:
+    """A published aggregate without a model identity cannot be compared with anything."""
+    run_result.model_identity = {"name": "claude-test-model-2026"}
+    second = RunResult(task_id="demo-task", category="local_edit", repeat=2)
+    second.model_identity = {"name": "claude-test-model-2026"}
+
+    summary = summarize([run_result, second])
+
+    assert summary.model_identity == {"name": "claude-test-model-2026"}
+
+
+def test_summary_model_identity_stays_null_when_runs_disagree(run_result: RunResult) -> None:
+    """Naming one model for a campaign that mixed two would misattribute every number."""
+    run_result.model_identity = {"name": "claude-test-model-2026"}
+    second = RunResult(task_id="demo-task", category="local_edit", repeat=2)
+    second.model_identity = {"name": "claude-other-model-2026"}
+
+    summary = summarize([run_result, second])
+
+    assert summary.model_identity is None
+
+
 def test_run_document_matches_the_published_schema_and_hides_raw_inputs(
     run_result: RunResult,
 ) -> None:
@@ -258,6 +376,75 @@ def test_run_and_summary_documents_agree_on_every_number(
     assert (tmp_path / "reports" / "report.md").exists()
 
 
+def test_reread_keeps_every_recorded_oracle_outcome(recorded_run: RunResult) -> None:
+    """Back-deriving oracle results from score flags would publish an outcome never observed."""
+    document = run_document(recorded_run, campaign_id="campaign-1")
+
+    reread = result_from_document(document)
+
+    assert reread.oracle_passed is True
+    assert reread.regressions_passed is False
+    assert reread.target_oracle == OracleFacts(
+        passed=True, exit_code=0, duration_ms=117, errored=False
+    )
+    assert reread.regression_oracle == OracleFacts(
+        passed=False, exit_code=1, duration_ms=118, errored=False
+    )
+
+
+def test_reread_reproduces_the_recorded_run_document(recorded_run: RunResult) -> None:
+    """A fact dropped while re-reading would make published metrics read zeros without failing."""
+    document = run_document(recorded_run, campaign_id="campaign-1")
+
+    assert run_document(result_from_document(document), campaign_id="campaign-1") == document
+
+
+def test_reread_keeps_the_recorded_compaction_and_duration_measurements(
+    recorded_run: RunResult,
+    tmp_path: Path,
+) -> None:
+    """Published summaries come from runs.jsonl, so a zeroed re-read would erase measurements."""
+    document = run_document(recorded_run, campaign_id="campaign-1")
+    input_dir = tmp_path / "campaign"
+    input_dir.mkdir()
+    (input_dir / "runs.jsonl").write_text(json.dumps(document) + "\n", encoding="utf-8")
+
+    reread = result_from_document(document)
+    summary = summarize_campaign(input_dir, tmp_path / "reports")
+
+    assert reread.compaction == recorded_run.compaction
+    assert reread.durations == recorded_run.durations
+    assert summary.compaction_runs == 1
+    assert summary.agent_monotonic_ms["total"] == 41277
+    assert summary.total_input_tokens == 11
+
+
+def test_summary_never_recomputes_a_recorded_score_flag(
+    run_result: RunResult,
+    tmp_path: Path,
+) -> None:
+    """Recomputing a score while summarizing would let a re-read overrule the immutable record."""
+    passed = OracleFacts(passed=True, exit_code=0, duration_ms=5, errored=False)
+    run_result.target_oracle = passed
+    run_result.regression_oracle = passed
+    run_result.oracle_passed = True
+    run_result.regressions_passed = True
+    run_result.state = "COMPLETED"
+    score_result(run_result)
+    document = run_document(run_result, campaign_id="campaign-1")
+    document["strict_success"] = False
+    document["artifact_correct"] = False
+    input_dir = tmp_path / "campaign"
+    input_dir.mkdir()
+    (input_dir / "runs.jsonl").write_text(json.dumps(document) + "\n", encoding="utf-8")
+
+    summary = summarize_campaign(input_dir, tmp_path / "reports")
+
+    assert summary.strict_success_runs == 0
+    assert summary.artifact_correct_runs == 0
+    assert summary.tasks[0].results == (False,)
+
+
 def test_summarize_campaign_refuses_to_overwrite_an_existing_report(
     run_result: RunResult,
     tmp_path: Path,
@@ -297,4 +484,19 @@ def test_summary_document_matches_the_published_schema(run_result: RunResult) ->
     document = summary.to_document()
 
     assert set(schema["required"]) <= set(document)
+    assert set(document) == set(schema["properties"])
+
+
+@pytest.mark.parametrize(
+    "example, schema_name",
+    [
+        ("run-v1.redacted.json", "run-v1.schema.json"),
+        ("summary-v1.json", "summary-v1.schema.json"),
+    ],
+)
+def test_published_examples_carry_every_documented_field(example: str, schema_name: str) -> None:
+    """A stale example would advertise a document shape the harness no longer writes."""
+    document = json.loads((EXAMPLES / example).read_text(encoding="utf-8"))
+    schema = json.loads((SCHEMAS / schema_name).read_text(encoding="utf-8"))
+
     assert set(document) == set(schema["properties"])

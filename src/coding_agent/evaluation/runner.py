@@ -9,7 +9,6 @@ directory, and oracles always execute outside that workspace.
 from __future__ import annotations
 
 import difflib
-import hashlib
 import json
 import os
 import shutil
@@ -23,7 +22,15 @@ from pathlib import Path
 from uuid import uuid4
 
 from coding_agent.config import AppSettings, ConfigurationError, load_settings
-from coding_agent.evaluation.manifest import EvaluationManifest, TaskSpec, workspace_scope
+from coding_agent.evaluation.manifest import (
+    IGNORED_NAMES,
+    EvaluationManifest,
+    TaskSpec,
+    content_hash,
+    tree_files,
+    tree_hash,
+    workspace_scope,
+)
 from coding_agent.evaluation.report import (
     AGENT_ARGV_OPTIONS,
     OUTCOME_HARNESS_ORACLE_ERROR,
@@ -36,17 +43,14 @@ from coding_agent.evaluation.report import (
     Summary,
     ToolFacts,
     UsageFacts,
-    classify_failure,
-    compute_artifact_correct,
-    compute_strict_success,
     run_document,
+    score_result,
     summarize_campaign,
     write_run_document,
 )
 from coding_agent.runtime.metrics import canonical_hash
 
 CANARY_TEXT = "evaluation canary; a change here means the agent wrote outside its workspace\n"
-_IGNORED_NAMES = frozenset({"__pycache__", ".git", ".DS_Store"})
 _ORACLE_TIMEOUT_SECONDS = 120
 _LOCALE_ENV_NAMES = ("LANG", "LC_ALL", "LC_CTYPE")
 
@@ -402,7 +406,7 @@ def _run_once(
     policy_file.write_text(_policy_document(task), encoding="utf-8")
     canary = run_dir / "canary.txt"
     canary.write_text(CANARY_TEXT, encoding="utf-8")
-    baseline_files = _tree_files(task.baseline)
+    baseline_files = tree_files(task.baseline)
     prepared = monotonic()
 
     result = RunResult(task_id=task.task_id, category=task.category, repeat=repeat)
@@ -411,9 +415,9 @@ def _run_once(
     result.hashes = {
         "config": config_hash,
         "task": _task_hash(task, prompt_bytes),
-        "prompt": _sha256(prompt_bytes),
+        "prompt": content_hash(prompt_bytes),
         "tool_schema": None,
-        "baseline_tree": _tree_hash(baseline_files),
+        "baseline_tree": tree_hash(baseline_files),
         "workspace_tree": None,
         "diff": None,
     }
@@ -458,9 +462,9 @@ def _run_once(
     result.agent_exit_code = process.exit_code
     result.agent_timed_out = process.timed_out
 
-    workspace_files = _tree_files(workspace)
+    workspace_files = tree_files(workspace)
     diff = _diff(baseline_files, workspace_files, task.baseline, workspace)
-    result.hashes["workspace_tree"] = _tree_hash(workspace_files)
+    result.hashes["workspace_tree"] = tree_hash(workspace_files)
     result.hashes["diff"] = _diff_hash(baseline_files, workspace_files)
     result.modifications = ModificationFacts(
         files_added=len(diff.added),
@@ -477,7 +481,7 @@ def _run_once(
     ]
     result.detected_workspace_escape = (
         canary.read_text(encoding="utf-8") != CANARY_TEXT
-        or _tree_hash(_tree_files(task.baseline)) != result.hashes["baseline_tree"]
+        or tree_hash(tree_files(task.baseline)) != result.hashes["baseline_tree"]
     )
 
     report = _read_agent_report(invocation.report_out)
@@ -531,9 +535,7 @@ def _finalize(
     result.durations.oracle_ms = _elapsed_ms(finished_agent, end)
     result.durations.total_ms = _elapsed_ms(started, end)
     result.finished_at = datetime.now(UTC).isoformat()
-    result.strict_success = compute_strict_success(result)
-    result.artifact_correct = compute_artifact_correct(result)
-    result.failure_stage, result.failure_kind = classify_failure(result)
+    score_result(result)
     write_run_document(run_dir / "run.json", result, campaign_id)
     return result
 
@@ -544,6 +546,7 @@ def _absorb_agent_report(result: RunResult, report: Mapping[str, object]) -> Non
     result.stop_reason = _text(report.get("stop_reason"))
     result.error_kind = _text(report.get("error_kind"))
     result.hashes["tool_schema"] = _text(report.get("tool_schema_hash"))
+    result.model_identity = _mapping(report.get("model_identity")) or None
     model = _mapping(report.get("model"))
     main = _mapping(model.get("main"))
     compaction = _mapping(model.get("compaction"))
@@ -637,11 +640,11 @@ def _task_hash(task: TaskSpec, prompt_bytes: bytes) -> str:
             "forbidden_paths": list(task.forbidden_paths),
             "timeout_seconds": task.timeout_seconds,
             "commands": [dict(entry) for entry in task.commands],
-            "prompt": _sha256(prompt_bytes),
-            "baseline_tree": _tree_hash(_tree_files(task.baseline)),
-            "gold_tree": _tree_hash(_tree_files(task.gold_overlay)),
-            "target_oracle": _sha256(task.target_oracle.read_bytes()),
-            "regression_oracle": _sha256(task.regression_oracle.read_bytes()),
+            "prompt": content_hash(prompt_bytes),
+            "baseline_tree": tree_hash(tree_files(task.baseline)),
+            "gold_tree": tree_hash(tree_files(task.gold_overlay)),
+            "target_oracle": content_hash(task.target_oracle.read_bytes()),
+            "regression_oracle": content_hash(task.regression_oracle.read_bytes()),
         }
     )
 
@@ -651,7 +654,7 @@ def _materialize(baseline: Path, destination: Path) -> Path:
     shutil.copytree(
         baseline,
         destination,
-        ignore=shutil.ignore_patterns(*sorted(_IGNORED_NAMES), "*.pyc"),
+        ignore=shutil.ignore_patterns(*sorted(IGNORED_NAMES), "*.pyc"),
     )
     return destination
 
@@ -661,24 +664,8 @@ def _overlay(overlay: Path, destination: Path) -> None:
         overlay,
         destination,
         dirs_exist_ok=True,
-        ignore=shutil.ignore_patterns(*sorted(_IGNORED_NAMES), "*.pyc"),
+        ignore=shutil.ignore_patterns(*sorted(IGNORED_NAMES), "*.pyc"),
     )
-
-
-def _tree_files(root: Path) -> dict[str, str]:
-    files: dict[str, str] = {}
-    for path in sorted(root.rglob("*")):
-        if not path.is_file() or path.is_symlink():
-            continue
-        relative = path.relative_to(root)
-        if any(part in _IGNORED_NAMES for part in relative.parts) or path.suffix == ".pyc":
-            continue
-        files[relative.as_posix()] = _sha256(path.read_bytes())
-    return files
-
-
-def _tree_hash(files: Mapping[str, str]) -> str:
-    return canonical_hash(dict(sorted(files.items())))
 
 
 def _diff_hash(baseline: Mapping[str, str], candidate: Mapping[str, str]) -> str:
@@ -811,10 +798,6 @@ def _setup_detail(
 
 def _elapsed_ms(started: float, finished: float) -> int:
     return max(0, round((finished - started) * 1000))
-
-
-def _sha256(data: bytes) -> str:
-    return hashlib.sha256(data).hexdigest()
 
 
 def _mapping(value: object) -> Mapping[str, object]:

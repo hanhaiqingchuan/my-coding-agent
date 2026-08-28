@@ -20,6 +20,8 @@ from coding_agent.evaluation.report import (
     Summary,
     compute_artifact_correct,
     compute_strict_success,
+    result_from_document,
+    score_result,
     summarize,
     summarize_campaign,
 )
@@ -45,7 +47,9 @@ __all__ = [
     "TaskSpec",
     "compute_artifact_correct",
     "compute_strict_success",
+    "result_from_document",
     "run_campaign",
+    "score_result",
     "summarize",
     "summarize_campaign",
     "validate_manifest",

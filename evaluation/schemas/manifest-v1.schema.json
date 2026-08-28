@@ -24,9 +24,12 @@
         "category",
         "prompt",
         "baseline",
+        "baseline_tree_hash",
         "gold_overlay",
         "target_oracle",
+        "target_oracle_hash",
         "regression_oracle",
+        "regression_oracle_hash",
         "allowed_paths",
         "timeout_seconds",
         "commands"
@@ -44,6 +47,11 @@
           "type": "string",
           "description": "Read-only baseline tree; every repeat is a fresh copy of it."
         },
+        "baseline_tree_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "sha256 over the canonical JSON of the baseline's path-to-content-hash mapping, ignoring __pycache__, .git, .DS_Store and *.pyc. Validation recomputes it and rejects the manifest on any mismatch."
+        },
         "gold_overlay": {
           "type": "string",
           "description": "Gold patch expressed as a file overlay so no external patch tool is required."
@@ -56,9 +64,19 @@
           "type": "string",
           "description": "Script run outside the workspace with the candidate workspace as argv[1]. Exit 0 passes, exit 1 fails, any other code is a harness oracle error."
         },
+        "target_oracle_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "sha256 of the target oracle's bytes. Validation recomputes it and rejects the manifest on any mismatch."
+        },
         "regression_oracle": {
           "type": "string",
           "description": "Script proving pre-existing behaviour survived; same contract as target_oracle."
+        },
+        "regression_oracle_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "sha256 of the regression oracle's bytes. Validation recomputes it and rejects the manifest on any mismatch."
         },
         "allowed_paths": {
           "type": "array",

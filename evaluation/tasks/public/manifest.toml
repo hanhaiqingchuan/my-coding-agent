@@ -4,16 +4,25 @@ manifest_id = "public-p0"
 # Four self-authored, redistributable P0 tasks, one per category of design section 18.4.
 # Every path is relative to this file, stays inside this directory, and lives outside the
 # read-only baseline so that gold overlays and oracles never reach the agent workspace.
+#
+# Each task pins what it ships: `baseline_tree_hash` is the sha256 over the canonical JSON of
+# the baseline's path-to-content-hash mapping (ignoring `__pycache__`, `.git`, `.DS_Store` and
+# `*.pyc`), and each oracle hash is the sha256 of that oracle file's bytes. `coding-agent-eval
+# validate` recomputes all three and refuses the manifest on any mismatch, so a baseline or an
+# oracle cannot be edited between campaigns without invalidating this file.
 
 [[tasks]]
 task_id = "new-file-slugify"
 category = "new_file"
 prompt = "new-file-slugify/prompt.md"
 baseline = "new-file-slugify/baseline"
+baseline_tree_hash = "7b43c81858e4e878f765d843fdff5d24d3770161422d02efe67c92d4475f5f89"
 gold_overlay = "new-file-slugify/gold"
 error_overlay = "new-file-slugify/error"
 target_oracle = "new-file-slugify/oracle/target.py"
+target_oracle_hash = "c948f14bb53daa1a9bef53fcc4c635c734db538062b1b8bb48fbd49f0d822f60"
 regression_oracle = "new-file-slugify/oracle/regression.py"
+regression_oracle_hash = "9b96a737ade800562a82da7479540cf46c539922cddb2f906916824a1117cd1f"
 allowed_paths = ["src/textkit"]
 forbidden_paths = ["tests", "README.md"]
 timeout_seconds = 900
@@ -26,10 +35,13 @@ task_id = "local-edit-clamp"
 category = "local_edit"
 prompt = "local-edit-clamp/prompt.md"
 baseline = "local-edit-clamp/baseline"
+baseline_tree_hash = "08608de3259c427b37a71c28f675fad3b912da1c8ebd72e443d184d2341575c8"
 gold_overlay = "local-edit-clamp/gold"
 error_overlay = "local-edit-clamp/error"
 target_oracle = "local-edit-clamp/oracle/target.py"
+target_oracle_hash = "a680fb91b9db60dd58a8e62a1006d4b840bb7c6b604bf7548e3363411d6ab552"
 regression_oracle = "local-edit-clamp/oracle/regression.py"
+regression_oracle_hash = "b66d532969efdbd333c1d5c056e326af6dad400ea3358a31d30d41ad2de0dad6"
 allowed_paths = ["src/mathkit/ranges.py"]
 forbidden_paths = ["tests", "README.md"]
 timeout_seconds = 900
@@ -42,10 +54,13 @@ task_id = "locate-two-files"
 category = "locate_and_modify"
 prompt = "locate-two-files/prompt.md"
 baseline = "locate-two-files/baseline"
+baseline_tree_hash = "d5d4cdcde3b36f28eeb5227b96c33f3a6a0bc909ec829e865a0d1da49cc8662c"
 gold_overlay = "locate-two-files/gold"
 error_overlay = "locate-two-files/error"
 target_oracle = "locate-two-files/oracle/target.py"
+target_oracle_hash = "5f72d89f2f1b6cd8fa0636dd84fc46d7664cfbac90b591f97af80d7e6971446a"
 regression_oracle = "locate-two-files/oracle/regression.py"
+regression_oracle_hash = "dd635bd47fc2f453bf01421362670e48d0bbf36eeb7163cfa7a585e2e9a1007f"
 allowed_paths = ["src/pipeline"]
 forbidden_paths = ["tests", "README.md"]
 timeout_seconds = 900
@@ -58,10 +73,13 @@ task_id = "large-file-handlers"
 category = "large_file_edit"
 prompt = "large-file-handlers/prompt.md"
 baseline = "large-file-handlers/baseline"
+baseline_tree_hash = "9176b6c39c13ad6d6c20cb3bec256a3dcbfd6286ba382e631a1035a6055ce7a1"
 gold_overlay = "large-file-handlers/gold"
 error_overlay = "large-file-handlers/error"
 target_oracle = "large-file-handlers/oracle/target.py"
+target_oracle_hash = "20b09e5c016392cdc9ce4a43af47e4bb382225d5d01894b4e808d7c7dbb3fdd1"
 regression_oracle = "large-file-handlers/oracle/regression.py"
+regression_oracle_hash = "173bfe60524ea128ba3cc1865dac3e7ca8a05de29a1bafbb21ce3212f524a999"
 allowed_paths = ["src/dispatch/handlers.py"]
 forbidden_paths = ["tests", "README.md"]
 timeout_seconds = 900

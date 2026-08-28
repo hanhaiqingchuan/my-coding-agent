@@ -3,31 +3,42 @@
 This module never executes a task. It only proves that a manifest describes a
 complete, self-contained and in-bounds task set, so that every later stage can
 assume its paths exist inside the manifest directory and its allowlist is exact.
+It also owns the harness's single content-hashing implementation and uses it to
+verify each task's pinned baseline tree and oracle hashes against the files on disk.
 """
 
 from __future__ import annotations
 
+import hashlib
 import tomllib
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
+from coding_agent.runtime.metrics import canonical_hash
+
 SCHEMA_VERSION = "evaluation-manifest-v1"
 CATEGORIES = ("new_file", "local_edit", "locate_and_modify", "large_file_edit")
 MAX_TIMEOUT_SECONDS = 3_600
+IGNORED_NAMES = frozenset({"__pycache__", ".git", ".DS_Store"})
 _TOP_LEVEL_FIELDS = frozenset({"schema_version", "manifest_id", "tasks"})
 _REQUIRED_TASK_FIELDS = (
     "task_id",
     "category",
     "prompt",
     "baseline",
+    "baseline_tree_hash",
     "gold_overlay",
     "target_oracle",
+    "target_oracle_hash",
     "regression_oracle",
+    "regression_oracle_hash",
     "allowed_paths",
     "timeout_seconds",
     "commands",
 )
+_HASH_FIELDS = ("baseline_tree_hash", "target_oracle_hash", "regression_oracle_hash")
+_HEX_DIGITS = frozenset("0123456789abcdef")
 _OPTIONAL_TASK_FIELDS = ("error_overlay", "forbidden_paths")
 _FILE_FIELDS = ("prompt", "target_oracle", "regression_oracle")
 _DIRECTORY_FIELDS = ("baseline", "gold_overlay", "error_overlay")
@@ -35,6 +46,33 @@ _DIRECTORY_FIELDS = ("baseline", "gold_overlay", "error_overlay")
 
 class ManifestError(ValueError):
     """Raised when a manifest is missing, malformed, or out of bounds."""
+
+
+def content_hash(data: bytes) -> str:
+    """Hash one file's exact bytes; the harness has no second hashing implementation."""
+    return hashlib.sha256(data).hexdigest()
+
+
+def tree_files(root: Path) -> dict[str, str]:
+    """Map every regular file below ``root`` to its content hash, ignoring build noise.
+
+    Symlinks, ``__pycache__``, ``.git``, ``.DS_Store`` and byte-compiled files stay out, so
+    a recorded tree hash survives anyone merely running the baseline's own test suite.
+    """
+    files: dict[str, str] = {}
+    for path in sorted(root.rglob("*")):
+        if not path.is_file() or path.is_symlink():
+            continue
+        relative = path.relative_to(root)
+        if any(part in IGNORED_NAMES for part in relative.parts) or path.suffix == ".pyc":
+            continue
+        files[relative.as_posix()] = content_hash(path.read_bytes())
+    return files
+
+
+def tree_hash(files: Mapping[str, str]) -> str:
+    """Hash one tree's path-to-content-hash mapping over its canonical JSON encoding."""
+    return canonical_hash(dict(sorted(files.items())))
 
 
 @dataclass(frozen=True, slots=True)
@@ -48,6 +86,9 @@ class TaskSpec:
     gold_overlay: Path
     target_oracle: Path
     regression_oracle: Path
+    baseline_tree_hash: str
+    target_oracle_hash: str
+    regression_oracle_hash: str
     allowed_paths: tuple[str, ...]
     forbidden_paths: tuple[str, ...]
     timeout_seconds: int
@@ -155,6 +196,15 @@ def _task(entry: object, index: int, root: Path) -> TaskSpec:
     if not 0 < timeout <= MAX_TIMEOUT_SECONDS:
         raise ManifestError(f"{field}.timeout_seconds: must be between 1 and {MAX_TIMEOUT_SECONDS}")
 
+    recorded = {name: _digest(entry[name], f"{field}.{name}") for name in _HASH_FIELDS}
+    _verify_pinned_inputs(
+        field,
+        recorded,
+        baseline=baseline,
+        target_oracle=resolved["target_oracle"],
+        regression_oracle=resolved["regression_oracle"],
+    )
+
     return TaskSpec(
         task_id=task_id,
         category=category,
@@ -163,12 +213,47 @@ def _task(entry: object, index: int, root: Path) -> TaskSpec:
         gold_overlay=resolved["gold_overlay"],
         target_oracle=resolved["target_oracle"],
         regression_oracle=resolved["regression_oracle"],
+        baseline_tree_hash=recorded["baseline_tree_hash"],
+        target_oracle_hash=recorded["target_oracle_hash"],
+        regression_oracle_hash=recorded["regression_oracle_hash"],
         allowed_paths=allowed,
         forbidden_paths=forbidden,
         timeout_seconds=timeout,
         commands=_commands(entry["commands"], f"{field}.commands", baseline),
         error_overlay=resolved.get("error_overlay"),
     )
+
+
+def _digest(value: object, field: str) -> str:
+    if not isinstance(value, str) or len(value) != 64 or set(value) - _HEX_DIGITS:
+        raise ManifestError(f"{field}: must be a 64-character lowercase sha256 hex digest")
+    return value
+
+
+def _verify_pinned_inputs(
+    field: str,
+    recorded: Mapping[str, str],
+    *,
+    baseline: Path,
+    target_oracle: Path,
+    regression_oracle: Path,
+) -> None:
+    """Prove the recorded hashes still describe the files this manifest points at.
+
+    Without this check a baseline or an oracle could be edited between campaigns and every
+    result would still claim to come from the pinned task.
+    """
+    on_disk = {
+        "baseline_tree_hash": tree_hash(tree_files(baseline)),
+        "target_oracle_hash": content_hash(target_oracle.read_bytes()),
+        "regression_oracle_hash": content_hash(regression_oracle.read_bytes()),
+    }
+    for name, expected in recorded.items():
+        if on_disk[name] != expected:
+            raise ManifestError(
+                f"{field}.{name}: recorded {expected} does not match the content on disk "
+                f"({on_disk[name]})"
+            )
 
 
 def _existing(value: object, root: Path, field: str, *, directory: bool) -> Path:
@@ -250,9 +335,13 @@ def workspace_scope(paths: Sequence[str], candidate: str) -> bool:
 __all__ = [
     "CATEGORIES",
     "EvaluationManifest",
+    "IGNORED_NAMES",
     "ManifestError",
     "SCHEMA_VERSION",
     "TaskSpec",
+    "content_hash",
+    "tree_files",
+    "tree_hash",
     "validate_manifest",
     "workspace_scope",
 ]

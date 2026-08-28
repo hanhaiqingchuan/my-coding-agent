@@ -9,6 +9,7 @@
     "schema_version",
     "campaign_id",
     "agent_commit",
+    "model_identity",
     "provider",
     "started_runs",
     "valid_runs",
@@ -30,6 +31,17 @@
     "schema_version": { "const": "summary-v1" },
     "campaign_id": { "type": ["string", "null"] },
     "agent_commit": { "type": ["string", "null"] },
+    "model_identity": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "description": "The single model identity every run in this campaign recorded. Null when no run recorded one, or when the runs disagree — a campaign that mixed models must not be labelled with one.",
+      "properties": {
+        "name": { "type": ["string", "null"] },
+        "context_window": { "type": ["integer", "null"] },
+        "max_output_tokens": { "type": ["integer", "null"] },
+        "stream": { "type": ["boolean", "null"] }
+      }
+    },
     "provider": { "const": "anthropic_messages" },
     "started_runs": { "type": "integer", "minimum": 0 },
     "valid_runs": {

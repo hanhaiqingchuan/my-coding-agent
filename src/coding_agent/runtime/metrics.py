@@ -2,7 +2,8 @@
 
 The run report is a projection of facts SQLite already owns. Nothing here mutates
 state, and nothing here exports prompt text, tool arguments, command output, or
-absolute paths: only counts, hashes, token usage and durations.
+absolute paths: only counts, hashes, token usage, durations and the model identity
+the run's own configuration snapshot records — never the credential or the endpoint.
 """
 
 from __future__ import annotations
@@ -99,6 +100,7 @@ def build_run_report(
         "started_at": run.started_at.isoformat(),
         "finished_at": run.finished_at.isoformat() if run.finished_at is not None else None,
         "tool_schema_hash": tool_schema_hash(tool_schemas),
+        "model_identity": _model_identity(run.config_snapshot),
         "model": {"main": _model_facts(main), "compaction": _model_facts(compaction)},
         "tools": tool_facts,
         "compaction": _compaction_facts(snapshot, requests),
@@ -110,6 +112,30 @@ def build_run_report(
             "compaction_request_elapsed_ms": _elapsed_ms(compaction),
         },
     }
+
+
+def _model_identity(config_snapshot: Mapping[str, object]) -> dict[str, object | None]:
+    """Project the model identity out of the run's own persisted configuration snapshot.
+
+    The snapshot is the configuration this run actually served its requests with, so it
+    cannot drift from the process that produced the numbers. The credential and the API
+    endpoint are deliberately left out: neither identifies a model, and a published report
+    must not carry them.
+    """
+    values = config_snapshot.get("model")
+    model = values if isinstance(values, Mapping) else {}
+    name = model.get("model")
+    stream = model.get("stream")
+    return {
+        "name": name if isinstance(name, str) else None,
+        "context_window": _setting_int(model.get("context_window")),
+        "max_output_tokens": _setting_int(model.get("max_output_tokens")),
+        "stream": stream if isinstance(stream, bool) else None,
+    }
+
+
+def _setting_int(value: object) -> int | None:
+    return value if isinstance(value, int) and not isinstance(value, bool) else None
 
 
 def _model_facts(requests: Sequence[Mapping[str, object]]) -> dict[str, object]:

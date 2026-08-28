@@ -66,6 +66,12 @@
         "usage_coverage": 1.0
       }
     },
+    "model_identity": {
+      "context_window": 64000,
+      "max_output_tokens": 8192,
+      "name": "claude-model-name",
+      "stream": true
+    },
     "run_id": "00000000-0000-4000-8000-000000000001",
     "schema_version": "run-report-v1",
     "session_id": "00000000-0000-4000-8000-000000000002",
@@ -155,6 +161,12 @@
       "output_tokens": 1301
     },
     "usage_coverage": 1.0
+  },
+  "model_identity": {
+    "context_window": 64000,
+    "max_output_tokens": 8192,
+    "name": "claude-model-name",
+    "stream": true
   },
   "modifications": {
     "detected_workspace_escape": false,

@@ -131,6 +131,7 @@ def test_headless_run_uses_injected_runtime_and_writes_versioned_report(tmp_path
         "tools",
         "compaction",
         "durations",
+        "model_identity",
     }
     assert len(report["tool_schema_hash"]) == 64
     assert report["model"]["main"]["requests"] == 1
@@ -153,6 +154,48 @@ def test_headless_run_uses_injected_runtime_and_writes_versioned_report(tmp_path
     }
     assert report["durations"]["agent_monotonic_ms"] == 0
     assert report["durations"]["retry_wait_monotonic_ms"] == 0
+
+
+def test_report_records_the_model_identity_that_served_the_requests(tmp_path: Path) -> None:
+    """Numbers nobody can attribute to a model are not a publishable measurement."""
+    paths = _task_files(tmp_path)
+    paths["config"].write_text(
+        '[model]\nmodel = "claude-test-model-2026"\nmax_output_tokens = 4096\n',
+        encoding="utf-8",
+    )
+    dependencies = _dependencies(paths["data_dir"])
+
+    exit_code = cli.main(
+        [
+            "run",
+            "--config",
+            str(paths["config"]),
+            "--workspace",
+            str(paths["workspace"]),
+            "--data-dir",
+            str(paths["data_dir"]),
+            "--prompt-file",
+            str(paths["prompt"]),
+            "--yes",
+            "--ack-unsafe-auto-approve",
+            "--command-policy",
+            str(paths["policy"]),
+            "--report-out",
+            str(paths["report"]),
+        ],
+        dependencies=dependencies,
+    )
+
+    report = json.loads(paths["report"].read_text(encoding="utf-8"))
+    assert exit_code == 0
+    assert report["model_identity"] == {
+        "name": "claude-test-model-2026",
+        "context_window": 64000,
+        "max_output_tokens": 4096,
+        "stream": True,
+    }
+    assert "ANTHROPIC_API_KEY" not in json.dumps(report)
+    assert "api.anthropic.com" not in json.dumps(report)
 
 
 def test_report_keeps_missing_provider_usage_components_null(tmp_path: Path) -> None:

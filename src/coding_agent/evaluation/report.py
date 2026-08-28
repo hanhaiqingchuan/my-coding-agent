@@ -215,6 +215,7 @@ class RunResult:
     hashes: dict[str, str | None] = field(default_factory=dict)
     agent_commit: str | None = None
     agent_report: Mapping[str, object] | None = None
+    model_identity: Mapping[str, object] | None = None
     agent_exit_code: int | None = None
     agent_timed_out: bool = False
     harness_detail: str | None = None
@@ -274,6 +275,17 @@ def classify_failure(result: RunResult) -> tuple[str | None, str | None]:
     return "agent", "unknown"
 
 
+def score_result(result: RunResult) -> None:
+    """Record the score flags and failure classification of one finished run, exactly once.
+
+    Scoring happens here and nowhere else: every later reader, including the summary,
+    treats the recorded flags as the immutable fact and never recomputes them.
+    """
+    result.strict_success = compute_strict_success(result)
+    result.artifact_correct = compute_artifact_correct(result)
+    result.failure_stage, result.failure_kind = classify_failure(result)
+
+
 def run_document(result: RunResult, *, campaign_id: str) -> dict[str, object]:
     """Serialize one run as the versioned, redacted ``run-v1`` document."""
     return {
@@ -284,6 +296,7 @@ def run_document(result: RunResult, *, campaign_id: str) -> dict[str, object]:
         "repeat": result.repeat,
         "provider": PROVIDER,
         "agent_commit": result.agent_commit,
+        "model_identity": dict(result.model_identity) if result.model_identity else None,
         "outcome": result.outcome,
         "strict_success": result.strict_success,
         "artifact_correct": result.artifact_correct,
@@ -345,6 +358,7 @@ class Summary:
 
     campaign_id: str | None
     agent_commit: str | None
+    model_identity: Mapping[str, object] | None
     started_runs: int
     valid_runs: int
     harness_setup_runs: int
@@ -374,6 +388,7 @@ class Summary:
             "schema_version": SUMMARY_SCHEMA_VERSION,
             "campaign_id": self.campaign_id,
             "agent_commit": self.agent_commit,
+            "model_identity": dict(self.model_identity) if self.model_identity else None,
             "provider": PROVIDER,
             "started_runs": self.started_runs,
             "valid_runs": self.valid_runs,
@@ -409,8 +424,8 @@ def summarize(
 ) -> Summary:
     """Aggregate runs while keeping harness outcomes out of the capability denominator."""
     valid = [item for item in results if item.outcome == OUTCOME_OK]
-    strict = [item for item in valid if item.strict_success or compute_strict_success(item)]
-    artifact = [item for item in valid if item.artifact_correct or compute_artifact_correct(item)]
+    strict = [item for item in valid if item.strict_success]
+    artifact = [item for item in valid if item.artifact_correct]
     durations = [
         float(item.durations.agent_monotonic_ms)
         for item in valid
@@ -420,6 +435,7 @@ def summarize(
     return Summary(
         campaign_id=campaign_id,
         agent_commit=agent_commit or next((item.agent_commit for item in results), None),
+        model_identity=_agreed_model_identity(results),
         started_runs=len(results),
         valid_runs=len(valid),
         harness_setup_runs=sum(1 for item in results if item.outcome == OUTCOME_HARNESS_SETUP),
@@ -453,7 +469,7 @@ def summarize(
 def summarize_campaign(input_dir: Path, output_dir: Path) -> Summary:
     """Read one campaign's immutable run records and write its redacted aggregates."""
     documents = _read_documents(input_dir)
-    results = [_result_from_document(document) for document in documents]
+    results = [result_from_document(document) for document in documents]
     campaign_id = next((document.get("campaign_id") for document in documents), None)
     commit = next((document.get("agent_commit") for document in documents), None)
     summary = summarize(
@@ -485,14 +501,18 @@ def _read_documents(input_dir: Path) -> list[Mapping[str, object]]:
     return documents
 
 
-def _result_from_document(document: Mapping[str, object]) -> RunResult:
-    model = _mapping(document.get("model"))
-    usage = _mapping(model.get("usage"))
-    tools = _mapping(document.get("tools"))
-    compaction = _mapping(document.get("compaction"))
+def result_from_document(document: Mapping[str, object]) -> RunResult:
+    """Rebuild one run from its ``run-v1`` document, the exact inverse of :func:`run_document`.
+
+    Nothing here derives one fact from another. A run whose target oracle passed while its
+    regression failed reads back as exactly that, and a measurement the document does not
+    carry stays missing instead of becoming a zero.
+    """
+    oracle = _mapping(document.get("oracle"))
+    target = _oracle_facts(oracle.get("target"))
+    regression = _oracle_facts(oracle.get("regression"))
     modifications = _mapping(document.get("modifications"))
-    durations = _mapping(document.get("durations"))
-    result = RunResult(
+    return RunResult(
         task_id=str(document.get("task_id")),
         category=str(document.get("category")),
         repeat=int(document.get("repeat") or 0),
@@ -500,19 +520,51 @@ def _result_from_document(document: Mapping[str, object]) -> RunResult:
         state=_optional_str(document.get("state")),
         stop_reason=_optional_str(document.get("stop_reason")),
         error_kind=_optional_str(document.get("error_kind")),
+        oracle_passed=bool(target.passed),
+        regressions_passed=bool(regression.passed),
+        forbidden_changes=[
+            str(item) for item in _sequence(modifications.get("forbidden_paths_modified"))
+        ],
+        detected_workspace_escape=bool(modifications.get("detected_workspace_escape")),
         strict_success=bool(document.get("strict_success")),
         artifact_correct=bool(document.get("artifact_correct")),
         failure_stage=_optional_str(document.get("failure_stage")),
         failure_kind=_optional_str(document.get("failure_kind")),
+        model=_model_facts(document.get("model")),
+        tools=_tool_facts(document.get("tools")),
+        compaction=_compaction_facts(document.get("compaction")),
+        target_oracle=target,
+        regression_oracle=regression,
+        modifications=_modification_facts(modifications),
+        durations=_duration_facts(document.get("durations")),
+        hashes={
+            name: _optional_str(value) for name, value in _mapping(document.get("hashes")).items()
+        },
         agent_commit=_optional_str(document.get("agent_commit")),
+        agent_report=_mapping(document.get("agent_report")) or None,
+        model_identity=_mapping(document.get("model_identity")) or None,
+        agent_exit_code=_optional_int(document.get("agent_exit_code")),
+        agent_timed_out=bool(document.get("agent_timed_out")),
+        harness_detail=_optional_str(document.get("harness_detail")),
+        started_at=_optional_str(document.get("started_at")),
+        finished_at=_optional_str(document.get("finished_at")),
     )
-    result.oracle_passed = bool(result.strict_success or result.artifact_correct)
-    result.regressions_passed = result.oracle_passed
-    result.forbidden_changes = [
-        str(item) for item in _sequence(modifications.get("forbidden_paths_modified"))
-    ]
-    result.detected_workspace_escape = bool(modifications.get("detected_workspace_escape"))
-    result.model = ModelFacts(
+
+
+def _oracle_facts(value: object) -> OracleFacts:
+    facts = _mapping(value)
+    return OracleFacts(
+        passed=_optional_bool(facts.get("passed")),
+        exit_code=_optional_int(facts.get("exit_code")),
+        duration_ms=_optional_int(facts.get("duration_ms")),
+        errored=bool(facts.get("errored")),
+    )
+
+
+def _model_facts(value: object) -> ModelFacts:
+    model = _mapping(value)
+    usage = _mapping(model.get("usage"))
+    return ModelFacts(
         usage=UsageFacts(
             input_tokens=_optional_int(usage.get("input_tokens")),
             output_tokens=_optional_int(usage.get("output_tokens")),
@@ -525,20 +577,51 @@ def _result_from_document(document: Mapping[str, object]) -> RunResult:
         network_retries=int(model.get("network_retries") or 0),
         usage_coverage=_optional_float(model.get("usage_coverage")),
     )
-    result.tools = ToolFacts(**{name: int(tools.get(name) or 0) for name in _TOOL_COUNTER_NAMES})
-    result.compaction = CompactionFacts(
-        count=int(compaction.get("count") or 0),
-        requests=int(compaction.get("requests") or 0),
-        above_target=bool(compaction.get("above_target")),
+
+
+def _tool_facts(value: object) -> ToolFacts:
+    tools = _mapping(value)
+    return ToolFacts(**{name: int(tools.get(name) or 0) for name in _TOOL_COUNTER_NAMES})
+
+
+def _compaction_facts(value: object) -> CompactionFacts:
+    facts = _mapping(value)
+    return CompactionFacts(
+        count=int(facts.get("count") or 0),
+        requests=int(facts.get("requests") or 0),
+        above_target=bool(facts.get("above_target")),
+        input_tokens_before=_optional_int(facts.get("input_tokens_before")),
+        input_tokens_after=_optional_int(facts.get("input_tokens_after")),
+        estimated_summary_tokens=_optional_int(facts.get("estimated_summary_tokens")),
+        provider_summary_output_tokens=_optional_int(facts.get("provider_summary_output_tokens")),
+        estimated_minus_provider_tokens=_optional_int(facts.get("estimated_minus_provider_tokens")),
     )
-    result.durations = DurationFacts(
+
+
+def _modification_facts(modifications: Mapping[str, object]) -> ModificationFacts:
+    return ModificationFacts(
+        files_added=int(modifications.get("files_added") or 0),
+        files_modified=int(modifications.get("files_modified") or 0),
+        files_deleted=int(modifications.get("files_deleted") or 0),
+        lines_added=int(modifications.get("lines_added") or 0),
+        lines_removed=int(modifications.get("lines_removed") or 0),
+        out_of_scope_paths=[
+            str(item) for item in _sequence(modifications.get("out_of_scope_paths"))
+        ],
+    )
+
+
+def _duration_facts(value: object) -> DurationFacts:
+    durations = _mapping(value)
+    return DurationFacts(
         workspace_prepare_ms=int(durations.get("workspace_prepare_ms") or 0),
         agent_process_ms=int(durations.get("agent_process_ms") or 0),
         oracle_ms=int(durations.get("oracle_ms") or 0),
         total_ms=int(durations.get("total_ms") or 0),
         agent_monotonic_ms=_optional_int(durations.get("agent_monotonic_ms")),
+        retry_wait_monotonic_ms=_optional_int(durations.get("retry_wait_monotonic_ms")),
+        tool_execution_monotonic_ms=_optional_int(durations.get("tool_execution_monotonic_ms")),
     )
-    return result
 
 
 def _write_outputs(
@@ -614,6 +697,7 @@ def _markdown(summary: Summary) -> str:
         "",
         f"- provider: `{PROVIDER}`",
         f"- agent commit: `{summary.agent_commit or 'unknown'}`",
+        f"- model: `{_model_name(summary.model_identity)}`",
         f"- started runs: {summary.started_runs}",
         f"- valid runs: {summary.valid_runs}",
         f"- harness setup outcomes: {summary.harness_setup_runs}",
@@ -636,6 +720,11 @@ def _markdown(summary: Summary) -> str:
         )
     lines.append("")
     return "\n".join(lines)
+
+
+def _model_name(identity: Mapping[str, object] | None) -> str:
+    name = (identity or {}).get("name")
+    return name if isinstance(name, str) and name else "unknown"
 
 
 def _percent(value: float | None) -> str:
@@ -675,6 +764,14 @@ def _distribution(values: Sequence[float]) -> dict[str, float | None]:
     }
 
 
+def _agreed_model_identity(results: Iterable[RunResult]) -> Mapping[str, object] | None:
+    """Return the one identity every run agrees on, or ``None`` when they do not agree."""
+    recorded = [dict(item.model_identity) for item in results if item.model_identity]
+    if not recorded or any(identity != recorded[0] for identity in recorded[1:]):
+        return None
+    return recorded[0]
+
+
 def _failure_kinds(results: Iterable[RunResult]) -> dict[str, int]:
     counts: dict[str, int] = {}
     for item in results:
@@ -695,8 +792,7 @@ def _task_summaries(results: Sequence[RunResult]) -> tuple[TaskSummary, ...]:
     for task_id, items in ordered.items():
         valid = [entry for entry in items if entry.outcome == OUTCOME_OK]
         flags = tuple(
-            bool(entry.strict_success or compute_strict_success(entry))
-            for entry in sorted(valid, key=lambda entry: entry.repeat)
+            entry.strict_success for entry in sorted(valid, key=lambda entry: entry.repeat)
         )
         successes = sum(1 for value in flags if value)
         summaries.append(
@@ -706,11 +802,7 @@ def _task_summaries(results: Sequence[RunResult]) -> tuple[TaskSummary, ...]:
                 started_runs=len(items),
                 valid_runs=len(valid),
                 strict_success_runs=successes,
-                artifact_correct_runs=sum(
-                    1
-                    for entry in valid
-                    if entry.artifact_correct or compute_artifact_correct(entry)
-                ),
+                artifact_correct_runs=sum(1 for entry in valid if entry.artifact_correct),
                 results=flags,
                 robust=bool(flags) and successes * 2 >= len(flags) and successes >= 2,
             )
@@ -728,6 +820,10 @@ def _sequence(value: object) -> Sequence[object]:
 
 def _optional_str(value: object) -> str | None:
     return value if isinstance(value, str) else None
+
+
+def _optional_bool(value: object) -> bool | None:
+    return value if isinstance(value, bool) else None
 
 
 def _optional_int(value: object) -> int | None:
@@ -778,7 +874,9 @@ __all__ = [
     "classify_failure",
     "compute_artifact_correct",
     "compute_strict_success",
+    "result_from_document",
     "run_document",
+    "score_result",
     "summarize",
     "summarize_campaign",
     "write_run_document",

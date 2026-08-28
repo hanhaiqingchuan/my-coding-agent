@@ -71,16 +71,25 @@ inside the baseline, because only the baseline is ever copied into a workspace.
 Two versioned documents exist, because one process cannot know both halves.
 
 `run-report-v1` is written by the agent itself (`--report-out`). It is a read-only
-projection of facts SQLite already owns: run state, stop reason, error kind, model
-requests and attempts with per-component provider usage, tool statistics with hashed
-arguments, compaction facts, and per-phase durations.
+projection of facts SQLite already owns: run state, stop reason, error kind, the model
+identity taken from the run's own configuration snapshot, model requests and attempts
+with per-component provider usage, tool statistics with hashed arguments, compaction
+facts, and per-phase durations. The identity carries the model name, context window,
+max output tokens and stream flag — never the credential and never the API endpoint.
 
 `run-v1` is written by the evaluator. It embeds the agent report verbatim under
 `agent_report` and adds only harness facts: task id, category and repeat,
 `provider = "anthropic_messages"`, the agent commit, the config/task/prompt/tool-schema
 hashes, the failure stage and kind, the workspace tree and diff hashes, the oracle
-results, and `strict_success` / `artifact_correct`. The evaluator never opens the
+results, and `strict_success` / `artifact_correct`. The model identity is copied out of
+the agent report rather than re-read from the harness's own configuration, because only
+the agent process knows what actually served its requests. The evaluator never opens the
 agent's database and never re-derives an agent fact.
+
+A written `run-v1` document is the immutable record of that run. `summarize` re-reads
+those documents exactly as written: it never recomputes `strict_success` or
+`artifact_correct`, and it never derives an oracle outcome from a score flag. Scoring
+happens once, when the run finishes.
 
 ## Task manifest
 
@@ -89,8 +98,20 @@ directory, and must live outside the baseline. Validation rejects an unknown
 `schema_version`, a path escape, a missing baseline or oracle, an unknown or missing
 field, a duplicate task id, an unknown category, an empty or out-of-bounds
 `allowed_paths`, a `forbidden_paths` entry overlapping `allowed_paths`, a timeout
-outside 1–3600 seconds, and an empty, prefix-shaped or out-of-bounds command
-allowlist. `coding-agent-eval validate` additionally proves, by running the oracles,
+outside 1–3600 seconds, a malformed pinned digest, and an empty, prefix-shaped or
+out-of-bounds command allowlist.
+
+Each task also pins the inputs it ships. `baseline_tree_hash` is the sha256 over the
+canonical JSON of the baseline's path-to-content-hash mapping, and `target_oracle_hash`
+and `regression_oracle_hash` are the sha256 of each oracle file's bytes. Validation
+recomputes all three from disk and refuses the manifest with a field-scoped error on any
+mismatch, so a baseline or an oracle cannot be edited between campaigns while results
+still claim to come from the pinned task. The tree hash ignores `__pycache__`, `.git`,
+`.DS_Store` and `*.pyc`, so merely running a baseline's own test suite cannot break the
+pin. Run time keeps computing `hashes.task` independently; the manifest pin is what makes
+that value comparable across campaigns.
+
+`coding-agent-eval validate` additionally proves, by running the oracles,
 that the baseline fails the target oracle, the baseline already passes its regression
 oracle, the gold overlay passes both, and the error variant fails the target oracle.
 Any of those failing is reported as `HARNESS_SETUP` for that task instead of an agent
