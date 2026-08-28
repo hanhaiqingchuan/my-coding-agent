@@ -51,11 +51,11 @@ test-e2e:
 	npm --prefix web run test:e2e
 
 lint:
-	uv run --python 3.12 ruff check src tests
+	uv run --python 3.12 ruff check src tests scripts
 	npm --prefix web run lint
 
 format:
-	uv run --python 3.12 ruff format src tests
+	uv run --python 3.12 ruff format src tests scripts
 	npm --prefix web run format
 
 check: lint test test-e2e build
