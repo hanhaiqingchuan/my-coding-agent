@@ -131,6 +131,46 @@ test("a durable refresh preserves a live draft until its message is committed", 
   expect(refreshed.snapshot?.active_run?.state).toBe("awaiting_approval");
 });
 
+test("a durable refresh rejects the whole snapshot when its sequence is stale", () => {
+  const current = {
+    ...createInitialSessionViewState(),
+    snapshot: snapshot(8, "model_streaming"),
+    lastSeq: 9,
+    assistantDrafts: { "attempt-1": "newer draft" },
+  };
+
+  const refreshed = sessionViewReducer(current, {
+    type: "snapshot.refreshed",
+    snapshot: snapshot(7, "completed"),
+  });
+
+  expect(refreshed).toBe(current);
+});
+
+test("a durable refresh at the current sequence is accepted idempotently", () => {
+  const current = {
+    ...createInitialSessionViewState(),
+    snapshot: snapshot(6, "model_streaming"),
+    lastSeq: 7,
+    assistantDrafts: { "attempt-1": "finished draft" },
+  };
+  const terminal = snapshot(7, "completed");
+
+  const once = sessionViewReducer(current, {
+    type: "snapshot.refreshed",
+    snapshot: terminal,
+  });
+  const twice = sessionViewReducer(once, {
+    type: "snapshot.refreshed",
+    snapshot: terminal,
+  });
+
+  expect(once.snapshot).toBe(terminal);
+  expect(once.lastSeq).toBe(7);
+  expect(once.assistantDrafts).toEqual({});
+  expect(twice).toEqual(once);
+});
+
 test("a terminal durable event clears transient assistant and tool output drafts", () => {
   const streaming = {
     ...createInitialSessionViewState(),

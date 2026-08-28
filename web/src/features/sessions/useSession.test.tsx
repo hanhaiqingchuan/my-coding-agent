@@ -84,9 +84,43 @@ function snapshot(
   };
 }
 
+// Longer than the whole bounded refresh backoff, so nothing stays pending.
+const RETRY_WINDOW_MS = 5_000;
+// The first fetch plus every bounded retry of useSession's refresh loop.
+const MAX_SNAPSHOT_FETCHES = 4;
+
+function finishedEvent(sequence: number): ServerMessage {
+  return {
+    type: "durable",
+    event: {
+      seq: sequence,
+      session_id: "session-1",
+      run_id: "run-1",
+      type: "run.finished",
+      payload: { state: "completed" },
+      created_at: "2026-08-28T00:00:01Z",
+    },
+  };
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
+}
+
+async function settlePendingWork(elapsedMs = 0): Promise<void> {
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(elapsedMs);
+  });
+}
+
 afterEach(() => {
   BrowserSocket.instances = [];
   vi.unstubAllGlobals();
+  vi.useRealTimers();
 });
 
 test("a durable event refreshes the authoritative session snapshot", async () => {
@@ -136,4 +170,152 @@ test("a durable event refreshes the authoritative session snapshot", async () =>
     type: "text",
     text: "Finished from the durable store.",
   });
+});
+
+test("a transiently failing refresh retries so the last durable update still lands", async () => {
+  vi.useFakeTimers();
+  vi.stubGlobal("WebSocket", BrowserSocket);
+  let snapshotCalls = 0;
+  const api = {
+    bootstrap: async () => ({
+      csrf_token: "token",
+      websocket_url: "ws://local.test/api/ws",
+    }),
+    clearToken: () => undefined,
+    snapshot: async () => {
+      snapshotCalls += 1;
+      if (snapshotCalls === 1) throw new TypeError("the backend is restarting");
+      return snapshot(7, "completed");
+    },
+  } as unknown as ApiClient;
+  const { result } = renderHook(() => useSession(api, "session-1"));
+
+  await settlePendingWork();
+  expect(BrowserSocket.instances).toHaveLength(1);
+  act(() => BrowserSocket.instances[0].open());
+  act(() =>
+    BrowserSocket.instances[0].message({
+      type: "snapshot",
+      client_command_id: "subscribe-1",
+      session_id: "session-1",
+      snapshot: snapshot(2, "model_streaming"),
+    }),
+  );
+  act(() => BrowserSocket.instances[0].message(finishedEvent(7)));
+  await settlePendingWork();
+
+  expect(snapshotCalls).toBe(1);
+  expect(result.current.state.snapshot?.active_run?.state).toBe(
+    "model_streaming",
+  );
+
+  await settlePendingWork(RETRY_WINDOW_MS);
+
+  expect(snapshotCalls).toBe(2);
+  expect(result.current.state.snapshot?.active_run).toBeNull();
+});
+
+test("a permanently failing refresh stops after its bounded retries", async () => {
+  vi.useFakeTimers();
+  vi.stubGlobal("WebSocket", BrowserSocket);
+  let snapshotCalls = 0;
+  const api = {
+    bootstrap: async () => ({
+      csrf_token: "token",
+      websocket_url: "ws://local.test/api/ws",
+    }),
+    clearToken: () => undefined,
+    snapshot: async () => {
+      snapshotCalls += 1;
+      throw new TypeError("the backend is unreachable");
+    },
+  } as unknown as ApiClient;
+  renderHook(() => useSession(api, "session-1"));
+
+  await settlePendingWork();
+  act(() => BrowserSocket.instances[0].open());
+  act(() => BrowserSocket.instances[0].message(finishedEvent(7)));
+  await settlePendingWork();
+  expect(snapshotCalls).toBe(1);
+
+  await settlePendingWork(RETRY_WINDOW_MS);
+
+  expect(snapshotCalls).toBe(MAX_SNAPSHOT_FETCHES);
+  expect(vi.getTimerCount()).toBe(0);
+});
+
+test("unmounting during a refresh backoff cancels the pending retry", async () => {
+  vi.useFakeTimers();
+  vi.stubGlobal("WebSocket", BrowserSocket);
+  let snapshotCalls = 0;
+  const api = {
+    bootstrap: async () => ({
+      csrf_token: "token",
+      websocket_url: "ws://local.test/api/ws",
+    }),
+    clearToken: () => undefined,
+    snapshot: async () => {
+      snapshotCalls += 1;
+      throw new TypeError("the backend is unreachable");
+    },
+  } as unknown as ApiClient;
+  const { unmount } = renderHook(() => useSession(api, "session-1"));
+
+  await settlePendingWork();
+  act(() => BrowserSocket.instances[0].open());
+  act(() => BrowserSocket.instances[0].message(finishedEvent(7)));
+  await settlePendingWork();
+  expect(snapshotCalls).toBe(1);
+
+  act(() => unmount());
+  await settlePendingWork(RETRY_WINDOW_MS);
+
+  expect(snapshotCalls).toBe(1);
+  expect(vi.getTimerCount()).toBe(0);
+});
+
+test("durable events during an in-flight refresh coalesce into one more fetch", async () => {
+  vi.useFakeTimers();
+  vi.stubGlobal("WebSocket", BrowserSocket);
+  const inFlight = deferred<SessionSnapshotDto>();
+  let snapshotCalls = 0;
+  const api = {
+    bootstrap: async () => ({
+      csrf_token: "token",
+      websocket_url: "ws://local.test/api/ws",
+    }),
+    clearToken: () => undefined,
+    snapshot: () => {
+      snapshotCalls += 1;
+      if (snapshotCalls === 1) return inFlight.promise;
+      return Promise.resolve(snapshot(9, "completed"));
+    },
+  } as unknown as ApiClient;
+  const { result } = renderHook(() => useSession(api, "session-1"));
+
+  await settlePendingWork();
+  act(() => BrowserSocket.instances[0].open());
+  act(() =>
+    BrowserSocket.instances[0].message({
+      type: "snapshot",
+      client_command_id: "subscribe-1",
+      session_id: "session-1",
+      snapshot: snapshot(2, "model_streaming"),
+    }),
+  );
+  act(() => BrowserSocket.instances[0].message(finishedEvent(5)));
+  await settlePendingWork();
+  act(() => BrowserSocket.instances[0].message(finishedEvent(6)));
+  act(() => BrowserSocket.instances[0].message(finishedEvent(7)));
+  act(() => BrowserSocket.instances[0].message(finishedEvent(8)));
+  await settlePendingWork();
+  expect(snapshotCalls).toBe(1);
+
+  // The in-flight response was cut before those events, so it is already stale.
+  inFlight.resolve(snapshot(5, "model_streaming"));
+  await settlePendingWork(RETRY_WINDOW_MS);
+
+  expect(snapshotCalls).toBe(2);
+  expect(result.current.state.snapshot?.active_run).toBeNull();
+  expect(result.current.state.snapshot?.snapshot_seq).toBe(9);
 });

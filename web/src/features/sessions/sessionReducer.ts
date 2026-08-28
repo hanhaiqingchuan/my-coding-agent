@@ -109,16 +109,21 @@ export function sessionViewReducer(
   switch (action.type) {
     case "server.message":
       return reduceServerMessage(state, action.message);
-    case "snapshot.refreshed":
+    case "snapshot.refreshed": {
+      if (action.snapshot.snapshot_seq < state.lastSeq) {
+        return state;
+      }
+      const activeRun = action.snapshot.active_run;
+      const runStillProducing =
+        activeRun !== null && !TERMINAL_RUN_STATES.has(activeRun.state);
       return {
         ...state,
         snapshot: action.snapshot,
-        lastSeq: Math.max(state.lastSeq, action.snapshot.snapshot_seq),
-        assistantDrafts:
-          action.snapshot.active_run === null ? {} : state.assistantDrafts,
-        toolOutputDrafts:
-          action.snapshot.active_run === null ? {} : state.toolOutputDrafts,
+        lastSeq: action.snapshot.snapshot_seq,
+        assistantDrafts: runStillProducing ? state.assistantDrafts : {},
+        toolOutputDrafts: runStillProducing ? state.toolOutputDrafts : {},
       };
+    }
     case "connection.changed":
       return { ...state, connection: action.connection };
     case "csrf.changed":
