@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "test": "vitest run",
-    "test:e2e": "playwright test -c playwright.config.ts",
+    "test:e2e": "NODE_PATH=./node_modules playwright test -c playwright.config.ts",
     "lint": "eslint .",
     "format": "prettier --write ."
   },

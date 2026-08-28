@@ -33,6 +33,8 @@ htmlcov/
 /web/node_modules/
 /web/dist/
 /web/.vite/
+/web/playwright-report/
+/web/test-results/
 /playwright-report/
 /test-results/
 

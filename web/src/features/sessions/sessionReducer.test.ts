@@ -1,4 +1,4 @@
-import { expect, test } from "vitest";
+import { afterEach, expect, test, vi } from "vitest";
 
 import contract from "../../api/schema.fixture.json";
 import { ApiClient, ApiError } from "../../api/client";
@@ -114,6 +114,23 @@ test("a transient assistant delta leaves the durable cursor unchanged", () => {
   expect(next.assistantDrafts["attempt-1"]).toBe("Working…");
 });
 
+test("a durable refresh preserves a live draft until its message is committed", () => {
+  const streaming = {
+    ...createInitialSessionViewState(),
+    snapshot: snapshot(2),
+    lastSeq: 2,
+    assistantDrafts: { "attempt-1": "Working…" },
+  };
+
+  const refreshed = sessionViewReducer(streaming, {
+    type: "snapshot.refreshed",
+    snapshot: snapshot(3, "awaiting_approval"),
+  });
+
+  expect(refreshed.assistantDrafts).toEqual({ "attempt-1": "Working…" });
+  expect(refreshed.snapshot?.active_run?.state).toBe("awaiting_approval");
+});
+
 test("a terminal durable event clears transient assistant and tool output drafts", () => {
   const streaming = {
     ...createInitialSessionViewState(),
@@ -182,6 +199,10 @@ function deferred<T>() {
   });
   return { promise, resolve, reject };
 }
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 test("switching or reconnecting a session closes the old transport and subscribes again", async () => {
   const sockets: BrowserSocket[] = [];
@@ -327,7 +348,7 @@ test("an expired authentication token is bootstrapped at most once before resubs
   });
 });
 
-test("a non-user socket close reconnects once, bootstraps again, and resubscribes", async () => {
+test("each non-user socket close bootstraps again and resubscribes", async () => {
   const sockets: BrowserSocket[] = [];
   let bootstraps = 0;
   const connections: string[] = [];
@@ -365,6 +386,56 @@ test("a non-user socket close reconnects once, bootstraps again, and resubscribe
 
   sockets[1].closeFromServer(1006);
   await Promise.resolve();
+  expect(sockets).toHaveLength(3);
+  expect(connections.at(-1)).toBe("reconnecting");
+  sockets[2].open();
+  expect(connections.at(-1)).toBe("connected");
+  socket.close();
+});
+
+test("a temporary bootstrap failure during restart keeps retrying until the server returns", async () => {
+  vi.useFakeTimers();
+  const sockets: BrowserSocket[] = [];
+  const connections: string[] = [];
+  let bootstraps = 0;
+  const api = {
+    bootstrap: async () => {
+      bootstraps += 1;
+      if (bootstraps === 2) throw new TypeError("backend is restarting");
+      return {
+        csrf_token: `token-${bootstraps}`,
+        websocket_url: "ws://local.test/api/ws",
+      };
+    },
+    clearToken: () => undefined,
+  } as unknown as ApiClient;
+  const socket = new SessionSocket({
+    api,
+    onMessage: () => undefined,
+    onConnection: (connection) => connections.push(connection),
+    onToken: () => undefined,
+    createSocket: () => {
+      const connection = new BrowserSocket();
+      sockets.push(connection);
+      return connection;
+    },
+  });
+
+  await socket.connect("session-a");
+  sockets[0].open();
+  sockets[0].closeFromServer(1006);
+  await Promise.resolve();
+  expect(bootstraps).toBe(2);
+
+  await vi.runOnlyPendingTimersAsync();
+  expect(bootstraps).toBe(3);
   expect(sockets).toHaveLength(2);
-  expect(connections.at(-1)).toBe("offline");
+  sockets[1].open();
+
+  expect(connections.at(-1)).toBe("connected");
+  expect(JSON.parse(sockets[1].sent[0])).toMatchObject({
+    type: "session.subscribe",
+    session_id: "session-a",
+  });
+  socket.close();
 });

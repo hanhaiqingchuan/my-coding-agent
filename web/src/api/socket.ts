@@ -3,9 +3,11 @@ import type { ClientCommand, ServerMessage } from "./types";
 
 export const WS_AUTH_EXPIRED = 4401;
 export const WS_SUBPROTOCOL = "coding-agent";
-const MAX_AUTOMATIC_RECONNECTS = 1;
+const RECONNECT_DELAY_MS = 250;
+const MAX_RECONNECT_DELAY_MS = 2_000;
 
-export type SocketConnectionState = "connecting" | "connected" | "reconnecting" | "offline";
+export type SocketConnectionState =
+  "connecting" | "connected" | "reconnecting" | "offline";
 
 type SocketLike = {
   onopen: WebSocket["onopen"];
@@ -30,6 +32,7 @@ export class SessionSocket {
   private socket: SocketLike | null = null;
   private sessionId: string | null = null;
   private generation = 0;
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(private readonly options: SessionSocketOptions) {}
 
@@ -42,6 +45,10 @@ export class SessionSocket {
 
   close(): void {
     this.generation += 1;
+    if (this.reconnectTimer !== null) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
     this.socket?.close();
     this.socket = null;
     this.sessionId = null;
@@ -64,27 +71,35 @@ export class SessionSocket {
       bootstrap = await this.options.api.bootstrap();
     } catch (error) {
       if (!this.isCurrent(generation, sessionId)) return;
-      if (error instanceof ApiError && error.status === 403 && authRetries < 1) {
+      if (
+        error instanceof ApiError &&
+        error.status === 403 &&
+        authRetries < 1
+      ) {
         this.options.api.clearToken();
         this.options.onToken(null);
         if (!this.isCurrent(generation, sessionId)) return;
         await this.open(sessionId, authRetries + 1, reconnects, generation);
         return;
       }
-      if (generation === this.generation) {
-        this.options.onConnection("offline");
-      }
+      this.scheduleReconnect(sessionId, authRetries, reconnects, generation);
       return;
     }
     if (!this.isCurrent(generation, sessionId)) {
       return;
     }
     this.options.onToken(bootstrap.csrf_token);
-    const factory = this.options.createSocket ?? ((url, protocols) => new WebSocket(url, protocols));
-    const socket = factory(bootstrap.websocket_url, [WS_SUBPROTOCOL, bootstrap.csrf_token]);
+    const factory =
+      this.options.createSocket ??
+      ((url, protocols) => new WebSocket(url, protocols));
+    const socket = factory(bootstrap.websocket_url, [
+      WS_SUBPROTOCOL,
+      bootstrap.csrf_token,
+    ]);
     this.socket = socket;
     socket.onopen = () => {
-      if (generation !== this.generation || this.sessionId !== sessionId) return;
+      if (generation !== this.generation || this.sessionId !== sessionId)
+        return;
       this.options.onConnection("connected");
       this.send({
         type: "session.subscribe",
@@ -102,10 +117,12 @@ export class SessionSocket {
       }
     };
     socket.onerror = () => {
-      if (generation === this.generation) this.options.onConnection("reconnecting");
+      if (generation === this.generation)
+        this.options.onConnection("reconnecting");
     };
     socket.onclose = (event) => {
-      if (generation !== this.generation || this.sessionId !== sessionId) return;
+      if (generation !== this.generation || this.sessionId !== sessionId)
+        return;
       this.socket = null;
       if (event.code === WS_AUTH_EXPIRED) {
         if (authRetries < 1) {
@@ -118,13 +135,28 @@ export class SessionSocket {
         this.options.onConnection("offline");
         return;
       }
-      if (reconnects < MAX_AUTOMATIC_RECONNECTS) {
-        this.options.onConnection("reconnecting");
-        void this.open(sessionId, authRetries, reconnects + 1, generation);
-        return;
-      }
-      this.options.onConnection("offline");
+      this.options.onConnection("reconnecting");
+      void this.open(sessionId, authRetries, reconnects + 1, generation);
     };
+  }
+
+  private scheduleReconnect(
+    sessionId: string,
+    authRetries: number,
+    reconnects: number,
+    generation: number,
+  ): void {
+    if (!this.isCurrent(generation, sessionId) || this.reconnectTimer !== null)
+      return;
+    this.options.onConnection("reconnecting");
+    const delay = Math.min(
+      RECONNECT_DELAY_MS * 2 ** Math.min(reconnects, 3),
+      MAX_RECONNECT_DELAY_MS,
+    );
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      void this.open(sessionId, authRetries, reconnects + 1, generation);
+    }, delay);
   }
 
   private isCurrent(generation: number, sessionId: string): boolean {

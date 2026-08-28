@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from coding_agent.api.dependencies import ApiDependencies
 from coding_agent.api.routes import router
@@ -24,6 +27,8 @@ def create_app(
     event_publisher: EventPublisher | None = None,
     server_port: int = 8000,
     development_origin: str | None = None,
+    web_dist: Path | None = None,
+    recover_on_startup: bool = True,
 ) -> FastAPI:
     """Build one independently injectable app without module-global mutable state."""
     dependencies = ApiDependencies(
@@ -37,7 +42,14 @@ def create_app(
         server_port=server_port,
         development_origin=development_origin,
     )
-    app = FastAPI()
+
+    @asynccontextmanager
+    async def lifespan(_: FastAPI):
+        if recover_on_startup:
+            store.recover_interrupted_runs()
+        yield
+
+    app = FastAPI(lifespan=lifespan)
     app.state.api_dependencies = dependencies
     if dependencies.development_origin is not None:
         app.add_middleware(
@@ -63,6 +75,8 @@ def create_app(
 
     app.include_router(router)
     app.include_router(websocket_router)
+    if web_dist is not None:
+        app.mount("/", StaticFiles(directory=web_dist, html=True), name="web")
     return app
 
 

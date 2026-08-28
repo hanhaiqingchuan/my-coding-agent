@@ -280,9 +280,13 @@ class SQLiteStore:
                     for item in connection.execute(
                         """
                         SELECT * FROM messages
-                        WHERE session_id = ? AND status = ? ORDER BY seq
+                        WHERE session_id = ? AND status IN (?, ?) ORDER BY seq
                         """,
-                        (session_id, MessageStatus.COMMITTED.value),
+                        (
+                            session_id,
+                            MessageStatus.COMMITTED.value,
+                            MessageStatus.INTERRUPTED.value,
+                        ),
                     ).fetchall()
                 )
                 tool_rows = connection.execute(
@@ -1765,7 +1769,9 @@ def _synthetic_result(tool_call_id: str, state: ToolExecutionState) -> ToolResul
     details = {
         ToolExecutionState.UNKNOWN: (
             "EXECUTION_UNKNOWN",
-            "execution state is unknown after server restart; inspect the workspace",
+            "execution state is unknown after server restart; inspect the workspace and "
+            "running processes. P0 cannot guarantee cleanup of descendants that detached "
+            "from the original process group",
         ),
         ToolExecutionState.CANCELLED: (
             "TOOL_CANCELLED",

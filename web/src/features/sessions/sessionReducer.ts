@@ -1,8 +1,20 @@
 import type { ServerMessage, SessionSnapshotDto } from "../../api/types";
 
-const TERMINAL_RUN_STATES = new Set(["completed", "stopped", "cancelled", "failed", "interrupted"]);
+const TERMINAL_RUN_STATES = new Set([
+  "completed",
+  "stopped",
+  "cancelled",
+  "failed",
+  "interrupted",
+]);
+const DRAFT_COMMIT_EVENTS = new Set([
+  "assistant.turn_committed",
+  "assistant.interrupted",
+  "tool.group_settled",
+]);
 
-export type ConnectionState = "connecting" | "connected" | "reconnecting" | "offline";
+export type ConnectionState =
+  "connecting" | "connected" | "reconnecting" | "offline";
 
 export type SessionViewState = {
   snapshot: SessionSnapshotDto | null;
@@ -16,6 +28,7 @@ export type SessionViewState = {
 
 export type SessionViewAction =
   | { type: "server.message"; message: ServerMessage }
+  | { type: "snapshot.refreshed"; snapshot: SessionSnapshotDto }
   | { type: "connection.changed"; connection: ConnectionState }
   | { type: "csrf.changed"; csrfToken: string | null }
   | { type: "draft.changed"; draftText: string }
@@ -52,8 +65,16 @@ export function reduceServerMessage(
       return state;
     }
     const eventState = message.event.payload.state;
-    if (typeof eventState === "string" && TERMINAL_RUN_STATES.has(eventState)) {
-      return { ...state, lastSeq: message.event.seq, assistantDrafts: {}, toolOutputDrafts: {} };
+    if (
+      (typeof eventState === "string" && TERMINAL_RUN_STATES.has(eventState)) ||
+      DRAFT_COMMIT_EVENTS.has(message.event.type)
+    ) {
+      return {
+        ...state,
+        lastSeq: message.event.seq,
+        assistantDrafts: {},
+        toolOutputDrafts: {},
+      };
     }
     return { ...state, lastSeq: message.event.seq };
   }
@@ -88,6 +109,16 @@ export function sessionViewReducer(
   switch (action.type) {
     case "server.message":
       return reduceServerMessage(state, action.message);
+    case "snapshot.refreshed":
+      return {
+        ...state,
+        snapshot: action.snapshot,
+        lastSeq: Math.max(state.lastSeq, action.snapshot.snapshot_seq),
+        assistantDrafts:
+          action.snapshot.active_run === null ? {} : state.assistantDrafts,
+        toolOutputDrafts:
+          action.snapshot.active_run === null ? {} : state.toolOutputDrafts,
+      };
     case "connection.changed":
       return { ...state, connection: action.connection };
     case "csrf.changed":

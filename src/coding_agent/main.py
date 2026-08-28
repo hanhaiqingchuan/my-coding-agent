@@ -111,7 +111,6 @@ def build_runtime_dependencies(
     data_dir.mkdir(parents=True, exist_ok=True)
     store = SQLiteStore(data_dir / "state.db")
     store.initialize()
-    store.recover_interrupted_runs()
     model = AnthropicMessagesModel(settings.model, api_key)
     tools = ToolRegistry(
         read_file=ReadFileTool(settings.tools),
@@ -162,6 +161,7 @@ async def run_headless(
     )
     runtime.approval_gate.auto_approve = auto_approve
     runtime.tool_registry.configure_command_policy(command_policy)
+    runtime.store.recover_interrupted_runs()
     coordinator = build_run_coordinator(settings, runtime)
     session = runtime.store.create_session(str(boundary.root), prompt_file.name)
     run = await coordinator.start_run(session.id, prompt, f"headless-start-{uuid4()}")
@@ -240,6 +240,7 @@ def serve_web(
         coordinator,
         public_config,
         server_port=settings.server.port,
+        web_dist=Path(__file__).resolve().parents[2] / "web" / "dist",
     )
     if settings.server.open_browser:
         webbrowser.open(f"http://127.0.0.1:{settings.server.port}")

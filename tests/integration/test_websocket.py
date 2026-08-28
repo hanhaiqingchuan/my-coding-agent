@@ -90,6 +90,7 @@ def _runtime(
         coordinator,
         {"model": "test"},
         server_port=server_port,
+        recover_on_startup=False,
     )
     return _Runtime(app, actual_store, publisher, runner)
 
