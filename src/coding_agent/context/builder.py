@@ -168,11 +168,21 @@ class ContextBuilder:
         )
         _require_unique_sequence_numbers(committed)
         groups = _group_committed_messages(committed)
-        recent_cutoff = _recent_user_cutoff(groups, request.recent_user_turns)
+        recent_completed_indexes, recent_cutoff = _recent_completed_rounds(
+            groups,
+            request.recent_user_turns,
+            request.current_run_id,
+        )
         mandatory_indexes = {
             index
             for index, group in enumerate(groups)
-            if _is_mandatory(group, recent_cutoff, request.current_run_id)
+            if _is_mandatory(
+                group,
+                index,
+                recent_completed_indexes,
+                request.current_run_id,
+                snapshot,
+            )
         }
 
         mandatory_messages = _flatten_model_messages(
@@ -374,24 +384,60 @@ def _group_committed_messages(messages: Sequence[Message]) -> tuple[_CanonicalGr
     return tuple(groups)
 
 
-def _recent_user_cutoff(groups: Sequence[_CanonicalGroup], count: int) -> int:
-    user_seqs = [group.first_seq for group in groups if group.kind == "user"]
-    if not user_seqs:
-        return max((group.last_seq for group in groups), default=-1) + 1
-    return user_seqs[max(0, len(user_seqs) - count)]
+def _recent_completed_rounds(
+    groups: Sequence[_CanonicalGroup],
+    count: int,
+    current_run_id: str | None,
+) -> tuple[frozenset[int], int]:
+    completed_user_indexes = [
+        index
+        for index, group in enumerate(groups)
+        if group.kind == "user"
+        and (current_run_id is None or group.messages[0].run_id != current_run_id)
+    ]
+    selected_starts = completed_user_indexes[-count:]
+    selected_indexes: set[int] = set()
+    for start in selected_starts:
+        end = next(
+            (
+                index
+                for index in range(start + 1, len(groups))
+                if groups[index].kind == "user"
+            ),
+            len(groups),
+        )
+        selected_indexes.update(range(start, end))
+
+    if selected_starts:
+        active_zone_cutoff = groups[selected_starts[0]].first_seq
+    else:
+        active_zone_cutoff = next(
+            (
+                group.first_seq
+                for group in groups
+                if group.kind == "user"
+                and current_run_id is not None
+                and group.messages[0].run_id == current_run_id
+            ),
+            max((group.last_seq for group in groups), default=-1) + 1,
+        )
+    return frozenset(selected_indexes), active_zone_cutoff
 
 
 def _is_mandatory(
     group: _CanonicalGroup,
-    recent_cutoff: int,
+    index: int,
+    recent_completed_indexes: frozenset[int],
     current_run_id: str | None,
+    snapshot: ContextSnapshot | None,
 ) -> bool:
-    if group.kind == "user" or group.first_seq >= recent_cutoff:
+    if group.kind == "user" or index in recent_completed_indexes:
         return True
     return bool(
         group.kind == "tool_exchange"
         and current_run_id is not None
         and group.messages[0].run_id == current_run_id
+        and (snapshot is None or group.last_seq > snapshot.covered_through_message_seq)
     )
 
 

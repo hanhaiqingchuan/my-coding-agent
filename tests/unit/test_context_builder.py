@@ -163,7 +163,7 @@ def test_recent_two_turns_and_current_committed_tool_exchange_remain_complete(
 ) -> None:
     snapshot = ContextSnapshot(
         session_id="session-1",
-        covered_through_message_seq=10,
+        covered_through_message_seq=7,
         summary="summary",
         created_at=datetime(2026, 8, 28, tzinfo=UTC),
     )
@@ -187,6 +187,108 @@ def test_recent_two_turns_and_current_committed_tool_exchange_remain_complete(
     ] == ["call-current"]
 
 
+def test_active_user_does_not_consume_a_completed_recent_round_slot() -> None:
+    transcript = (
+        _message(1, "user", TextPart("round 1"), run_id="run-1"),
+        _message(2, "assistant", TextPart("round 1 answer"), run_id="run-1"),
+        _message(3, "user", TextPart("round 2"), run_id="run-2"),
+        _message(4, "assistant", TextPart("round 2 answer"), run_id="run-2"),
+        _message(5, "user", TextPart("round 3"), run_id="run-3"),
+        _message(6, "assistant", TextPart("round 3 answer"), run_id="run-3"),
+        _message(7, "user", TextPart("active request"), run_id="run-active"),
+    )
+    snapshot = ContextSnapshot(
+        session_id="session-1",
+        covered_through_message_seq=7,
+        summary="older assistant work",
+        created_at=datetime(2026, 8, 28, tzinfo=UTC),
+    )
+
+    result = ContextBuilder().build(
+        transcript,
+        snapshot,
+        _request(current_run_id="run-active"),
+    )
+
+    assert isinstance(result, ReadyContext)
+    assert "round 1 answer" not in _all_text(result)
+    assert "round 2 answer" in _all_text(result)
+    assert "round 3 answer" in _all_text(result)
+    assert _text_user_messages(result) == [
+        "round 1",
+        "round 2",
+        "round 3",
+        "active request",
+    ]
+
+
+def test_snapshot_covered_current_run_tool_exchanges_are_not_mandatory() -> None:
+    covered_first = ToolCall("call-covered-1", "read_file", {"path": "first.py"})
+    covered_second = ToolCall("call-covered-2", "read_file", {"path": "second.py"})
+    after_snapshot = ToolCall("call-after-snapshot", "read_file", {"path": "latest.py"})
+    transcript = (
+        _message(1, "user", TextPart("round 1"), run_id="run-1"),
+        _message(2, "assistant", TextPart("round 1 answer"), run_id="run-1"),
+        _message(3, "user", TextPart("round 2"), run_id="run-2"),
+        _message(4, "assistant", TextPart("round 2 answer"), run_id="run-2"),
+        _message(5, "user", TextPart("round 3"), run_id="run-3"),
+        _message(6, "assistant", TextPart("round 3 answer"), run_id="run-3"),
+        _message(7, "user", TextPart("active request"), run_id="run-active"),
+        _message(8, "assistant", ToolUsePart(covered_first), run_id="run-active"),
+        _message(
+            9,
+            "tool",
+            ToolResult("call-covered-1", "first result", True),
+            run_id="run-active",
+            tool_call_id="call-covered-1",
+        ),
+        _message(10, "assistant", ToolUsePart(covered_second), run_id="run-active"),
+        _message(
+            11,
+            "tool",
+            ToolResult("call-covered-2", "second result", True),
+            run_id="run-active",
+            tool_call_id="call-covered-2",
+        ),
+        _message(12, "assistant", ToolUsePart(after_snapshot), run_id="run-active"),
+        _message(
+            13,
+            "tool",
+            ToolResult("call-after-snapshot", "latest result", True),
+            run_id="run-active",
+            tool_call_id="call-after-snapshot",
+        ),
+    )
+    snapshot = ContextSnapshot(
+        session_id="session-1",
+        covered_through_message_seq=11,
+        summary="summary through the second current-run exchange",
+        created_at=datetime(2026, 8, 28, tzinfo=UTC),
+    )
+
+    result = ContextBuilder().build(
+        transcript,
+        snapshot,
+        _request(current_run_id="run-active"),
+    )
+
+    assert isinstance(result, ReadyContext)
+    projected_call_ids = [
+        part.call.id
+        for message in result.view.messages
+        for part in message.parts
+        if isinstance(part, ToolUsePart)
+    ]
+    projected_result_ids = [
+        part.tool_call_id
+        for message in result.view.messages
+        for part in message.parts
+        if isinstance(part, ToolResult)
+    ]
+    assert projected_call_ids == ["call-after-snapshot"]
+    assert projected_result_ids == ["call-after-snapshot"]
+
+
 def test_mandatory_content_overflow_prevents_model_call() -> None:
     transcript = (
         _message(1, "user", TextPart("不可截断" * 300), run_id="run-1"),
@@ -205,9 +307,24 @@ def test_mandatory_content_overflow_prevents_model_call() -> None:
     assert result.diagnostic["reason"] == "mandatory_content_exceeds_available_input"
 
 
-def test_old_tool_output_is_pruned_before_summary(
-    transcript: tuple[Message, ...],
-) -> None:
+def test_old_tool_output_is_pruned_before_summary() -> None:
+    old_call = ToolCall("call-old", "read_file", {"path": "old.py"})
+    transcript = (
+        _message(1, "user", TextPart("first"), run_id="run-1"),
+        _message(2, "assistant", ToolUsePart(old_call), run_id="run-1"),
+        _message(
+            3,
+            "tool",
+            ToolResult("call-old", "x" * 1_200, True),
+            run_id="run-1",
+            tool_call_id="call-old",
+        ),
+        _message(4, "user", TextPart("second"), run_id="run-2"),
+        _message(5, "assistant", TextPart("second answer"), run_id="run-2"),
+        _message(6, "user", TextPart("third"), run_id="run-3"),
+        _message(7, "assistant", TextPart("third answer"), run_id="run-3"),
+        _message(8, "user", TextPart("current"), run_id="run-4"),
+    )
     result = ContextBuilder().build(
         transcript,
         None,
@@ -253,7 +370,9 @@ def test_pruning_preserves_small_results_inside_an_atomic_multi_tool_group() -> 
         ),
         _message(5, "user", TextPart("second"), run_id="run-2"),
         _message(6, "assistant", TextPart("second answer"), run_id="run-2"),
-        _message(7, "user", TextPart("current"), run_id="run-3"),
+        _message(7, "user", TextPart("third"), run_id="run-3"),
+        _message(8, "assistant", TextPart("third answer"), run_id="run-3"),
+        _message(9, "user", TextPart("current"), run_id="run-4"),
     )
 
     result = ContextBuilder().build(
@@ -263,7 +382,7 @@ def test_pruning_preserves_small_results_inside_an_atomic_multi_tool_group() -> 
             context_window=950,
             max_output_tokens=100,
             safety_margin_tokens=100,
-            current_run_id="run-3",
+            current_run_id="run-4",
         ),
     )
 
@@ -280,17 +399,33 @@ def test_pruning_preserves_small_results_inside_an_atomic_multi_tool_group() -> 
     assert tool_results[1].truncated is False
 
 
-def test_compaction_plan_uses_complete_replaceable_groups(
-    transcript: tuple[Message, ...],
-) -> None:
-    expanded = (
-        transcript[0],
-        _message(2, "assistant", TextPart("analysis " * 500), run_id="run-1"),
-        *transcript[2:],
+def test_compaction_plan_uses_complete_replaceable_groups() -> None:
+    old_call = ToolCall("call-old", "read_file", {"path": "old.py"})
+    transcript = (
+        _message(1, "user", TextPart("first"), run_id="run-1"),
+        _message(
+            2,
+            "assistant",
+            TextPart("analysis " * 500),
+            ToolUsePart(old_call),
+            run_id="run-1",
+        ),
+        _message(
+            3,
+            "tool",
+            ToolResult("call-old", "x" * 1_200, True),
+            run_id="run-1",
+            tool_call_id="call-old",
+        ),
+        _message(4, "user", TextPart("second"), run_id="run-2"),
+        _message(5, "assistant", TextPart("second answer"), run_id="run-2"),
+        _message(6, "user", TextPart("third"), run_id="run-3"),
+        _message(7, "assistant", TextPart("third answer"), run_id="run-3"),
+        _message(8, "user", TextPart("current"), run_id="run-4"),
     )
 
     result = ContextBuilder().build(
-        expanded,
+        transcript,
         None,
         _request(context_window=1_250, max_output_tokens=100, safety_margin_tokens=100),
     )
@@ -299,10 +434,10 @@ def test_compaction_plan_uses_complete_replaceable_groups(
     old_tool_candidate = next(
         candidate
         for candidate in result.plan.candidates
-        if candidate.source_message_seqs == (4, 5)
+        if candidate.source_message_seqs == (2, 3)
     )
     assert [message.role for message in old_tool_candidate.messages] == ["assistant", "tool"]
-    assert [message.seq for message in old_tool_candidate.read_only_user_context] == [3]
+    assert [message.seq for message in old_tool_candidate.read_only_user_context] == [1]
     assert result.plan.required_reduction_tokens > 0
 
 
@@ -312,13 +447,15 @@ def test_eighty_percent_trigger_uses_sixty_percent_soft_target_with_mandatory_fl
         _message(2, "assistant", TextPart("a" * 500), run_id="run-1"),
         _message(3, "user", TextPart("next"), run_id="run-2"),
         _message(4, "assistant", TextPart("next answer"), run_id="run-2"),
-        _message(5, "user", TextPart("latest"), run_id="run-3"),
+        _message(5, "user", TextPart("more"), run_id="run-3"),
+        _message(6, "assistant", TextPart("more answer"), run_id="run-3"),
+        _message(7, "user", TextPart("latest"), run_id="run-4"),
     )
     request = _request(
         context_window=900,
         max_output_tokens=100,
         safety_margin_tokens=100,
-        current_run_id="run-3",
+        current_run_id="run-4",
     )
 
     result = ContextBuilder().build(transcript, None, request)
@@ -337,23 +474,25 @@ def test_exactly_eighty_percent_triggers_compaction() -> None:
         _message(3, "user", TextPart("2"), run_id="run-2"),
         _message(4, "assistant", TextPart("b"), run_id="run-2"),
         _message(5, "user", TextPart("3"), run_id="run-3"),
+        _message(6, "assistant", TextPart("c"), run_id="run-3"),
+        _message(7, "user", TextPart("4"), run_id="run-4"),
     )
     request = ContextRequest(
         system="",
-        context_window=145,
+        context_window=191,
         max_output_tokens=10,
         safety_margin_tokens=10,
         compact_trigger_ratio=0.80,
         compact_target_ratio=0.60,
         summary_max_tokens=16,
         recent_user_turns=2,
-        current_run_id="run-3",
+        current_run_id="run-4",
     )
 
     result = ContextBuilder().build(transcript, None, request)
 
     assert isinstance(result, CompactionRequired)
-    assert result.estimated_tokens == result.trigger_tokens == 100
+    assert result.estimated_tokens == result.trigger_tokens == 137
 
 
 def test_request_rejects_an_invalid_budget_before_building_context() -> None:
