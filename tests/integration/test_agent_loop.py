@@ -1198,11 +1198,11 @@ async def test_unexpected_store_failure_ends_the_run_and_frees_the_global_slot(
     with caplog.at_level(logging.ERROR, logger="coding_agent.runtime.loop"):
         outcome = await loop.run(run_id, session_id, CancellationToken())
 
-    assert outcome == RunOutcome.fail(StopReason.CONFIG_ERROR, ErrorKind.CONFIG_ERROR)
+    assert outcome == RunOutcome.fail(StopReason.INTERNAL_ERROR, ErrorKind.INTERNAL_ERROR)
     finished = store.get_run(run_id)
     assert finished.state is RunState.FAILED
-    assert finished.stop_reason is StopReason.CONFIG_ERROR
-    assert finished.error_kind is ErrorKind.CONFIG_ERROR
+    assert finished.stop_reason is StopReason.INTERNAL_ERROR
+    assert finished.error_kind is ErrorKind.INTERNAL_ERROR
     assert finished.finished_at is not None
     assert [message.role for message in store.load_committed_transcript(session_id)] == ["user"]
     assert any(
@@ -1243,7 +1243,7 @@ async def test_renamed_workspace_root_fails_the_run_without_a_pending_group(
 
     outcome = await loop.run(run_id, session_id, CancellationToken())
 
-    assert outcome == RunOutcome.fail(StopReason.CONFIG_ERROR, ErrorKind.CONFIG_ERROR)
+    assert outcome == RunOutcome.fail(StopReason.INTERNAL_ERROR, ErrorKind.INTERNAL_ERROR)
     assert store.get_run(run_id).state is RunState.FAILED
     assert tools.executed == ["call-first"]
     with store.connection() as connection:

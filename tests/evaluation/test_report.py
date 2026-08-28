@@ -272,6 +272,7 @@ def test_robust_tasks_require_a_majority_of_repeats(run_result: RunResult) -> No
         ("STOPPED", "MAX_ROUNDS", None, "agent", "max_rounds"),
         ("STOPPED", "DOOM_LOOP", None, "agent", "doom_loop"),
         ("FAILED", "CONFIG_ERROR", "CONFIG_ERROR", "setup", "harness_setup"),
+        ("FAILED", "INTERNAL_ERROR", "INTERNAL_ERROR", "agent", "internal_error"),
         ("CANCELLED", "USER_STOP", None, "agent", "unknown"),
     ],
 )

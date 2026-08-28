@@ -32,7 +32,8 @@
       "model_refusal",
       "pause_turn",
       "server_restart",
-      "model_protocol_error"
+      "model_protocol_error",
+      "internal_error"
     ],
     "ApprovalStatus": ["pending", "approved", "rejected", "cancelled"],
     "ApprovalDecision": ["approve", "reject"],

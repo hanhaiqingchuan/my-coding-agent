@@ -393,8 +393,8 @@ class AgentLoop:
     ) -> RunOutcome:
         """Give an unexpected failure a terminal record and release the active-run claim.
 
-        The P0 protocol has no internal-error category, so a local environment or
-        persistence failure the user has to repair is reported as ``CONFIG_ERROR``; the
+        A local environment or persistence failure is this process's own fault, so it ends
+        as ``INTERNAL_ERROR`` rather than blaming the operator's configuration; the
         original exception stays visible with its traceback in the process log.
         """
         _LOGGER.error(
@@ -405,7 +405,7 @@ class AgentLoop:
         return await self._finish(
             run_id,
             session_id,
-            RunOutcome.fail(StopReason.CONFIG_ERROR, ErrorKind.CONFIG_ERROR),
+            RunOutcome.fail(StopReason.INTERNAL_ERROR, ErrorKind.INTERNAL_ERROR),
         )
 
     def _workspace_boundary(self, session_id: str) -> WorkspaceBoundary:

@@ -34,6 +34,7 @@ export const STOP_REASONS = [
   "pause_turn",
   "server_restart",
   "model_protocol_error",
+  "internal_error",
 ] as const;
 export type StopReason = (typeof STOP_REASONS)[number];
 
@@ -66,7 +67,8 @@ export type ErrorKind =
   | "auth_error"
   | "config_error"
   | "retry_exhausted"
-  | "context_overflow";
+  | "context_overflow"
+  | "internal_error";
 export type MessageStatus = "pending_tools" | "committed" | "interrupted";
 
 export type SessionDto = {

@@ -42,6 +42,13 @@ class StopReason(StrEnum):
     PAUSE_TURN = "pause_turn"
     SERVER_RESTART = "server_restart"
     MODEL_PROTOCOL_ERROR = "model_protocol_error"
+    INTERNAL_ERROR = "internal_error"
+    """A failure inside this process, not in the operator's configuration or the model.
+
+    Spec 5.2 fixes a minimum vocabulary rather than a closed one. Reporting a local
+    persistence or environment failure as ``CONFIG_ERROR`` would send the user to repair
+    settings that are already correct.
+    """
 
 
 class ErrorKind(StrEnum):
@@ -50,6 +57,7 @@ class ErrorKind(StrEnum):
     CONFIG_ERROR = "config_error"
     RETRY_EXHAUSTED = "retry_exhausted"
     CONTEXT_OVERFLOW = "context_overflow"
+    INTERNAL_ERROR = "internal_error"
 
 
 class MessageStatus(StrEnum):

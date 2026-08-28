@@ -65,6 +65,7 @@ _STOP_TO_TERMINAL = {
     StopReason.CONFIG_ERROR: RunState.FAILED,
     StopReason.RETRY_EXHAUSTED: RunState.FAILED,
     StopReason.CONTEXT_OVERFLOW: RunState.FAILED,
+    StopReason.INTERNAL_ERROR: RunState.FAILED,
 }
 
 

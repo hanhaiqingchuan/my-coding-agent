@@ -252,6 +252,7 @@ _STOP_REASON_FAILURES: dict[str, tuple[str, str]] = {
     "DOOM_LOOP": ("agent", "doom_loop"),
     "EMPTY_RESPONSE": ("agent", "doom_loop"),
     "CONFIG_ERROR": ("setup", "harness_setup"),
+    "INTERNAL_ERROR": ("agent", "internal_error"),
 }
 
 

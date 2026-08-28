@@ -23,6 +23,7 @@ def test_terminal_state_cannot_transition() -> None:
         (StopReason.PAUSE_TURN, RunState.STOPPED),
         (StopReason.SERVER_RESTART, RunState.INTERRUPTED),
         (StopReason.RETRY_EXHAUSTED, RunState.FAILED),
+        (StopReason.INTERNAL_ERROR, RunState.FAILED),
     ],
 )
 def test_stop_reason_maps_to_terminal_state(reason: StopReason, state: RunState) -> None:
