@@ -12,8 +12,10 @@ import {
   TOOL_EXECUTION_STATES,
   type DurableEvent,
   type BootstrapDto,
+  type ErrorKind,
   type RunState,
   type SessionSnapshotDto,
+  type StopReason,
 } from "../../api/types";
 import {
   createInitialSessionViewState,
@@ -82,6 +84,15 @@ test("frontend protocol constants match the fixed backend schema fixture", () =>
   expect(APPROVAL_DECISIONS).toEqual(contract.enums.ApprovalDecision);
   expect(TOOL_EXECUTION_STATES).toEqual(contract.enums.ToolExecutionState);
   expect(REQUIRED_DTO_FIELDS).toEqual(contract.required);
+});
+
+test("the internal error stop reason and error kind stay in the contract", () => {
+  // The comparison above stays green if a value disappears from both the fixture
+  // and the union, and this intersection only resolves while both unions carry it.
+  const internalError: StopReason & ErrorKind = "internal_error";
+
+  expect(STOP_REASONS).toContain(internalError);
+  expect(contract.enums.StopReason).toContain(internalError);
 });
 
 test("a snapshot replaces locally inferred state and resets the durable cursor", () => {
