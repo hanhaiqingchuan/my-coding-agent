@@ -287,6 +287,13 @@ def test_report_projects_tool_statistics_with_hashed_arguments(tmp_path: Path) -
     }
     assert [call["args_hash"] for call in report["tools"]["calls"]] == [expected_hash]
     assert report["tools"]["output_bytes"] > 0
+    with dependencies.store.connection() as connection:
+        recorded_duration = connection.execute(
+            "SELECT duration_ms FROM tool_executions"
+        ).fetchone()[0]
+    assert recorded_duration is not None
+    assert [call["duration_ms"] for call in report["tools"]["calls"]] == [recorded_duration]
+    assert report["durations"]["tool_execution_monotonic_ms"] == recorded_duration
     assert report["model"]["main"]["requests"] == 2
     assert str(paths["workspace"]) not in json.dumps(report)
 

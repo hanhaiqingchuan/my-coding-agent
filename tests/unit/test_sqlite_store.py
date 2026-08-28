@@ -22,6 +22,7 @@ from coding_agent.core.models import (
     Usage,
 )
 from coding_agent.storage.sqlite import SQLiteStore
+from coding_agent.tools import result as tool_result
 
 
 @pytest.fixture
@@ -76,6 +77,17 @@ def advance_to_model_streaming(store: SQLiteStore, run_id: str) -> None:
     """Reach the only state the product ever stages a tool group from."""
     store.transition_run(run_id, {RunState.STARTING}, RunState.BUILDING_CONTEXT, None, None)
     store.transition_run(run_id, {RunState.BUILDING_CONTEXT}, RunState.MODEL_STREAMING, None, None)
+
+
+def tool_envelope_result(tool_call_id: str, *, duration_ms: int) -> ToolResult:
+    """Build the same envelope a local tool returns, including its measured duration."""
+    return tool_result(
+        tool_call_id,
+        "read_file",
+        ok=True,
+        summary="read 1 line",
+        duration_ms=duration_ms,
+    )
 
 
 def test_initialize_creates_v1_schema_and_configures_connections(tmp_path) -> None:
@@ -314,6 +326,21 @@ def test_mixed_group_moves_the_run_state_onto_each_current_call(
     store.settle_tool_group(group.id, (ToolResult("call-read", "a.txt", True),))
 
     assert store.get_run(run.id).state is RunState.AWAITING_APPROVAL
+
+
+def test_settling_a_tool_result_records_its_measured_duration(store: SQLiteStore, session) -> None:
+    """A permanently NULL duration hides the per-execution timing spec 6 requires."""
+    run = store.begin_run(session.id, "change it", {}, "cmd-start", "hash-start")
+    advance_to_model_streaming(store, run.id)
+    group = store.stage_tool_group(run.id, mixed_tool_turn())
+
+    store.settle_tool_group(
+        group.id,
+        (tool_envelope_result("call-read", duration_ms=37),),
+    )
+
+    assert [tool.duration_ms for tool in store.load_snapshot(session.id).tools] == [37, None]
+    assert [fact["duration_ms"] for fact in store.tool_executions_for_report(run.id)] == [37, None]
 
 
 def test_terminal_run_rejects_new_assistant_turns(store: SQLiteStore, session) -> None:

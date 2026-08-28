@@ -451,12 +451,13 @@ class SQLiteStore:
                 connection.execute(
                     """
                     UPDATE tool_executions
-                    SET execution_state = ?, result_json = ?
+                    SET execution_state = ?, result_json = ?, duration_ms = ?
                     WHERE tool_call_id = ?
                     """,
                     (
                         _execution_state_for_result(result).value,
                         encoded_result,
+                        _measured_duration_ms(result),
                         result.tool_call_id,
                     ),
                 )
@@ -1194,6 +1195,7 @@ class SQLiteStore:
                        tool_executions.input_json AS input_json,
                        tool_executions.execution_state AS execution_state,
                        tool_executions.effect_started_at AS effect_started_at,
+                       tool_executions.duration_ms AS duration_ms,
                        tool_executions.result_json AS result_json
                 FROM tool_executions
                 JOIN messages ON messages.id = tool_executions.assistant_message_id
@@ -1211,6 +1213,7 @@ class SQLiteStore:
                     "args_json": row["input_json"],
                     "execution_state": row["execution_state"],
                     "effect_started": row["effect_started_at"] is not None,
+                    "duration_ms": row["duration_ms"],
                     **envelope,
                 }
             )
@@ -1748,23 +1751,31 @@ def _result_from_json(value: str) -> ToolResult:
 def _result_facts(result_json: str | None) -> dict[str, object]:
     """Extract only the numeric facts of a stored tool result, never its output text."""
     if not result_json:
-        return {"duration_ms": None, "output_bytes": None, "truncated": False}
+        return {"output_bytes": None, "truncated": False}
     value = json.loads(result_json)
     data = value.get("data") or {}
-    duration: object = None
-    content = value.get("content")
-    if isinstance(content, str):
-        try:
-            envelope = json.loads(content)
-        except json.JSONDecodeError:
-            envelope = None
-        if isinstance(envelope, dict):
-            duration = envelope.get("duration_ms")
     return {
-        "duration_ms": duration if isinstance(duration, int) else None,
         "output_bytes": data.get("output_bytes") if isinstance(data, dict) else None,
         "truncated": bool(value.get("truncated")),
     }
+
+
+def _measured_duration_ms(result: ToolResult) -> int | None:
+    """Return the duration the tool itself measured while producing this result.
+
+    The envelope is the only place a monotonic measurement exists, so it is copied into
+    the ``tool_executions`` row once, as the execution settles. Results the store or the
+    loop synthesizes — rejected, cancelled, skipped or unknown — never ran, so they keep
+    a NULL duration instead of a fabricated zero.
+    """
+    try:
+        envelope = json.loads(result.content)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(envelope, dict):
+        return None
+    duration = envelope.get("duration_ms")
+    return duration if type(duration) is int else None
 
 
 def _message_from_row(row: sqlite3.Row) -> Message:
