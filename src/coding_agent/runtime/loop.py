@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 from dataclasses import replace
 from importlib.resources import files
 from pathlib import Path
@@ -51,6 +52,8 @@ from coding_agent.storage.sqlite import SQLiteStore
 from coding_agent.tools import ToolContext
 from coding_agent.tools.paths import WorkspaceBoundary
 from coding_agent.tools.registry import ToolRegistry
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class AgentLoop:
@@ -244,6 +247,7 @@ class AgentLoop:
                         run_id, session_id, RunOutcome.stop(StopReason.DOOM_LOOP)
                     )
 
+                workspace = self._workspace_boundary(session_id)
                 group = await self._mutate(
                     session_id, lambda: self._store.stage_tool_group(run_id, turn)
                 )
@@ -274,12 +278,7 @@ class AgentLoop:
                 argument_error = False
                 for call in group.calls:
                     cancellation.raise_if_cancelled()
-                    prepared = self._tools.prepare(
-                        call.call,
-                        WorkspaceBoundary(
-                            Path(self._store.load_snapshot(session_id).session.workspace_realpath)
-                        ),
-                    )
+                    prepared = self._tools.prepare(call.call, workspace)
                     if isinstance(prepared, ToolResult):
                         if prepared.error is not None and prepared.error.code.startswith("INVALID"):
                             argument_error = True
@@ -329,13 +328,7 @@ class AgentLoop:
                         result = await self._tools.execute(
                             prepared,
                             ToolContext(
-                                workspace=WorkspaceBoundary(
-                                    Path(
-                                        self._store.load_snapshot(
-                                            session_id
-                                        ).session.workspace_realpath
-                                    )
-                                ),
+                                workspace=workspace,
                                 cancellation=cancellation,
                                 emit_output=emit_tool_output,
                             ),
@@ -382,12 +375,42 @@ class AgentLoop:
                     ),
                 )
             return await self._finish(run_id, session_id, RunOutcome.cancel())
-        except StoreError:
-            if not cancellation.cancelled:
-                raise
-            return await self._finish(run_id, session_id, RunOutcome.cancel())
+        except StoreError as error:
+            if cancellation.cancelled:
+                return await self._finish(run_id, session_id, RunOutcome.cancel())
+            return await self._fail_unexpected(run_id, session_id, error)
+        except Exception as error:
+            return await self._fail_unexpected(run_id, session_id, error)
         finally:
             await self._mutation_gate.unregister_cancellation(run_id)
+
+    async def _fail_unexpected(
+        self,
+        run_id: str,
+        session_id: str,
+        error: Exception,
+    ) -> RunOutcome:
+        """Give an unexpected failure a terminal record and release the active-run claim.
+
+        The P0 protocol has no internal-error category, so a local environment or
+        persistence failure the user has to repair is reported as ``CONFIG_ERROR``; the
+        original exception stays visible with its traceback in the process log.
+        """
+        _LOGGER.error(
+            "run failed with an unexpected error",
+            exc_info=error,
+            extra={"run_id": run_id, "session_id": session_id},
+        )
+        return await self._finish(
+            run_id,
+            session_id,
+            RunOutcome.fail(StopReason.CONFIG_ERROR, ErrorKind.CONFIG_ERROR),
+        )
+
+    def _workspace_boundary(self, session_id: str) -> WorkspaceBoundary:
+        return WorkspaceBoundary(
+            Path(self._store.load_snapshot(session_id).session.workspace_realpath)
+        )
 
     async def _build_context(
         self,

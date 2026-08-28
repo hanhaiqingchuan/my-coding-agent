@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 import json
+import logging
 from collections.abc import AsyncIterator
 from dataclasses import replace
 from datetime import UTC, datetime
@@ -1171,3 +1172,84 @@ async def test_mandatory_view_above_soft_target_keeps_running_with_the_summary(
             ).fetchone()[0]
             == 0
         )
+
+
+@pytest.mark.asyncio
+async def test_unexpected_store_failure_ends_the_run_and_frees_the_global_slot(
+    tmp_path: Path, valid_settings: AppSettings, caplog: pytest.LogCaptureFixture
+) -> None:
+    """A run left non-terminal would hold the single process-wide active-run claim forever."""
+    loop, store, session_id, run_id, _, _, _ = _make_loop(
+        tmp_path,
+        valid_settings,
+        [_tool_turn(ToolCall("call-read", "read_file", {"path": "seed.txt"}))],
+    )
+    with store.connection() as connection:
+        connection.execute(
+            """
+            CREATE TRIGGER fail_tool_staging BEFORE INSERT ON events
+            WHEN NEW.type = 'tool.group_staged'
+            BEGIN SELECT RAISE(ABORT, 'injected staging failure'); END
+            """
+        )
+
+    with caplog.at_level(logging.ERROR, logger="coding_agent.runtime.loop"):
+        outcome = await loop.run(run_id, session_id, CancellationToken())
+
+    assert outcome == RunOutcome.fail(StopReason.CONFIG_ERROR, ErrorKind.CONFIG_ERROR)
+    finished = store.get_run(run_id)
+    assert finished.state is RunState.FAILED
+    assert finished.stop_reason is StopReason.CONFIG_ERROR
+    assert finished.error_kind is ErrorKind.CONFIG_ERROR
+    assert finished.finished_at is not None
+    assert [message.role for message in store.load_committed_transcript(session_id)] == ["user"]
+    assert any(
+        record.exc_info is not None and "injected staging failure" in str(record.exc_info[1])
+        for record in caplog.records
+    )
+    store.begin_run(session_id, "next request", {}, "start-again", "hash-again")
+
+
+@pytest.mark.asyncio
+async def test_renamed_workspace_root_fails_the_run_without_a_pending_group(
+    tmp_path: Path, valid_settings: AppSettings
+) -> None:
+    """An approved command can rename the workspace root between two tool rounds."""
+
+    def rename_workspace(_prepared) -> None:
+        (tmp_path / "workspace").rename(tmp_path / "workspace-renamed")
+
+    tools = RecordingTools(rename_workspace)
+    loop, store, session_id, run_id, _, _, _ = _make_loop(
+        tmp_path,
+        valid_settings,
+        [
+            _turn(
+                "tools-first",
+                ModelStopReason.TOOL_USE,
+                ToolUsePart(ToolCall("call-first", "read_file", {"path": "a.txt"})),
+            ),
+            _turn(
+                "tools-second",
+                ModelStopReason.TOOL_USE,
+                ToolUsePart(ToolCall("call-second", "read_file", {"path": "b.txt"})),
+            ),
+            _final_turn(),
+        ],
+        tools=tools,
+    )
+
+    outcome = await loop.run(run_id, session_id, CancellationToken())
+
+    assert outcome == RunOutcome.fail(StopReason.CONFIG_ERROR, ErrorKind.CONFIG_ERROR)
+    assert store.get_run(run_id).state is RunState.FAILED
+    assert tools.executed == ["call-first"]
+    with store.connection() as connection:
+        assert (
+            connection.execute(
+                "SELECT count(*) FROM messages WHERE status = ?",
+                (MessageStatus.PENDING_TOOLS.value,),
+            ).fetchone()[0]
+            == 0
+        )
+    store.begin_run(session_id, "next request", {}, "start-again", "hash-again")
