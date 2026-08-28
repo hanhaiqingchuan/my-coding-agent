@@ -6,11 +6,15 @@ import asyncio
 import json
 import os
 import time
+import webbrowser
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from uuid import uuid4
 
+import uvicorn
+
+from coding_agent.api.app import create_app
 from coding_agent.config import AppSettings, ConfigurationError, resolve_api_key
 from coding_agent.context import Compactor, ContextBuilder
 from coding_agent.core.models import Run, RunState
@@ -201,6 +205,48 @@ def build_run_coordinator(
     )
 
 
+def serve_web(
+    *,
+    settings: AppSettings,
+    workspace: Path | None,
+    data_dir: Path | None,
+    dependencies: RuntimeDependencies | None = None,
+    auto_approve: bool = False,
+) -> int:
+    """Run the local browser API on the fixed loopback interface."""
+    runtime_workspace = WorkspaceBoundary(workspace or Path.cwd()).root
+    runtime = dependencies or build_runtime_dependencies(
+        settings=settings,
+        workspace=runtime_workspace,
+        data_dir=data_dir or Path.cwd() / ".coding-agent",
+        auto_approve=auto_approve,
+        command_policy=None,
+    )
+    runtime.approval_gate.auto_approve = auto_approve
+    if workspace is not None and not any(
+        session.workspace_realpath == str(runtime_workspace)
+        for session in runtime.store.list_sessions()
+    ):
+        runtime.store.create_session(str(runtime_workspace), runtime_workspace.name)
+    coordinator = build_run_coordinator(settings, runtime)
+    public_config = {
+        "model": settings.model.model,
+        "context_window": settings.model.context_window,
+        "max_output_tokens": settings.model.max_output_tokens,
+        "max_rounds": settings.agent.max_rounds,
+    }
+    app = create_app(
+        runtime.store,
+        coordinator,
+        public_config,
+        server_port=settings.server.port,
+    )
+    if settings.server.open_browser:
+        webbrowser.open(f"http://127.0.0.1:{settings.server.port}")
+    uvicorn.run(app, host="127.0.0.1", port=settings.server.port, log_level="info")
+    return 0
+
+
 def _read_prompt(prompt_file: Path) -> str:
     try:
         prompt = prompt_file.read_text(encoding="utf-8")
@@ -240,4 +286,5 @@ __all__ = [
     "build_runtime_dependencies",
     "load_command_policy",
     "run_headless",
+    "serve_web",
 ]

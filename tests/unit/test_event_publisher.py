@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 import pytest
 
 from coding_agent.core.models import DurableEvent, RunState
-from coding_agent.runtime.publisher import EventPublisher
+from coding_agent.runtime.publisher import AssistantDelta, EventPublisher
 from coding_agent.storage.sqlite import SQLiteStore
 
 
@@ -164,3 +164,22 @@ async def test_real_snapshot_cut_filters_committed_before_publish_without_losing
     assert duplicated.seq == snapshot.snapshot_seq
     with pytest.raises(asyncio.TimeoutError):
         await asyncio.wait_for(later_subscription.receive(), 0.02)
+
+
+@pytest.mark.asyncio
+async def test_transient_delta_does_not_advance_the_durable_sequence_cut() -> None:
+    """Treating a delta as durable could make the next committed event disappear."""
+    publisher = EventPublisher()
+    async with publisher.session_guard("session-a"):
+        subscription = publisher.subscribe_locked("session-a", after_seq=2)
+
+    delta = AssistantDelta("session-a", "run-a", "epoch-a", 0, "draft")
+    await publisher.publish_transient(delta)
+    await publisher.publish_committed(_event("session-a", 2))
+    next_event = _event("session-a", 3)
+    await publisher.publish_committed(next_event)
+
+    assert await subscription.receive() == delta
+    assert await subscription.receive() == next_event
+    with pytest.raises(asyncio.TimeoutError):
+        await asyncio.wait_for(subscription.receive(), 0.02)

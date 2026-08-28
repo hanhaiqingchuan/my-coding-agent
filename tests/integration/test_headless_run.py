@@ -352,3 +352,44 @@ def test_parser_has_serve_and_run_without_a_scripted_model_switch(
     assert raised.value.code == 2
     assert "unrecognized arguments: --scripted-model" in error
     assert "the following arguments are required" not in error
+
+
+def test_serve_uses_the_injected_runtime_and_fixed_loopback_host(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Leaving the frozen serve command unwired would make the browser API unreachable."""
+    paths = _task_files(tmp_path)
+    dependencies = _dependencies(paths["data_dir"])
+    captured: dict[str, object] = {}
+
+    def fake_run(app, *, host: str, port: int, log_level: str) -> None:
+        captured.update(app=app, host=host, port=port, log_level=log_level)
+
+    monkeypatch.setattr("uvicorn.run", fake_run)
+    monkeypatch.setattr("webbrowser.open", lambda url: captured.update(browser_url=url))
+
+    exit_code = cli.main(
+        [
+            "serve",
+            "--config",
+            str(paths["config"]),
+            "--workspace",
+            str(paths["workspace"]),
+            "--data-dir",
+            str(paths["data_dir"]),
+            "--port",
+            "8123",
+        ],
+        dependencies=dependencies,
+    )
+
+    assert exit_code == 0
+    assert captured["host"] == "127.0.0.1"
+    assert captured["port"] == 8123
+    assert captured["log_level"] == "info"
+    assert captured["browser_url"] == "http://127.0.0.1:8123"
+    assert captured["app"].state.api_dependencies.store is dependencies.store
+    sessions = dependencies.store.list_sessions()
+    assert len(sessions) == 1
+    assert sessions[0].workspace_realpath == str(paths["workspace"].resolve())

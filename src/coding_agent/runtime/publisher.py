@@ -6,7 +6,7 @@ import asyncio
 from contextlib import asynccontextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass, field
-from typing import AsyncIterator
+from typing import AsyncIterator, TypeAlias
 
 from coding_agent.core.models import DurableEvent
 
@@ -15,10 +15,44 @@ _guarded_sessions: ContextVar[frozenset[str]] = ContextVar(
 )
 
 
+@dataclass(frozen=True, slots=True)
+class AssistantDelta:
+    session_id: str
+    run_id: str
+    draft_epoch: str
+    index: int
+    text: str
+
+    def __post_init__(self) -> None:
+        if not self.session_id or not self.run_id or not self.draft_epoch:
+            raise ValueError("assistant delta requires session, run, and draft epoch")
+        if self.index < 0:
+            raise ValueError("assistant delta index must not be negative")
+
+
+@dataclass(frozen=True, slots=True)
+class ToolOutputDelta:
+    session_id: str
+    run_id: str
+    draft_epoch: str
+    tool_call_id: str
+    text: str
+
+    def __post_init__(self) -> None:
+        if not self.session_id or not self.run_id or not self.draft_epoch:
+            raise ValueError("tool output delta requires session, run, and draft epoch")
+        if not self.tool_call_id:
+            raise ValueError("tool output delta requires a tool call id")
+
+
+TransientDelta: TypeAlias = AssistantDelta | ToolOutputDelta
+PublishedMessage: TypeAlias = DurableEvent | TransientDelta
+
+
 @dataclass(eq=False, slots=True)
 class EventSubscription:
     session_id: str
-    _queue: asyncio.Queue[DurableEvent]
+    _queue: asyncio.Queue[PublishedMessage]
     _last_seq: int
     _closed: bool = field(default=False, init=False)
 
@@ -26,7 +60,7 @@ class EventSubscription:
     def closed(self) -> bool:
         return self._closed
 
-    async def receive(self) -> DurableEvent:
+    async def receive(self) -> PublishedMessage:
         return await self._queue.get()
 
 
@@ -78,6 +112,17 @@ class EventPublisher:
                 else:
                     subscription._last_seq = event.seq
 
+    async def publish_transient(self, delta: TransientDelta) -> None:
+        """Broadcast a non-durable draft update without advancing a subscriber's seq."""
+        async with self.session_guard(delta.session_id):
+            subscribers = self._subscriptions.get(delta.session_id, set())
+            for subscription in tuple(subscribers):
+                try:
+                    subscription._queue.put_nowait(delta)
+                except asyncio.QueueFull:
+                    subscription._closed = True
+                    subscribers.discard(subscription)
+
     async def unsubscribe(self, subscription: EventSubscription) -> None:
         async with self.session_guard(subscription.session_id):
             subscribers = self._subscriptions.get(subscription.session_id)
@@ -88,4 +133,11 @@ class EventPublisher:
             subscription._closed = True
 
 
-__all__ = ["EventPublisher", "EventSubscription"]
+__all__ = [
+    "AssistantDelta",
+    "EventPublisher",
+    "EventSubscription",
+    "PublishedMessage",
+    "ToolOutputDelta",
+    "TransientDelta",
+]

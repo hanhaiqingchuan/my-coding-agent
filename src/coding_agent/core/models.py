@@ -339,16 +339,62 @@ class Run:
 
 
 @dataclass(frozen=True, slots=True)
+class ToolExecution:
+    tool_call_id: str
+    run_id: str
+    assistant_message_id: str
+    call_order: int
+    name: str
+    input: FrozenJsonMapping
+    requires_approval: bool
+    approval_status: ApprovalStatus
+    approval_decision: ApprovalDecision | None
+    approval_decided_at: datetime | None
+    execution_state: ToolExecutionState
+    result: ToolResult | None
+    duration_ms: int | None
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "input", _freeze_mapping(self.input))
+
+
+@dataclass(frozen=True, slots=True)
+class PendingApproval:
+    run_id: str
+    tool_call_id: str
+    name: str
+    input: FrozenJsonMapping
+    target: str | None
+    preview: str | None
+    metadata: FrozenJsonMapping
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "input", _freeze_mapping(self.input))
+        object.__setattr__(self, "metadata", _freeze_mapping(self.metadata))
+
+
+@dataclass(frozen=True, slots=True)
+class InterruptedRunNotice:
+    run_id: str
+    stop_reason: StopReason
+    requires_recovery_ack: bool
+
+
+@dataclass(frozen=True, slots=True)
 class SessionSnapshot:
     session: Session
     active_run: Run | None
     messages: tuple[Message, ...]
     snapshot_seq: int
+    tools: tuple[ToolExecution, ...] = ()
+    pending_approval: PendingApproval | None = None
+    interrupted_banner: InterruptedRunNotice | None = None
 
     def __post_init__(self) -> None:
         if self.snapshot_seq < 0:
             raise ValueError("snapshot sequence must not be negative")
         object.__setattr__(self, "messages", tuple(self.messages))
+        object.__setattr__(self, "tools", tuple(self.tools))
 
 
 @dataclass(frozen=True, slots=True)

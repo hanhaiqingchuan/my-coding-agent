@@ -10,7 +10,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from coding_agent.config import ConfigurationError, load_settings
-from coding_agent.main import RuntimeDependencies, load_command_policy, run_headless
+from coding_agent.main import RuntimeDependencies, load_command_policy, run_headless, serve_web
 from coding_agent.tools.paths import WorkspacePathError
 
 
@@ -66,7 +66,13 @@ def main(
                     command_policy=policy,
                 )
             )
-        return _serve_unavailable(args, dependencies)
+        return serve_web(
+            settings=settings,
+            workspace=args.workspace,
+            data_dir=args.data_dir,
+            dependencies=dependencies,
+            auto_approve=args.yes,
+        )
     except (ConfigurationError, WorkspacePathError) as error:
         print(f"CONFIG_ERROR: {error}", file=sys.stderr)
         return 2
@@ -85,14 +91,6 @@ def _headless_policy(args: argparse.Namespace):
     if args.yes and policy is not None and not policy.allowed:
         raise ConfigurationError("run --yes requires a non-empty command policy")
     return policy
-
-
-def _serve_unavailable(
-    args: argparse.Namespace,
-    dependencies: RuntimeDependencies | None,
-) -> int:
-    _ = (args, dependencies)
-    raise ConfigurationError("serve: HTTP delivery is not available in this milestone")
 
 
 if __name__ == "__main__":  # pragma: no cover - console script calls main directly

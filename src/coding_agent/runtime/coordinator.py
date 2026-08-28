@@ -18,6 +18,7 @@ from coding_agent.core.models import (
     EffectStartResult,
     Run,
     RunState,
+    Session,
 )
 from coding_agent.runtime.publisher import EventPublisher
 from coding_agent.storage.sqlite import SQLiteStore
@@ -48,6 +49,10 @@ class RunMutationGate:
         self._publisher = publisher
         self._lock = asyncio.Lock()
         self._cancellations: dict[str, CancellationToken] = {}
+
+    @property
+    def event_publisher(self) -> EventPublisher:
+        return self._publisher
 
     async def register_cancellation(self, run_id: str, cancellation: CancellationToken) -> Run:
         """Register a token and observe persisted Stop under the mutation lock."""
@@ -142,6 +147,22 @@ class RunMutationGate:
             await self._publish_after(current.session_id, previous_seq)
             return approval
 
+    async def acknowledge_recovery(
+        self,
+        session_id: str,
+        client_command_id: str,
+    ) -> Session:
+        async with self._lock:
+            previous_seq = _latest_seq(self._store, session_id)
+            digest = hashlib.sha256(f"session.ack_recovery\0{session_id}".encode()).hexdigest()
+            session = self._store.acknowledge_recovery(
+                session_id,
+                client_command_id,
+                digest,
+            )
+            await self._publish_after(session_id, previous_seq)
+            return session
+
     async def finish_run(self, run_id: str, outcome: RunOutcome) -> RunOutcome:
         """Let a persisted Stop win over any late non-tool terminal outcome."""
         async with self._lock:
@@ -218,6 +239,10 @@ class RunCoordinator:
         self._ownership_lock = asyncio.Lock()
         self._tasks: dict[str, asyncio.Task[RunOutcome]] = {}
 
+    @property
+    def event_publisher(self) -> EventPublisher:
+        return self._mutation_gate.event_publisher
+
     async def start_run(
         self,
         session_id: str,
@@ -277,6 +302,13 @@ class RunCoordinator:
             client_command_id,
             on_committed=deliver_committed_approval,
         )
+
+    async def acknowledge_recovery(
+        self,
+        session_id: str,
+        client_command_id: str,
+    ) -> Session:
+        return await self._mutation_gate.acknowledge_recovery(session_id, client_command_id)
 
 
 def _latest_seq(store: SQLiteStore, session_id: str) -> int:

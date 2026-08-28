@@ -40,7 +40,7 @@ from coding_agent.model.retry import RetryingInvoker
 from coding_agent.runtime.approval import ApprovalGate
 from coding_agent.runtime.coordinator import RunMutationGate
 from coding_agent.runtime.loop import AgentLoop
-from coding_agent.runtime.publisher import EventPublisher
+from coding_agent.runtime.publisher import AssistantDelta, EventPublisher, ToolOutputDelta
 from coding_agent.storage.sqlite import SQLiteStore
 from coding_agent.tools.registry import ToolRegistry
 from tests.fakes.model import BlockingModel, ScriptedModel
@@ -175,6 +175,41 @@ def _make_loop(
         settings=settings,
     )
     return loop, store, session.id, run.id, model, tool_fake, mutation_gate
+
+
+@pytest.mark.asyncio
+async def test_live_deltas_include_run_and_distinct_draft_epochs(
+    tmp_path: Path, valid_settings: AppSettings
+) -> None:
+    """Reusing an epoch across attempts or tools would let reconnect stitch stale drafts."""
+    loop, _, session_id, run_id, _, _, mutation_gate = _make_loop(
+        tmp_path,
+        valid_settings,
+        [
+            _tool_turn(ToolCall("call-read", "read_file", {"path": "seed.txt"}), text="reading"),
+            _final_turn("finished"),
+        ],
+    )
+    publisher = mutation_gate.event_publisher
+    async with publisher.session_guard(session_id):
+        subscription = publisher.subscribe_locked(session_id)
+
+    await loop.run(run_id, session_id, CancellationToken())
+    published = []
+    while True:
+        try:
+            published.append(await asyncio.wait_for(subscription.receive(), timeout=0.01))
+        except TimeoutError:
+            break
+
+    assistant = [item for item in published if isinstance(item, AssistantDelta)]
+    tool = [item for item in published if isinstance(item, ToolOutputDelta)]
+    assert [item.text for item in assistant] == ["reading", "finished"]
+    assert len({item.draft_epoch for item in assistant}) == 2
+    assert all(item.run_id == run_id and item.session_id == session_id for item in assistant)
+    assert [(item.tool_call_id, item.text) for item in tool] == [("call-read", "output:call-read")]
+    assert tool[0].run_id == run_id
+    assert tool[0].draft_epoch
 
 
 @pytest.mark.asyncio

@@ -23,9 +23,11 @@ from coding_agent.core.models import (
     DurableEvent,
     EffectStartResult,
     ErrorKind,
+    InterruptedRunNotice,
     Message,
     MessagePart,
     MessageStatus,
+    PendingApproval,
     PendingToolGroup,
     PreparedToolCall,
     Run,
@@ -36,6 +38,7 @@ from coding_agent.core.models import (
     TextPart,
     ToolCall,
     ToolError,
+    ToolExecution,
     ToolExecutionState,
     ToolResult,
     ToolUsePart,
@@ -282,6 +285,35 @@ class SQLiteStore:
                         (session_id, MessageStatus.COMMITTED.value),
                     ).fetchall()
                 )
+                tool_rows = connection.execute(
+                    """
+                    SELECT tool_executions.* FROM tool_executions
+                    JOIN runs ON runs.id = tool_executions.run_id
+                    WHERE runs.session_id = ?
+                    ORDER BY runs.started_at, tool_executions.assistant_message_id,
+                             tool_executions.call_order
+                    """,
+                    (session_id,),
+                ).fetchall()
+                tools = tuple(_tool_execution_from_row(item) for item in tool_rows)
+                pending_approval = _pending_approval_from_rows(connection, session_id, tool_rows)
+                interrupted = connection.execute(
+                    """
+                    SELECT id, stop_reason FROM runs
+                    WHERE session_id = ? AND state = ?
+                    ORDER BY started_at DESC LIMIT 1
+                    """,
+                    (session_id, RunState.INTERRUPTED.value),
+                ).fetchone()
+                interrupted_banner = (
+                    InterruptedRunNotice(
+                        run_id=interrupted["id"],
+                        stop_reason=StopReason(interrupted["stop_reason"]),
+                        requires_recovery_ack=session.requires_recovery_ack,
+                    )
+                    if interrupted is not None
+                    else None
+                )
                 snapshot_seq = connection.execute(
                     "SELECT coalesce(max(seq), 0) FROM events WHERE session_id = ?",
                     (session_id,),
@@ -290,7 +322,15 @@ class SQLiteStore:
             except BaseException:
                 connection.rollback()
                 raise
-        return SessionSnapshot(session, active_run, messages, snapshot_seq)
+        return SessionSnapshot(
+            session,
+            active_run,
+            messages,
+            snapshot_seq,
+            tools,
+            pending_approval,
+            interrupted_banner,
+        )
 
     def stage_tool_group(self, run_id: str, turn: AssistantTurn) -> PendingToolGroup:
         if not turn.tool_calls:
@@ -1642,6 +1682,74 @@ def _event_from_row(row: sqlite3.Row) -> DurableEvent:
         type=row["type"],
         payload=json.loads(row["payload_json"]),
         created_at=datetime.fromisoformat(row["created_at"]),
+    )
+
+
+def _tool_execution_from_row(row: sqlite3.Row) -> ToolExecution:
+    return ToolExecution(
+        tool_call_id=row["tool_call_id"],
+        run_id=row["run_id"],
+        assistant_message_id=row["assistant_message_id"],
+        call_order=row["call_order"],
+        name=row["name"],
+        input=json.loads(row["input_json"]),
+        requires_approval=bool(row["requires_approval"]),
+        approval_status=ApprovalStatus(row["approval_status"]),
+        approval_decision=(
+            ApprovalDecision(row["approval_decision"]) if row["approval_decision"] else None
+        ),
+        approval_decided_at=(
+            datetime.fromisoformat(row["approval_decided_at"])
+            if row["approval_decided_at"]
+            else None
+        ),
+        execution_state=ToolExecutionState(row["execution_state"]),
+        result=_result_from_json(row["result_json"]) if row["result_json"] else None,
+        duration_ms=row["duration_ms"],
+    )
+
+
+def _pending_approval_from_rows(
+    connection: sqlite3.Connection,
+    session_id: str,
+    tool_rows: Sequence[sqlite3.Row],
+) -> PendingApproval | None:
+    current = next(
+        (
+            row
+            for row in tool_rows
+            if row["execution_state"] == ToolExecutionState.AWAITING_APPROVAL.value
+            and row["approval_status"] == ApprovalStatus.PENDING.value
+        ),
+        None,
+    )
+    if current is None:
+        return None
+    event_rows = connection.execute(
+        """
+        SELECT payload_json FROM events
+        WHERE session_id = ? AND type = 'approval.requested'
+        ORDER BY seq DESC
+        """,
+        (session_id,),
+    ).fetchall()
+    payload = next(
+        (
+            parsed
+            for row in event_rows
+            if (parsed := json.loads(row["payload_json"])).get("tool_call_id")
+            == current["tool_call_id"]
+        ),
+        {},
+    )
+    return PendingApproval(
+        run_id=current["run_id"],
+        tool_call_id=current["tool_call_id"],
+        name=current["name"],
+        input=json.loads(current["input_json"]),
+        target=payload.get("target"),
+        preview=payload.get("preview"),
+        metadata=payload.get("metadata", {}),
     )
 
 

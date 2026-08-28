@@ -46,7 +46,7 @@ from coding_agent.model.retry import RetryingInvoker
 from coding_agent.runtime.approval import ApprovalGate
 from coding_agent.runtime.coordinator import RunMutationGate
 from coding_agent.runtime.metrics import model_config_hash
-from coding_agent.runtime.publisher import EventPublisher
+from coding_agent.runtime.publisher import AssistantDelta, EventPublisher, ToolOutputDelta
 from coding_agent.storage.sqlite import SQLiteStore
 from coding_agent.tools import ToolContext
 from coding_agent.tools.paths import WorkspaceBoundary
@@ -310,6 +310,22 @@ class AgentLoop:
                         cancellation.raise_if_cancelled()
                         raise CancellationRequested()
                     try:
+
+                        async def emit_tool_output(
+                            text: str,
+                            *,
+                            tool_call_id: str = prepared.call.id,
+                        ) -> None:
+                            await self._publisher.publish_transient(
+                                ToolOutputDelta(
+                                    session_id=session_id,
+                                    run_id=run_id,
+                                    draft_epoch=f"tool:{tool_call_id}",
+                                    tool_call_id=tool_call_id,
+                                    text=text,
+                                )
+                            )
+
                         result = await self._tools.execute(
                             prepared,
                             ToolContext(
@@ -321,7 +337,7 @@ class AgentLoop:
                                     )
                                 ),
                                 cancellation=cancellation,
-                                emit_output=_ignore_output,
+                                emit_output=emit_tool_output,
                             ),
                         )
                     except CancellationRequested:
@@ -489,10 +505,20 @@ class AgentLoop:
                     RunState.MODEL_STREAMING,
                 )
             attempts += 1
+            draft_epoch = f"{request_id}:{attempts}"
             draft: dict[int, list[str]] = {}
 
             async def collect_delta(delta: TextDelta) -> None:
                 draft.setdefault(delta.index, []).append(delta.text)
+                await self._publisher.publish_transient(
+                    AssistantDelta(
+                        session_id=session_id,
+                        run_id=run_id,
+                        draft_epoch=draft_epoch,
+                        index=delta.index,
+                        text=delta.text,
+                    )
+                )
 
             try:
                 return await self._model.complete(request, collect_delta, cancellation)
@@ -620,10 +646,6 @@ class AgentLoop:
         for event in self._store.events_after(session_id, previous_seq):
             await self._publisher.publish_committed(event)
         return result
-
-
-async def _ignore_output(_: str) -> None:
-    return None
 
 
 def _has_nonempty_text(turn: AssistantTurn) -> bool:
