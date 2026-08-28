@@ -53,7 +53,11 @@ export function Composer({
       <textarea
         id="composer-message"
         aria-label="Message"
+        aria-describedby={
+          isRecoveryBlocked ? "composer-recovery-note" : undefined
+        }
         value={draft}
+        disabled={isRecoveryBlocked}
         placeholder={
           isRecoveryBlocked
             ? "Confirm recovery before sending a message"
@@ -61,6 +65,11 @@ export function Composer({
         }
         onChange={(event) => onDraftChange(event.target.value)}
       />
+      {isRecoveryBlocked ? (
+        <p className="composer-note" id="composer-recovery-note">
+          输入框已禁用：请先确认已检查 workspace/进程。
+        </p>
+      ) : null}
       <div className="composer-actions">
         {active ? (
           <button

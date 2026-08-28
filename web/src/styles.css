@@ -873,6 +873,19 @@ button:disabled:hover {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+/* Spec 13.3 keeps the input disabled until the user confirms the workspace was
+   inspected, so the dead control and its reason read as one statement. */
+.composer textarea:disabled {
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+.composer-note {
+  margin: 0;
+  padding: 0 var(--space-1);
+  color: var(--amber-fg);
+  font-size: var(--text-xs);
+  line-height: var(--leading-tight);
+}
 /* Send and Stop occupy the same slot and the same width, so the in-place
    swap never moves the control. */
 .composer-actions button {

@@ -156,6 +156,32 @@ test("disables Send for empty input and a recovery acknowledgement gate", () => 
   ).toBe(true);
 });
 
+test("keeps the message input disabled and explained until recovery is acknowledged", async () => {
+  const user = userEvent.setup();
+  const onDraftChange = vi.fn();
+  render(
+    <Composer
+      activeRun={null}
+      draft="ready"
+      isRecoveryBlocked
+      onDraftChange={onDraftChange}
+      onSend={vi.fn()}
+      onStop={vi.fn()}
+    />,
+  );
+
+  const textarea = screen.getByRole<HTMLTextAreaElement>("textbox", {
+    name: "Message",
+  });
+  expect(textarea.disabled).toBe(true);
+  expect(
+    screen.getByText("输入框已禁用：请先确认已检查 workspace/进程。"),
+  ).not.toBeNull();
+
+  await user.type(textarea, " more");
+  expect(onDraftChange).not.toHaveBeenCalled();
+});
+
 test("keeps a visible focus indicator on the message input for keyboard users", async () => {
   const user = userEvent.setup();
   render(
