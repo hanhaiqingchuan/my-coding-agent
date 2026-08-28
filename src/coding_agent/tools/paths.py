@@ -28,6 +28,10 @@ class WorkspaceBoundary:
             raise WorkspacePathError(
                 "WORKSPACE_NOT_FOUND", "workspace directory does not exist"
             ) from error
+        except (OSError, RuntimeError) as error:
+            raise WorkspacePathError(
+                "WORKSPACE_RESOLUTION_FAILED", "workspace path could not be resolved"
+            ) from error
         if not root.is_dir():
             raise WorkspacePathError("WORKSPACE_NOT_DIRECTORY", "workspace must be a directory")
         object.__setattr__(self, "root", root)
@@ -41,12 +45,21 @@ class WorkspaceBoundary:
         if not isinstance(path, str) or not path:
             raise WorkspacePathError("INVALID_PATH", "path must be a non-empty string")
         candidate = Path(path)
+        if ".." in candidate.parts:
+            raise WorkspacePathError(
+                "PATH_PARENT_TRAVERSAL", "path must not contain parent traversal"
+            )
         if not candidate.is_absolute():
             candidate = self.root / candidate
         try:
             resolved = candidate.resolve(strict=True)
         except FileNotFoundError as error:
-            unresolved = candidate.resolve(strict=False)
+            try:
+                unresolved = candidate.resolve(strict=False)
+            except (OSError, RuntimeError) as resolution_error:
+                raise WorkspacePathError(
+                    "PATH_RESOLUTION_FAILED", "path could not be resolved"
+                ) from resolution_error
             self._require_inside(unresolved)
             if not allow_missing_leaf:
                 raise WorkspacePathError("PATH_NOT_FOUND", "path does not exist") from error
@@ -56,8 +69,16 @@ class WorkspaceBoundary:
                 raise WorkspacePathError(
                     "PATH_PARENT_NOT_FOUND", "path parent directory does not exist"
                 ) from parent_error
+            except (OSError, RuntimeError) as resolution_error:
+                raise WorkspacePathError(
+                    "PATH_RESOLUTION_FAILED", "path could not be resolved"
+                ) from resolution_error
             self._require_inside(parent)
             resolved = parent / candidate.name
+        except (OSError, RuntimeError) as error:
+            raise WorkspacePathError(
+                "PATH_RESOLUTION_FAILED", "path could not be resolved"
+            ) from error
         self._require_inside(resolved)
         return resolved
 

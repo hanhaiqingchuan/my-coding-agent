@@ -22,8 +22,11 @@ def test_resolve_accepts_relative_and_absolute_paths_inside_workspace(tmp_path: 
     assert boundary.resolve(str(target)) == target.resolve()
 
 
-@pytest.mark.parametrize("path", ["../outside.txt", "/tmp/outside.txt"])
-def test_resolve_rejects_paths_outside_workspace(tmp_path: Path, path: str) -> None:
+@pytest.mark.parametrize(
+    ("path", "code"),
+    [("../outside.txt", "PATH_PARENT_TRAVERSAL"), ("/tmp/outside.txt", "PATH_OUTSIDE_WORKSPACE")],
+)
+def test_resolve_rejects_paths_outside_workspace(tmp_path: Path, path: str, code: str) -> None:
     """Removing the containment check would let a tool escape its session workspace."""
     workspace = tmp_path / "workspace"
     workspace.mkdir()
@@ -31,10 +34,10 @@ def test_resolve_rejects_paths_outside_workspace(tmp_path: Path, path: str) -> N
     outside.write_text("private", encoding="utf-8")
     absolute_path = str(outside) if path.startswith("/") else path
 
-    with pytest.raises(WorkspacePathError, match="outside") as error:
+    with pytest.raises(WorkspacePathError) as error:
         WorkspaceBoundary(workspace).resolve(absolute_path)
 
-    assert error.value.code == "PATH_OUTSIDE_WORKSPACE"
+    assert error.value.code == code
 
 
 def test_resolve_rejects_symlink_that_points_outside_workspace(tmp_path: Path) -> None:
@@ -49,6 +52,35 @@ def test_resolve_rejects_symlink_that_points_outside_workspace(tmp_path: Path) -
         WorkspaceBoundary(workspace).resolve("escape.txt")
 
     assert error.value.code == "PATH_OUTSIDE_WORKSPACE"
+
+
+def test_resolve_rejects_parent_traversal_even_when_it_normalizes_inside_workspace(
+    tmp_path: Path,
+) -> None:
+    """Normalizing ``..`` inside the root would violate the bound path-input policy."""
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    directory = workspace / "directory"
+    directory.mkdir()
+    (workspace / "file.txt").write_text("safe", encoding="utf-8")
+
+    with pytest.raises(WorkspacePathError) as error:
+        WorkspaceBoundary(workspace).resolve("directory/../file.txt")
+
+    assert error.value.code == "PATH_PARENT_TRAVERSAL"
+
+
+def test_resolve_translates_cyclic_symlink_to_stable_path_error(tmp_path: Path) -> None:
+    """A cyclic link must not make a model-supplied path raise out of the tool boundary."""
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    loop = workspace / "loop"
+    loop.symlink_to(loop)
+
+    with pytest.raises(WorkspacePathError) as error:
+        WorkspaceBoundary(workspace).resolve("loop")
+
+    assert error.value.code == "PATH_RESOLUTION_FAILED"
 
 
 def test_resolve_missing_leaf_uses_existing_canonical_parent(tmp_path: Path) -> None:

@@ -65,4 +65,25 @@ def test_registry_returns_tool_result_for_unknown_or_invalid_calls(
     assert not isinstance(result, PreparedToolCall)
     assert result.ok is False
     assert result.error is not None
-    assert result.error.code in {"UNKNOWN_TOOL", "PATH_OUTSIDE_WORKSPACE"}
+    assert result.error.code in {
+        "UNKNOWN_TOOL",
+        "PATH_OUTSIDE_WORKSPACE",
+        "PATH_PARENT_TRAVERSAL",
+    }
+
+
+def test_registry_returns_tool_result_when_path_resolution_hits_a_symlink_cycle(
+    tmp_path: Path,
+) -> None:
+    """A link loop must remain a recoverable model-visible path failure."""
+    loop = tmp_path / "loop"
+    loop.symlink_to(loop)
+
+    result = ToolRegistry().prepare(
+        ToolCall("call-loop", "read_file", {"path": "loop"}), WorkspaceBoundary(tmp_path)
+    )
+
+    assert not isinstance(result, PreparedToolCall)
+    assert result.ok is False
+    assert result.error is not None
+    assert result.error.code == "PATH_RESOLUTION_FAILED"
