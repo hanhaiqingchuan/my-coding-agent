@@ -13,10 +13,7 @@ export class ApiError extends Error {
 export class ApiClient {
   private csrfToken: string | null = null;
 
-  async bootstrap(force = false): Promise<BootstrapDto> {
-    if (!force && this.csrfToken !== null) {
-      return this.request<BootstrapDto>("/api/bootstrap", { method: "GET" }, false);
-    }
+  async bootstrap(): Promise<BootstrapDto> {
     const bootstrap = await this.request<BootstrapDto>("/api/bootstrap", { method: "GET" }, false);
     this.csrfToken = bootstrap.csrf_token;
     return bootstrap;
@@ -51,7 +48,12 @@ export class ApiClient {
     );
   }
 
-  private async request<T>(path: string, init: RequestInit, stateChanging: boolean): Promise<T> {
+  private async request<T>(
+    path: string,
+    init: RequestInit,
+    stateChanging: boolean,
+    retriedAfterAuth = false,
+  ): Promise<T> {
     const headers = new Headers(init.headers);
     if (stateChanging && this.csrfToken !== null) {
       headers.set("X-CSRF-Token", this.csrfToken);
@@ -60,6 +62,10 @@ export class ApiClient {
     if (!response.ok) {
       if (response.status === 403) {
         this.clearToken();
+        if (stateChanging && !retriedAfterAuth) {
+          await this.bootstrap();
+          return this.request(path, init, stateChanging, true);
+        }
       }
       throw new ApiError(response.status, `API request failed with status ${response.status}`);
     }

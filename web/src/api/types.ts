@@ -171,6 +171,80 @@ export type DurableEvent = {
   created_at: string;
 };
 
+export const REQUIRED_DTO_FIELDS = {
+  RunDto: [
+    "id",
+    "session_id",
+    "state",
+    "stop_reason",
+    "error_kind",
+    "cancellation_requested_at",
+    "config_snapshot",
+    "started_at",
+    "finished_at",
+  ],
+  MessageDto: ["id", "session_id", "run_id", "seq", "role", "parts", "status", "tool_call_id"],
+  ToolExecutionDto: [
+    "tool_call_id",
+    "run_id",
+    "assistant_message_id",
+    "call_order",
+    "name",
+    "input",
+    "requires_approval",
+    "approval_status",
+    "approval_decision",
+    "approval_decided_at",
+    "execution_state",
+    "result",
+    "duration_ms",
+  ],
+  PendingApprovalDto: ["run_id", "tool_call_id", "name", "input", "target", "preview", "metadata"],
+  SessionSnapshotDto: [
+    "session",
+    "active_run",
+    "messages",
+    "tools",
+    "pending_approval",
+    "interrupted_banner",
+    "snapshot_seq",
+  ],
+  DurableEvent: ["seq", "session_id", "run_id", "type", "payload", "created_at"],
+} as const;
+
+type RequiredDtoMap = {
+  RunDto: RunDto;
+  MessageDto: MessageDto;
+  ToolExecutionDto: ToolExecutionDto;
+  PendingApprovalDto: PendingApprovalDto;
+  SessionSnapshotDto: SessionSnapshotDto;
+  DurableEvent: DurableEvent;
+};
+
+type ExactFieldSet<Dto, Fields extends readonly PropertyKey[]> = Exclude<
+  keyof Dto,
+  Fields[number]
+> extends never
+  ? Exclude<Fields[number], keyof Dto> extends never
+    ? true
+    : never
+  : never;
+
+const requiredDtoFieldsMatchTypes: {
+  [Name in keyof RequiredDtoMap]: ExactFieldSet<
+    RequiredDtoMap[Name],
+    (typeof REQUIRED_DTO_FIELDS)[Name]
+  >;
+} = {
+  RunDto: true,
+  MessageDto: true,
+  ToolExecutionDto: true,
+  PendingApprovalDto: true,
+  SessionSnapshotDto: true,
+  DurableEvent: true,
+};
+void requiredDtoFieldsMatchTypes;
+
 export type ClientCommand =
   | { type: "session.subscribe"; client_command_id: string; session_id: string; payload: Record<string, never> }
   | { type: "run.start"; client_command_id: string; session_id: string; payload: { content: string } }

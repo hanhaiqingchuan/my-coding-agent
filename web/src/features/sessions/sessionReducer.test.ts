@@ -6,6 +6,7 @@ import { SessionSocket } from "../../api/socket";
 import {
   APPROVAL_DECISIONS,
   APPROVAL_STATUSES,
+  REQUIRED_DTO_FIELDS,
   RUN_STATES,
   STOP_REASONS,
   TOOL_EXECUTION_STATES,
@@ -67,6 +68,7 @@ test("frontend protocol constants match the fixed backend schema fixture", () =>
   expect(APPROVAL_STATUSES).toEqual(contract.enums.ApprovalStatus);
   expect(APPROVAL_DECISIONS).toEqual(contract.enums.ApprovalDecision);
   expect(TOOL_EXECUTION_STATES).toEqual(contract.enums.ToolExecutionState);
+  expect(REQUIRED_DTO_FIELDS).toEqual(contract.required);
 });
 
 test("a snapshot replaces locally inferred state and resets the durable cursor", () => {
@@ -216,4 +218,46 @@ test("an expired authentication token is bootstrapped at most once before resubs
     type: "session.subscribe",
     session_id: "session-a",
   });
+});
+
+test("a non-user socket close reconnects once, bootstraps again, and resubscribes", async () => {
+  const sockets: BrowserSocket[] = [];
+  let bootstraps = 0;
+  const connections: string[] = [];
+  const api = {
+    bootstrap: async () => {
+      bootstraps += 1;
+      return { csrf_token: `token-${bootstraps}`, websocket_url: "ws://local.test/api/ws" };
+    },
+    clearToken: () => undefined,
+  } as unknown as ApiClient;
+  const socket = new SessionSocket({
+    api,
+    onMessage: () => undefined,
+    onConnection: (connection) => connections.push(connection),
+    onToken: () => undefined,
+    createSocket: () => {
+      const connection = new BrowserSocket();
+      sockets.push(connection);
+      return connection;
+    },
+  });
+
+  await socket.connect("session-a");
+  sockets[0].open();
+  sockets[0].closeFromServer(4408);
+  await Promise.resolve();
+
+  expect(sockets).toHaveLength(2);
+  expect(bootstraps).toBe(2);
+  sockets[1].open();
+  expect(JSON.parse(sockets[1].sent[0])).toMatchObject({
+    type: "session.subscribe",
+    session_id: "session-a",
+  });
+
+  sockets[1].closeFromServer(1006);
+  await Promise.resolve();
+  expect(sockets).toHaveLength(2);
+  expect(connections.at(-1)).toBe("offline");
 });
