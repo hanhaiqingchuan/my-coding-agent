@@ -1,5 +1,6 @@
 # Local design/runtime artifacts belong to the private outer workspace.
 /.superpowers/
+/.worktrees/
 
 # Secrets and local configuration.
 .env
