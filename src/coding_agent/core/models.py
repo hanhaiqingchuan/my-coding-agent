@@ -102,16 +102,23 @@ JsonValue: TypeAlias = JsonScalar | tuple["JsonValue", ...] | Mapping[str, "Json
 FrozenJsonMapping: TypeAlias = Mapping[str, JsonValue]
 
 
-def _freeze_json(value: JsonValue) -> JsonValue:
+def _freeze_json(value: object) -> JsonValue:
     if isinstance(value, Mapping):
-        return MappingProxyType({str(key): _freeze_json(item) for key, item in value.items()})
+        return _freeze_mapping(value)
     if isinstance(value, list | tuple):
         return tuple(_freeze_json(item) for item in value)
-    return value
+    if value is None or type(value) in {str, int, float, bool}:
+        return value
+    raise TypeError(f"expected a JSON value, got {type(value).__name__}")
 
 
-def _freeze_mapping(value: Mapping[str, JsonValue]) -> FrozenJsonMapping:
-    return MappingProxyType({str(key): _freeze_json(item) for key, item in value.items()})
+def _freeze_mapping(value: Mapping[object, object]) -> FrozenJsonMapping:
+    frozen: dict[str, JsonValue] = {}
+    for key, item in value.items():
+        if type(key) is not str:
+            raise TypeError(f"expected a JSON object key, got {type(key).__name__}")
+        frozen[key] = _freeze_json(item)
+    return MappingProxyType(frozen)
 
 
 @dataclass(frozen=True, slots=True)

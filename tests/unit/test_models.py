@@ -67,6 +67,19 @@ def test_assistant_turn_rejects_duplicate_tool_call_ids() -> None:
         )
 
 
+@pytest.mark.parametrize(
+    "input_value",
+    [
+        {"payload": bytearray(b"mutable")},
+        {"nested": {"unsupported": {"mutable"}}},
+    ],
+)
+def test_tool_call_rejects_unsupported_json_values_recursively(input_value: object) -> None:
+    """Accepting mutable non-JSON values would let callers mutate a supposedly frozen DTO."""
+    with pytest.raises(TypeError, match="JSON"):
+        ToolCall(id="call-1", name="read_file", input=input_value)  # type: ignore[arg-type]
+
+
 def test_dto_is_frozen_and_rejects_unknown_fields() -> None:
     """Making DTOs mutable or permissive would let one layer silently corrupt another."""
     part = TextPart("immutable")
