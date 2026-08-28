@@ -111,10 +111,11 @@ class ModelAPIError(RuntimeError):
 
 
 class ModelProtocolError(RuntimeError):
-    def __init__(self, code: str, detail: str) -> None:
+    def __init__(self, code: str, detail: str, *, usage: Usage | None = None) -> None:
         super().__init__(f"{code}: {detail}")
         self.code = code
         self.detail = detail
+        self.usage = usage
 
 
 __all__ = [

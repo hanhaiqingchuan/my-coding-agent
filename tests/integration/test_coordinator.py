@@ -66,7 +66,7 @@ async def test_stop_and_effect_start_have_one_linearized_winner(
     session_id, run_id, call_id = _approved_call(store, tool_name)
     token = CancellationToken()
     gate = RunMutationGate(store, EventPublisher())
-    gate.register_cancellation(run_id, token)
+    await gate.register_cancellation(run_id, token)
 
     if winner == "approve-first":
         effect_task = asyncio.create_task(gate.begin_effect(run_id, call_id))

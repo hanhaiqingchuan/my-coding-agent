@@ -179,7 +179,9 @@ class MessageStreamAssembler:
         has_tool_use = any(block.type == "tool_use" for block in self._blocks)
         if self._stop_reason is ModelStopReason.MAX_TOKENS and has_tool_use:
             raise ModelProtocolError(
-                "INCOMPLETE_TOOL_CALL", "max_tokens ended a response containing tool use"
+                "INCOMPLETE_TOOL_CALL",
+                "max_tokens ended a response containing tool use",
+                usage=self._usage,
             )
         parts = tuple(self._build_part(block) for block in self._blocks)
         if self._stop_reason is ModelStopReason.TOOL_USE and not has_tool_use:

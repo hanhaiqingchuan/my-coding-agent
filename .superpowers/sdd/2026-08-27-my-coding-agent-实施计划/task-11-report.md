@@ -57,3 +57,36 @@
 - `pause_turn` continuation 按 P0 约束未实现，明确收束为 `STOPPED/PAUSE_TURN`。
 - publisher 保持进程内实时分发；durable replay 继续以 SQLite `events` 和 session `seq` 为事实源。
 - 未执行远端写入。
+
+## Fix Round 1
+
+### 变更
+
+- 将真实流式协议边界的 `ModelProtocolError(code="INCOMPLETE_TOOL_CALL")` 单独映射为 `STOPPED/INCOMPLETE_TOOL_CALL`，不进入工具 stage/execute。`MessageStreamAssembler` 把已聚合的 provider usage 附在该结构化错误上，request record 保存 `21/9/5/8` 四项 usage；部分文本仅保存为 `interrupted`，不进入 canonical transcript。
+- 将 cancellation token 注册改为异步 `RunMutationGate.register_cancellation()`：token 写入与 SQLite run 状态读取共用 Stop/effect 的同一临界区。若 Stop 已先持久化为 `CANCELLING`，注册立即触发 token，AgentLoop 不做 `STARTING → BUILDING_CONTEXT`，直接配对清理并收束 `CANCELLED/USER_STOP`。
+- `EventSubscription` 新增 snapshot cut/last seq；`subscribe_locked(..., after_seq=snapshot.snapshot_seq)` 后，live publish 丢弃 `seq <= cut` 的重复事件，并继续投递 cut 后事件。测试用真实 SQLite snapshot 和延迟 publish 并发任务覆盖 commit-before-snapshot 与 commit-after-cut 两侧。
+- `EventPublisher` 默认 queue 从 asyncio 的无限 `0` 改为有限 `256`，并拒绝所有非正配置；默认配置下慢消费者队列满后会被断开，快速消费者继续接收。
+- 移除原先手造 `AssistantTurn(MAX_TOKENS, tool_use)` 的不可能集成用例，替换为 `AnthropicMessagesModel → MessageStreamAssembler → AgentLoop` 的真实生产链路测试。
+
+### RED → GREEN 证据
+
+1. 真实 assembler 截断工具调用：
+   - RED：`uv run --python 3.12 pytest tests/integration/test_agent_loop.py::test_real_assembler_incomplete_tool_call_maps_to_stopped_and_keeps_usage -v` → 1 failed；实际为 `FAILED/MODEL_PROTOCOL_ERROR`。
+   - GREEN：同一测试加两项 assembler 协议回归 → 3 passed。
+2. Stop-before-registration：
+   - RED：`uv run --python 3.12 pytest tests/integration/test_agent_loop.py::test_stop_before_loop_registers_token_finishes_cancelled_without_model_call -v` → 1 failed；稳定复现非法 `CANCELLING -> BUILDING_CONTEXT`。
+   - GREEN：该测试与四组 Stop/effect 次序测试同跑 → 5 passed。
+3. snapshot/live cut：
+   - RED：真实 SQLite 并发测试 → 1 failed；`subscribe_locked` 无 cut 契约。
+   - GREEN：同一测试 → 1 passed；快照内事件不重复、cut 后事件恰好投递一次。
+4. 默认有限队列：
+   - RED：默认慢消费者与非正配置测试 → 2 failed；默认队列实际 `maxsize=0` 且接受零值。
+   - GREEN：同一命令 → 2 passed；默认慢订阅被隔离，快速订阅不中断。
+
+### 最终验证
+
+- Task 11 + 协议聚焦：`uv run --python 3.12 pytest tests/integration/test_agent_loop.py tests/integration/test_coordinator.py tests/unit/test_event_publisher.py tests/unit/test_approval.py tests/unit/test_message_assembler.py tests/unit/test_anthropic_messages.py -q` → 101 passed。
+- 全套：`uv run --python 3.12 pytest -q` → 266 passed, 1 skipped；skip 仍为既有 macOS Unix-socket 路径长度条件。
+- `uv run --python 3.12 ruff check .` → 通过。
+- 本轮触及文件 `ruff format --check` → 通过。
+- `git diff --check` → 通过。

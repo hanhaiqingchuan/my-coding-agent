@@ -30,11 +30,18 @@ class RunMutationGate:
         self._lock = asyncio.Lock()
         self._cancellations: dict[str, CancellationToken] = {}
 
-    def register_cancellation(self, run_id: str, cancellation: CancellationToken) -> None:
-        self._cancellations[run_id] = cancellation
+    async def register_cancellation(self, run_id: str, cancellation: CancellationToken) -> Run:
+        """Register a token and observe persisted Stop under the mutation lock."""
+        async with self._lock:
+            run = self._store.get_run(run_id)
+            self._cancellations[run_id] = cancellation
+            if run.state is RunState.CANCELLING or run.cancellation_requested_at is not None:
+                cancellation.cancel()
+            return run
 
-    def unregister_cancellation(self, run_id: str) -> None:
-        self._cancellations.pop(run_id, None)
+    async def unregister_cancellation(self, run_id: str) -> None:
+        async with self._lock:
+            self._cancellations.pop(run_id, None)
 
     async def begin_run(
         self,

@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 import json
+from collections.abc import AsyncIterator
 from dataclasses import replace
 from pathlib import Path
 
@@ -26,7 +27,8 @@ from coding_agent.core.models import (
     ToolUsePart,
     Usage,
 )
-from coding_agent.model import ModelMessage
+from coding_agent.model import ModelMessage, anthropic_messages
+from coding_agent.model.anthropic_messages import AnthropicMessagesModel
 from coding_agent.model.protocol import (
     ModelAPIError,
     ModelProtocolError,
@@ -43,6 +45,32 @@ from coding_agent.storage.sqlite import SQLiteStore
 from coding_agent.tools.registry import ToolRegistry
 from tests.fakes.model import BlockingModel, ScriptedModel
 from tests.fakes.tools import BlockingTools, CancellationRaisingTools, RecordingTools
+from tests.fixtures.anthropic_events import two_tool_use_event_stream
+
+
+class _FakeStream:
+    def __init__(self, events: list[dict[str, object]]) -> None:
+        self._events = events
+
+    def __aiter__(self) -> AsyncIterator[dict[str, object]]:
+        return self._iterate()
+
+    async def _iterate(self) -> AsyncIterator[dict[str, object]]:
+        for event in self._events:
+            yield event
+
+
+class _FakeMessages:
+    def __init__(self, events: list[dict[str, object]]) -> None:
+        self._events = events
+
+    async def create(self, **_kwargs: object) -> _FakeStream:
+        return _FakeStream(self._events)
+
+
+class _FakeClient:
+    def __init__(self, events: list[dict[str, object]]) -> None:
+        self.messages = _FakeMessages(events)
 
 
 class PartialFailureModel:
@@ -510,6 +538,28 @@ async def test_stop_wins_over_late_final_model_turn(
 
 
 @pytest.mark.asyncio
+async def test_stop_before_loop_registers_token_finishes_cancelled_without_model_call(
+    tmp_path: Path, valid_settings: AppSettings
+) -> None:
+    """Missing persisted cancellation during registration would strand the run in CANCELLING."""
+    loop, store, session_id, run_id, model, _, mutation_gate = _make_loop(
+        tmp_path, valid_settings, [_final_turn("must not run")]
+    )
+    await mutation_gate.request_stop(run_id, "stop-before-registration")
+    cancellation = CancellationToken()
+
+    outcome = await loop.run(run_id, session_id, cancellation)
+
+    assert outcome == RunOutcome.cancel()
+    assert cancellation.cancelled is True
+    assert model.call_count == 0
+    finished = store.get_run(run_id)
+    assert finished.state is RunState.CANCELLED
+    assert finished.stop_reason is StopReason.USER_STOP
+    assert [message.role for message in store.load_committed_transcript(session_id)] == ["user"]
+
+
+@pytest.mark.asyncio
 async def test_empty_response_retries_once_then_stops_with_typed_reason(
     tmp_path: Path, valid_settings: AppSettings
 ) -> None:
@@ -583,23 +633,41 @@ async def test_special_text_outputs_are_interrupted_not_canonical(
 
 
 @pytest.mark.asyncio
-async def test_max_tokens_with_tool_use_never_executes_or_enters_canonical_history(
-    tmp_path: Path, valid_settings: AppSettings
+async def test_real_assembler_incomplete_tool_call_maps_to_stopped_and_keeps_usage(
+    tmp_path: Path,
+    valid_settings: AppSettings,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Trusting a seemingly complete truncated tool block could perform unintended effects."""
-    turn = _turn(
-        "truncated-tool",
-        ModelStopReason.MAX_TOKENS,
-        TextPart("I am done"),
-        ToolUsePart(ToolCall("call-write", "write_file", {"path": "out.txt"})),
+    """Collapsing assembler INCOMPLETE_TOOL_CALL into protocol failure loses policy and usage."""
+    events = list(two_tool_use_event_stream())
+    message_delta = events[-3]
+    assert isinstance(message_delta["delta"], dict)
+    message_delta["delta"]["stop_reason"] = "max_tokens"
+    client = _FakeClient(events)
+    monkeypatch.setattr(anthropic_messages, "AsyncAnthropic", lambda **_kwargs: client)
+    model = AnthropicMessagesModel(valid_settings.model, api_key="test-only")
+    loop, store, session_id, run_id, _, tools, _ = _make_loop(
+        tmp_path, valid_settings, [], model_override=model
     )
-    loop, store, session_id, run_id, _, tools, _ = _make_loop(tmp_path, valid_settings, [turn])
 
     outcome = await loop.run(run_id, session_id, CancellationToken())
 
     assert outcome == RunOutcome.stop(StopReason.INCOMPLETE_TOOL_CALL)
     assert tools.execution_count == 0
     assert [message.role for message in store.load_committed_transcript(session_id)] == ["user"]
+    with store.connection() as connection:
+        request = connection.execute(
+            "SELECT result, input_tokens, output_tokens, cache_creation_input_tokens, "
+            "cache_read_input_tokens FROM model_requests WHERE run_id = ?",
+            (run_id,),
+        ).fetchone()
+        assert (
+            connection.execute(
+                "SELECT count(*) FROM tool_executions WHERE run_id = ?", (run_id,)
+            ).fetchone()[0]
+            == 0
+        )
+    assert tuple(request) == ("incomplete_tool_call", 21, 9, 5, 8)
 
 
 @pytest.mark.asyncio

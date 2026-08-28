@@ -90,13 +90,14 @@ class AgentLoop:
         session_id: str,
         cancellation: CancellationToken,
     ) -> RunOutcome:
-        self._mutation_gate.register_cancellation(run_id, cancellation)
         empty_responses = 0
         repeated_fingerprint: str | None = None
         repetition_count = 0
         argument_error_rounds = 0
         provider_overflow_rebuilt = False
         try:
+            await self._mutation_gate.register_cancellation(run_id, cancellation)
+            cancellation.raise_if_cancelled()
             await self._transition(
                 run_id, session_id, {RunState.STARTING}, RunState.BUILDING_CONTEXT
             )
@@ -151,7 +152,13 @@ class AgentLoop:
                         session_id,
                         RunOutcome.fail(StopReason.RETRY_EXHAUSTED, ErrorKind.RETRY_EXHAUSTED),
                     )
-                except ModelProtocolError:
+                except ModelProtocolError as error:
+                    if error.code == "INCOMPLETE_TOOL_CALL":
+                        return await self._finish(
+                            run_id,
+                            session_id,
+                            RunOutcome.stop(StopReason.INCOMPLETE_TOOL_CALL),
+                        )
                     return await self._finish(
                         run_id,
                         session_id,
@@ -363,7 +370,7 @@ class AgentLoop:
                 raise
             return await self._finish(run_id, session_id, RunOutcome.cancel())
         finally:
-            self._mutation_gate.unregister_cancellation(run_id)
+            await self._mutation_gate.unregister_cancellation(run_id)
 
     async def _build_context(
         self,
@@ -517,11 +524,17 @@ class AgentLoop:
 
         try:
             turn = await self._invoker.invoke(operation, cancellation, on_retry)
-        except BaseException:
+        except BaseException as error:
+            usage = error.usage if isinstance(error, ModelProtocolError) else None
             self._store.finish_model_request(
                 request_id,
-                result="failed",
-                usage=None,
+                result=(
+                    "incomplete_tool_call"
+                    if isinstance(error, ModelProtocolError)
+                    and error.code == "INCOMPLETE_TOOL_CALL"
+                    else "failed"
+                ),
+                usage=usage,
                 attempt_count=max(1, attempts),
                 network_retry_count=retries,
                 total_wait_ms=total_wait_ms,

@@ -19,6 +19,7 @@ _guarded_sessions: ContextVar[frozenset[str]] = ContextVar(
 class EventSubscription:
     session_id: str
     _queue: asyncio.Queue[DurableEvent]
+    _last_seq: int
     _closed: bool = field(default=False, init=False)
 
     @property
@@ -32,9 +33,9 @@ class EventSubscription:
 class EventPublisher:
     """Keep delivery latency for one client independent from all other clients."""
 
-    def __init__(self, *, queue_size: int = 0) -> None:
-        if queue_size < 0:
-            raise ValueError("publisher queue size must not be negative")
+    def __init__(self, *, queue_size: int = 256) -> None:
+        if queue_size <= 0:
+            raise ValueError("publisher queue size must be positive")
         self._queue_size = queue_size
         self._locks: dict[str, asyncio.Lock] = {}
         self._subscriptions: dict[str, set[EventSubscription]] = {}
@@ -53,11 +54,13 @@ class EventPublisher:
             _guarded_sessions.reset(token)
             lock.release()
 
-    def subscribe_locked(self, session_id: str) -> EventSubscription:
+    def subscribe_locked(self, session_id: str, *, after_seq: int = 0) -> EventSubscription:
         """Register while the caller holds the same lock used for snapshot publication."""
         if session_id not in _guarded_sessions.get():
             raise RuntimeError("subscribe_locked requires the session guard")
-        subscription = EventSubscription(session_id, asyncio.Queue(self._queue_size))
+        if after_seq < 0:
+            raise ValueError("subscription cut sequence must not be negative")
+        subscription = EventSubscription(session_id, asyncio.Queue(self._queue_size), after_seq)
         self._subscriptions.setdefault(session_id, set()).add(subscription)
         return subscription
 
@@ -65,11 +68,15 @@ class EventPublisher:
         async with self.session_guard(event.session_id):
             subscribers = self._subscriptions.get(event.session_id, set())
             for subscription in tuple(subscribers):
+                if event.seq <= subscription._last_seq:
+                    continue
                 try:
                     subscription._queue.put_nowait(event)
                 except asyncio.QueueFull:
                     subscription._closed = True
                     subscribers.discard(subscription)
+                else:
+                    subscription._last_seq = event.seq
 
     async def unsubscribe(self, subscription: EventSubscription) -> None:
         async with self.session_guard(subscription.session_id):
