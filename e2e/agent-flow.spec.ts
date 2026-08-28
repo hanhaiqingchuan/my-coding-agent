@@ -22,15 +22,29 @@ test("creates a session, approves write and command, then restores final history
   await page.getByRole("button", { name: "Send" }).click();
   await expect(page.getByText("Preparing the workspace change…")).toBeVisible();
 
+  const runDetails = page.getByRole("complementary", { name: "Run details" });
+  const detailValue = (label: string) =>
+    runDetails
+      .locator("dl > div")
+      .filter({ has: page.getByText(label, { exact: true }) })
+      .getByRole("definition");
+
   const writeApproval = page.getByRole("region", { name: "Pending approval" });
   await expect(
     writeApproval.getByRole("heading", { name: "write_file" }),
   ).toBeVisible();
+  await expect(detailValue("Model")).toHaveText("scripted-e2e");
+  await expect(detailValue("Rounds")).toHaveText("1");
   await writeApproval.getByRole("button", { name: "Approve" }).click();
 
   await expect(
     writeApproval.getByRole("heading", { name: "run_command" }),
   ).toBeVisible();
+  await expect(detailValue("Rounds")).toHaveText("2");
+  await expect(detailValue("Retries")).toHaveText("0");
+  await expect(detailValue("Cumulative tokens")).toContainText(
+    "input 16 · output 16 · cache create 0 · cache read 0",
+  );
   await expect(
     writeApproval.getByText(
       "test -f agent-output.txt && printf verified > command-marker.txt",

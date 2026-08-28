@@ -7,6 +7,7 @@ import pytest
 from coding_agent.core.models import (
     AssistantTurn,
     ModelStopReason,
+    RunTotals,
     TextPart,
     ToolCall,
     ToolError,
@@ -14,6 +15,12 @@ from coding_agent.core.models import (
     ToolUsePart,
     Usage,
 )
+
+
+def test_run_totals_reject_a_negative_counter() -> None:
+    """The run aggregate only ever holds monotonic SQLite sums, never a corrupted count."""
+    with pytest.raises(ValueError, match="round_count"):
+        RunTotals(round_count=-1)
 
 
 def test_tool_result_rejects_success_with_error() -> None:

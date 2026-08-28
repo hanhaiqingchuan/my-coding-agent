@@ -12,6 +12,7 @@ from coding_agent.core.models import (
     MessageStatus,
     ModelStopReason,
     RunState,
+    RunTotals,
     StopReason,
     TextPart,
     ToolCall,
@@ -376,6 +377,67 @@ def test_commit_final_turn_round_trips_as_a_committed_assistant_message(
     history = store.load_committed_transcript(session.id)
     assert [message.role for message in history] == ["user", "assistant"]
     assert history[-1].parts == (TextPart("finished"),)
+
+
+def test_run_totals_load_back_the_usage_and_counters_the_run_accumulated(
+    store: SQLiteStore, session
+) -> None:
+    """Counters the runs table already sums are invisible unless the Run carries them back."""
+    run = store.begin_run(session.id, "task", {}, "cmd-start", "hash-start")
+    first = store.start_model_request(run.id, 1, "main", "model-a", "config-hash")
+    store.finish_model_request(
+        first,
+        result="succeeded",
+        usage=Usage(
+            input_tokens=11,
+            output_tokens=5,
+            cache_creation_input_tokens=2,
+            cache_read_input_tokens=3,
+        ),
+        attempt_count=2,
+        network_retry_count=1,
+        total_wait_ms=250,
+    )
+    second = store.start_model_request(run.id, 2, "main", "model-a", "config-hash")
+    store.finish_model_request(
+        second,
+        result="succeeded",
+        usage=Usage(input_tokens=7, output_tokens=1),
+        attempt_count=1,
+        network_retry_count=0,
+        total_wait_ms=0,
+    )
+    compaction = store.start_model_request(run.id, 2, "compaction", "model-a", "config-hash")
+    store.finish_model_request(
+        compaction,
+        result="succeeded",
+        usage=Usage(input_tokens=4, output_tokens=2),
+        attempt_count=1,
+        network_retry_count=2,
+        total_wait_ms=0,
+    )
+
+    active_run = store.load_snapshot(session.id).active_run
+
+    assert active_run is not None
+    assert active_run.totals == RunTotals(
+        input_tokens=22,
+        output_tokens=8,
+        cache_creation_input_tokens=2,
+        cache_read_input_tokens=3,
+        round_count=2,
+        retry_count=3,
+    )
+
+
+def test_a_run_without_model_requests_reports_zeroed_totals(store: SQLiteStore, session) -> None:
+    """Zero is the stored fact for a run that has not finished a request yet."""
+    store.begin_run(session.id, "task", {}, "cmd-start", "hash-start")
+
+    active_run = store.load_snapshot(session.id).active_run
+
+    assert active_run is not None
+    assert active_run.totals == RunTotals()
 
 
 def test_events_are_monotonic_per_session_and_snapshot_uses_latest_cut(

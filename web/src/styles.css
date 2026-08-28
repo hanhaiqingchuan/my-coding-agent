@@ -929,6 +929,16 @@ button:disabled:hover {
   color: var(--text-primary);
   font-size: var(--text-sm);
 }
+/* The token counters are sums across rounds, so the caveat travels with them. */
+.run-details-list dd:has(> .run-details-note) {
+  display: grid;
+  gap: var(--space-1);
+}
+.run-details-note {
+  color: var(--text-muted);
+  font-size: var(--text-2xs);
+  line-height: 1.45;
+}
 .run-details-mono {
   color: var(--code-fg);
   font-family: var(--font-mono);

@@ -308,6 +308,39 @@ def test_snapshot_includes_frozen_tools_and_the_current_pending_approval(tmp_pat
     assert snapshot["interrupted_banner"] is None
 
 
+def test_snapshot_publishes_the_run_counters_the_store_accumulated(tmp_path: Path) -> None:
+    """The run panel cannot show rounds, retries or usage the run DTO never carries."""
+    client, store, _ = _make_client(tmp_path)
+    session = store.create_session(str(tmp_path.resolve()), "Telemetry")
+    run = store.begin_run(session.id, "count it", {}, "start", "start-hash")
+    request_id = store.start_model_request(run.id, 1, "main", "claude-test", "config-hash")
+    store.finish_model_request(
+        request_id,
+        result="succeeded",
+        usage=Usage(
+            input_tokens=9,
+            output_tokens=4,
+            cache_creation_input_tokens=1,
+            cache_read_input_tokens=2,
+        ),
+        attempt_count=2,
+        network_retry_count=1,
+        total_wait_ms=120,
+    )
+
+    response = client.get(f"/api/sessions/{session.id}/snapshot")
+
+    assert response.status_code == 200
+    assert response.json()["active_run"]["totals"] == {
+        "input_tokens": 9,
+        "output_tokens": 4,
+        "cache_creation_input_tokens": 1,
+        "cache_read_input_tokens": 2,
+        "round_count": 1,
+        "retry_count": 1,
+    }
+
+
 def test_snapshot_json_schema_freezes_domain_enums_for_the_frontend() -> None:
     """Plain string fields would let Python and TypeScript protocol enums silently drift."""
     definitions = SessionSnapshotDto.model_json_schema()["$defs"]
@@ -336,6 +369,7 @@ def test_frontend_contract_fixture_matches_the_backend_dto_schema() -> None:
     }
     assert fixture["required"] == {
         "RunDto": definitions["RunDto"]["required"],
+        "RunTotalsDto": definitions["RunTotalsDto"]["required"],
         "MessageDto": definitions["MessageDto"]["required"],
         "ToolExecutionDto": definitions["ToolExecutionDto"]["required"],
         "PendingApprovalDto": definitions["PendingApprovalDto"]["required"],

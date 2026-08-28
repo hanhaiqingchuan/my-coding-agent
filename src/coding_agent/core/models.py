@@ -323,6 +323,37 @@ class Session:
 
 
 @dataclass(frozen=True, slots=True)
+class RunTotals:
+    """Cumulative counters the ``runs`` row accumulates over a run's whole lifetime.
+
+    The token fields are sums of the per-request usage the provider actually reported;
+    requests that reported no usage contribute nothing, so these are totals of *known*
+    usage rather than a per-request measurement. Per-request null preservation lives in
+    ``model_requests`` and the evaluation report, which is why no ``usage_source`` belongs
+    here. A sum across rounds also cannot express current context-window occupancy.
+    """
+
+    input_tokens: int = 0
+    output_tokens: int = 0
+    cache_creation_input_tokens: int = 0
+    cache_read_input_tokens: int = 0
+    round_count: int = 0
+    retry_count: int = 0
+
+    def __post_init__(self) -> None:
+        for name, value in (
+            ("input_tokens", self.input_tokens),
+            ("output_tokens", self.output_tokens),
+            ("cache_creation_input_tokens", self.cache_creation_input_tokens),
+            ("cache_read_input_tokens", self.cache_read_input_tokens),
+            ("round_count", self.round_count),
+            ("retry_count", self.retry_count),
+        ):
+            if type(value) is not int or value < 0:
+                raise ValueError(f"{name} must be a non-negative integer")
+
+
+@dataclass(frozen=True, slots=True)
 class Run:
     id: str
     session_id: str
@@ -333,6 +364,7 @@ class Run:
     config_snapshot: FrozenJsonMapping
     started_at: datetime
     finished_at: datetime | None
+    totals: RunTotals = field(default_factory=RunTotals)
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "config_snapshot", _freeze_mapping(self.config_snapshot))

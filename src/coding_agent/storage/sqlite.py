@@ -32,6 +32,7 @@ from coding_agent.core.models import (
     PreparedToolCall,
     Run,
     RunState,
+    RunTotals,
     Session,
     SessionSnapshot,
     StopReason,
@@ -1630,6 +1631,14 @@ def _run_from_row(row: sqlite3.Row) -> Run:
         config_snapshot=json.loads(row["config_snapshot_json"]),
         started_at=datetime.fromisoformat(row["started_at"]),
         finished_at=datetime.fromisoformat(row["finished_at"]) if row["finished_at"] else None,
+        totals=RunTotals(
+            input_tokens=row["input_tokens"],
+            output_tokens=row["output_tokens"],
+            cache_creation_input_tokens=row["cache_creation_input_tokens"],
+            cache_read_input_tokens=row["cache_read_input_tokens"],
+            round_count=row["round_count"],
+            retry_count=row["retry_count"],
+        ),
     )
 
 

@@ -18,6 +18,7 @@ from coding_agent.core.models import (
     PendingApproval,
     Run,
     RunState,
+    RunTotals,
     Session,
     SessionSnapshot,
     StopReason,
@@ -78,6 +79,33 @@ class SessionDto(StrictDto):
         )
 
 
+class RunTotalsDto(StrictDto):
+    """Cumulative counters SQLite sums over the whole run.
+
+    The token fields are sums of the usage the provider actually reported, so they are
+    totals of known usage across rounds, not a per-request measurement and not a reading
+    of the current context window.
+    """
+
+    input_tokens: int
+    output_tokens: int
+    cache_creation_input_tokens: int
+    cache_read_input_tokens: int
+    round_count: int
+    retry_count: int
+
+    @classmethod
+    def from_domain(cls, totals: RunTotals) -> RunTotalsDto:
+        return cls(
+            input_tokens=totals.input_tokens,
+            output_tokens=totals.output_tokens,
+            cache_creation_input_tokens=totals.cache_creation_input_tokens,
+            cache_read_input_tokens=totals.cache_read_input_tokens,
+            round_count=totals.round_count,
+            retry_count=totals.retry_count,
+        )
+
+
 class RunDto(StrictDto):
     id: str
     session_id: str
@@ -88,6 +116,7 @@ class RunDto(StrictDto):
     config_snapshot: dict[str, Any]
     started_at: datetime
     finished_at: datetime | None
+    totals: RunTotalsDto
 
     @classmethod
     def from_domain(cls, run: Run) -> RunDto:
@@ -101,6 +130,7 @@ class RunDto(StrictDto):
             config_snapshot=_thaw_json(run.config_snapshot),
             started_at=run.started_at,
             finished_at=run.finished_at,
+            totals=RunTotalsDto.from_domain(run.totals),
         )
 
 
@@ -500,6 +530,7 @@ __all__ = [
     "RunDto",
     "RunStartCommand",
     "RunStopCommand",
+    "RunTotalsDto",
     "ServerMessage",
     "SessionAckRecoveryCommand",
     "SessionDto",

@@ -78,6 +78,20 @@ export type SessionDto = {
   updated_at: string;
 };
 
+/**
+ * Cumulative counters SQLite sums over the whole run. The token fields are sums of the
+ * usage the provider actually reported, so they describe known usage across rounds and
+ * never the current context-window occupancy.
+ */
+export type RunTotalsDto = {
+  input_tokens: number;
+  output_tokens: number;
+  cache_creation_input_tokens: number;
+  cache_read_input_tokens: number;
+  round_count: number;
+  retry_count: number;
+};
+
 export type RunDto = {
   id: string;
   session_id: string;
@@ -88,6 +102,7 @@ export type RunDto = {
   config_snapshot: Record<string, JsonValue>;
   started_at: string;
   finished_at: string | null;
+  totals: RunTotalsDto;
 };
 
 export type TextPartDto = { type: "text"; text: string };
@@ -182,6 +197,15 @@ export const REQUIRED_DTO_FIELDS = {
     "config_snapshot",
     "started_at",
     "finished_at",
+    "totals",
+  ],
+  RunTotalsDto: [
+    "input_tokens",
+    "output_tokens",
+    "cache_creation_input_tokens",
+    "cache_read_input_tokens",
+    "round_count",
+    "retry_count",
   ],
   MessageDto: [
     "id",
@@ -238,6 +262,7 @@ export const REQUIRED_DTO_FIELDS = {
 
 type RequiredDtoMap = {
   RunDto: RunDto;
+  RunTotalsDto: RunTotalsDto;
   MessageDto: MessageDto;
   ToolExecutionDto: ToolExecutionDto;
   PendingApprovalDto: PendingApprovalDto;
@@ -259,6 +284,7 @@ const requiredDtoFieldsMatchTypes: {
   >;
 } = {
   RunDto: true,
+  RunTotalsDto: true,
   MessageDto: true,
   ToolExecutionDto: true,
   PendingApprovalDto: true,

@@ -20,6 +20,14 @@ function run(state: RunState): RunDto {
     config_snapshot: {},
     started_at: "2026-08-28T00:00:00Z",
     finished_at: null,
+    totals: {
+      input_tokens: 0,
+      output_tokens: 0,
+      cache_creation_input_tokens: 0,
+      cache_read_input_tokens: 0,
+      round_count: 0,
+      retry_count: 0,
+    },
   };
 }
 
