@@ -14,3 +14,20 @@ class InvalidStateTransition(ValueError):
 
 class CancellationRequested(RuntimeError):
     """Raised at a cooperative cancellation checkpoint."""
+
+
+class StoreError(RuntimeError):
+    """A stable persistence-boundary failure suitable for transport mapping."""
+
+    code: str
+
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(message)
+        self.code = code
+
+
+class CommandIdConflict(StoreError):
+    """The same client command id was reused for a different canonical payload."""
+
+    def __init__(self) -> None:
+        super().__init__("COMMAND_ID_CONFLICT", "client command id has a different payload")
