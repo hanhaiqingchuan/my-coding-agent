@@ -452,6 +452,27 @@ async def test_status_retry_metadata_comes_from_status_and_headers(
 
 
 @pytest.mark.asyncio
+async def test_x_should_retry_true_overrides_the_default_status_policy(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Ignoring the explicit provider override would classify a retryable compatible error wrong."""
+    error = status_error(
+        400,
+        {"type": "error", "error": {"type": "invalid_request_error"}},
+        headers={"x-should-retry": "true", "retry-after-ms": "2500", "retry-after": "7"},
+    )
+    install_fake_client(monkeypatch, error)
+    model = AnthropicMessagesModel(ModelSettings(model="model-a"), api_key="secret")
+
+    with pytest.raises(ModelAPIError) as raised:
+        await model.complete(request_with_tool_history(), lambda _: None, CancellationToken())
+
+    assert raised.value.retryable is True
+    assert raised.value.retry_after_ms == "2500"
+    assert raised.value.retry_after == "7"
+
+
+@pytest.mark.asyncio
 async def test_sse_overloaded_error_with_http_200_is_retryable(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -490,6 +511,21 @@ async def test_connection_failures_are_typed_and_not_retried_by_adapter(
 
     assert raised.value.retryable is True
     assert len(client.messages.calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_read_timeouts_are_typed_as_retryable_transport_failures(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Leaving timeouts non-retryable would bypass the request retry policy."""
+    request = httpx2.Request("POST", "https://provider.example/v1/messages")
+    install_fake_client(monkeypatch, anthropic.APITimeoutError(request=request))
+    model = AnthropicMessagesModel(ModelSettings(model="model-a"), api_key="secret")
+
+    with pytest.raises(ModelTransportError) as raised:
+        await model.complete(request_with_tool_history(), lambda _: None, CancellationToken())
+
+    assert raised.value.retryable is True
 
 
 @pytest.mark.asyncio

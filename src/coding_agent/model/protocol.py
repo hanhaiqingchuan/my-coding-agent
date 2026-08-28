@@ -99,12 +99,15 @@ class ModelAPIError(RuntimeError):
         error_type: str | None,
         retry_after: str | None,
         retryable: bool,
+        *,
+        retry_after_ms: str | None = None,
     ) -> None:
         super().__init__(f"model API failure: status={status_code}, type={error_type or 'unknown'}")
         self.status_code = status_code
         self.error_type = error_type
         self.retry_after = retry_after
         self.retryable = retryable
+        self.retry_after_ms = retry_after_ms
 
 
 class ModelProtocolError(RuntimeError):

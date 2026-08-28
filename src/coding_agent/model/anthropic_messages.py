@@ -300,8 +300,9 @@ def _map_status_error(error: APIStatusError) -> ModelAPIError:
     return ModelAPIError(
         status_code=status_code,
         error_type=error_type,
-        retry_after=_retry_after(headers),
+        retry_after=headers.get("retry-after"),
         retryable=retryable,
+        retry_after_ms=headers.get("retry-after-ms"),
     )
 
 
@@ -320,19 +321,6 @@ def _structured_error_type(body: object) -> str | None:
         return code
     outer_type = body.get("type")
     return outer_type if isinstance(outer_type, str) and outer_type != "error" else None
-
-
-def _retry_after(headers: Mapping[str, str]) -> str | None:
-    milliseconds = headers.get("retry-after-ms")
-    if milliseconds is not None:
-        try:
-            value = float(milliseconds)
-        except ValueError:
-            return None
-        if value < 0:
-            return None
-        return f"{value / 1000:g}"
-    return headers.get("retry-after")
 
 
 def _thaw_json(value: JsonValue) -> Any:

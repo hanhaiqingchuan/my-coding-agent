@@ -82,6 +82,35 @@ def terminal_state_for(reason: StopReason) -> RunState:
     return _STOP_TO_TERMINAL[reason]
 
 
+def retry_wait_payload(
+    *,
+    attempt: int,
+    max_attempts: int,
+    delay_seconds: float,
+    reason: str,
+    deadline_monotonic: float,
+) -> dict[str, int | float | str]:
+    """Build the stable durable payload published before a model retry wait.
+
+    The deadline deliberately uses the retry owner's injected monotonic clock.  A
+    coordinator can translate it to wall-clock UI data without making retry policy
+    depend on wall-clock jumps.
+    """
+    if not 1 <= attempt <= max_attempts:
+        raise ValueError("retry attempt must be within max attempts")
+    if delay_seconds < 0:
+        raise ValueError("retry delay must not be negative")
+    if not reason:
+        raise ValueError("retry reason must not be empty")
+    return {
+        "attempt": attempt,
+        "max_attempts": max_attempts,
+        "delay_seconds": delay_seconds,
+        "reason": reason,
+        "deadline_monotonic": deadline_monotonic,
+    }
+
+
 @dataclass(frozen=True, slots=True)
 class RunOutcome:
     """A structured agent-loop outcome; it never uses natural-language error text as policy."""
