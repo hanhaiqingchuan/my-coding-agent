@@ -6,6 +6,7 @@ from coding_agent.core.models import PreparedToolCall, ToolCall, ToolResult
 from coding_agent.tools import ToolContext, ToolInputError, error_result
 from coding_agent.tools.paths import WorkspaceBoundary, WorkspacePathError
 from coding_agent.tools.read_file import ReadFileTool
+from coding_agent.tools.run_command import RunCommandTool
 from coding_agent.tools.write_file import WriteFileTool
 
 
@@ -16,9 +17,11 @@ class ToolRegistry:
         self,
         read_file: ReadFileTool | None = None,
         write_file: WriteFileTool | None = None,
+        run_command: RunCommandTool | None = None,
     ) -> None:
         self._read_file = read_file or ReadFileTool()
         self._write_file = write_file or WriteFileTool()
+        self._run_command = run_command or RunCommandTool()
 
     def schemas(self) -> list[dict[str, object]]:
         return [
@@ -82,6 +85,8 @@ class ToolRegistry:
             tool = self._read_file
         elif call.name == WriteFileTool.name:
             tool = self._write_file
+        elif call.name == RunCommandTool.name:
+            tool = self._run_command
         else:
             return error_result(call.id, call.name, "UNKNOWN_TOOL", f"unknown tool: {call.name}")
         try:
