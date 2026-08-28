@@ -79,6 +79,30 @@
     },
     "failure_kinds": {
       "type": "object",
+      "description": "Counts of the recorded run-v1 failure kinds. The vocabulary is the fixed set of section 18.5 and matches run-v1's failure_kind enum; a kind nobody recorded is absent rather than reported as zero.",
+      "propertyNames": {
+        "enum": [
+          "harness_setup",
+          "harness_oracle",
+          "model_auth",
+          "model_transport",
+          "model_protocol",
+          "model_refusal",
+          "pause_turn",
+          "context_overflow",
+          "output_truncated",
+          "max_rounds",
+          "doom_loop",
+          "tool_argument",
+          "tool_path",
+          "tool_execution",
+          "command_timeout",
+          "write_conflict",
+          "forbidden_modification",
+          "oracle_failure",
+          "unknown"
+        ]
+      },
       "additionalProperties": { "type": "integer", "minimum": 0 }
     },
     "tasks": {

@@ -774,11 +774,10 @@ def _agreed_model_identity(results: Iterable[RunResult]) -> Mapping[str, object]
 
 
 def _failure_kinds(results: Iterable[RunResult]) -> dict[str, int]:
+    """Count the recorded kinds only; a record without one is not re-classified here."""
     counts: dict[str, int] = {}
     for item in results:
-        stage, kind = (item.failure_stage, item.failure_kind)
-        if kind is None:
-            stage, kind = classify_failure(item)
+        kind = item.failure_kind
         if kind is None:
             continue
         counts[kind] = counts.get(kind, 0) + 1

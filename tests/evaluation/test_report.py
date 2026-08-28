@@ -446,6 +446,36 @@ def test_summary_never_recomputes_a_recorded_score_flag(
     assert summary.tasks[0].results == (False,)
 
 
+def test_summary_counts_only_the_failure_kinds_the_records_carry(
+    run_result: RunResult,
+    tmp_path: Path,
+) -> None:
+    """Re-classifying a record would publish a failure kind that scoring never assigned."""
+    run_result.state = "STOPPED"
+    run_result.stop_reason = "MAX_ROUNDS"
+    run_result.regressions_passed = True
+    score_result(run_result)
+    unscored = RunResult(task_id="other-task", category="new_file", repeat=1)
+    unscored.state = "STOPPED"
+    unscored.stop_reason = "DOOM_LOOP"
+    documents = [
+        run_document(run_result, campaign_id="campaign-1"),
+        run_document(unscored, campaign_id="campaign-1"),
+    ]
+    input_dir = tmp_path / "campaign"
+    input_dir.mkdir()
+    (input_dir / "runs.jsonl").write_text(
+        "".join(json.dumps(document) + "\n" for document in documents),
+        encoding="utf-8",
+    )
+
+    summary = summarize_campaign(input_dir, tmp_path / "reports")
+
+    assert documents[0]["failure_kind"] == "max_rounds"
+    assert documents[1]["failure_kind"] is None
+    assert summary.failure_kinds == {"max_rounds": 1}
+
+
 def test_summarize_campaign_refuses_to_overwrite_an_existing_report(
     run_result: RunResult,
     tmp_path: Path,
@@ -486,6 +516,19 @@ def test_summary_document_matches_the_published_schema(run_result: RunResult) ->
 
     assert set(schema["required"]) <= set(document)
     assert set(document) == set(schema["properties"])
+
+
+def test_summary_schema_closes_the_failure_kind_vocabulary() -> None:
+    """An open failure map would let an unknown label be published as a fixed failure kind."""
+    summary_schema = json.loads((SCHEMAS / "summary-v1.schema.json").read_text(encoding="utf-8"))
+    run_schema = json.loads((SCHEMAS / "run-v1.schema.json").read_text(encoding="utf-8"))
+
+    failure_kinds = summary_schema["properties"]["failure_kinds"]
+    recorded = [
+        kind for kind in run_schema["properties"]["failure_kind"]["enum"] if kind is not None
+    ]
+    assert failure_kinds["propertyNames"] == {"enum": recorded}
+    assert failure_kinds["additionalProperties"] == {"type": "integer", "minimum": 0}
 
 
 @pytest.mark.parametrize(
