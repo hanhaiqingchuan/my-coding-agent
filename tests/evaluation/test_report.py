@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from coding_agent.core.models import ErrorKind, StopReason
 from coding_agent.evaluation.report import (
     CompactionFacts,
     DurationFacts,
@@ -28,6 +29,12 @@ from coding_agent.evaluation.report import (
 
 SCHEMAS = Path(__file__).resolve().parents[2] / "evaluation" / "schemas"
 EXAMPLES = Path(__file__).resolve().parents[2] / "evaluation" / "examples"
+
+
+def published_failure_kinds() -> set[str]:
+    """Return the closed failure-kind vocabulary exactly as the run schema publishes it."""
+    schema = json.loads((SCHEMAS / "run-v1.schema.json").read_text(encoding="utf-8"))
+    return {kind for kind in schema["properties"]["failure_kind"]["enum"] if kind is not None}
 
 
 @pytest.fixture
@@ -272,7 +279,7 @@ def test_robust_tasks_require_a_majority_of_repeats(run_result: RunResult) -> No
         ("STOPPED", "MAX_ROUNDS", None, "agent", "max_rounds"),
         ("STOPPED", "DOOM_LOOP", None, "agent", "doom_loop"),
         ("FAILED", "CONFIG_ERROR", "CONFIG_ERROR", "setup", "harness_setup"),
-        ("FAILED", "INTERNAL_ERROR", "INTERNAL_ERROR", "agent", "internal_error"),
+        ("FAILED", "INTERNAL_ERROR", "INTERNAL_ERROR", "agent", "unknown"),
         ("CANCELLED", "USER_STOP", None, "agent", "unknown"),
     ],
 )
@@ -300,6 +307,52 @@ def test_successful_run_has_no_failure_classification(run_result: RunResult) -> 
     run_result.state = "COMPLETED"
 
     assert classify_failure(run_result) == (None, None)
+
+
+def test_no_agent_stop_reason_classifies_outside_the_published_vocabulary(
+    run_result: RunResult,
+) -> None:
+    """The agent stop reasons are extensible; the published failure vocabulary is closed."""
+    vocabulary = published_failure_kinds()
+    run_result.regressions_passed = True
+    run_result.state = "FAILED"
+
+    classified = {}
+    for reason in StopReason:
+        run_result.stop_reason = reason.name
+        classified[reason.name] = classify_failure(run_result)[1]
+
+    assert {name: kind for name, kind in classified.items() if kind not in vocabulary} == {}
+
+
+def test_internal_agent_error_scores_as_unknown_without_losing_its_stop_reason(
+    run_result: RunResult,
+) -> None:
+    """An internal error must stay publishable while still naming the reason the run ended."""
+    run_result.state = "FAILED"
+    run_result.stop_reason = StopReason.INTERNAL_ERROR.name
+    run_result.error_kind = ErrorKind.INTERNAL_ERROR.name
+    run_result.regressions_passed = True
+    run_result.agent_report = {
+        "schema_version": "run-report-v1",
+        "state": "FAILED",
+        "stop_reason": StopReason.INTERNAL_ERROR.name,
+        "error_kind": ErrorKind.INTERNAL_ERROR.name,
+    }
+    score_result(run_result)
+
+    document = run_document(run_result, campaign_id="campaign-1")
+
+    assert document["failure_kind"] in published_failure_kinds()
+    assert (document["failure_stage"], document["failure_kind"]) == ("agent", "unknown")
+    assert document["stop_reason"] == "INTERNAL_ERROR"
+    assert document["error_kind"] == "INTERNAL_ERROR"
+    assert document["agent_report"] == {
+        "schema_version": "run-report-v1",
+        "state": "FAILED",
+        "stop_reason": "INTERNAL_ERROR",
+        "error_kind": "INTERNAL_ERROR",
+    }
 
 
 def test_summary_names_the_model_that_produced_its_numbers(run_result: RunResult) -> None:

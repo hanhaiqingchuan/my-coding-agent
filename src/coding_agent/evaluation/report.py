@@ -252,7 +252,10 @@ _STOP_REASON_FAILURES: dict[str, tuple[str, str]] = {
     "DOOM_LOOP": ("agent", "doom_loop"),
     "EMPTY_RESPONSE": ("agent", "doom_loop"),
     "CONFIG_ERROR": ("setup", "harness_setup"),
-    "INTERNAL_ERROR": ("agent", "internal_error"),
+    # Spec 5.2 lets the agent's stop reasons grow, but spec 18.5 fixes this vocabulary, so a
+    # stop reason without a kind of its own lands in ``unknown``. Nothing is lost: the run and
+    # its embedded agent report keep the exact stop reason and error kind that ended the run.
+    "INTERNAL_ERROR": ("agent", "unknown"),
 }
 
 
