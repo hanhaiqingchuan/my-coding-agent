@@ -136,7 +136,7 @@ class Usage:
             ("cache_creation_input_tokens", self.cache_creation_input_tokens),
             ("cache_read_input_tokens", self.cache_read_input_tokens),
         ):
-            if value is not None and (isinstance(value, bool) or value < 0):
+            if value is not None and (type(value) is not int or value < 0):
                 raise ValueError(f"{name} must be a non-negative integer or None")
 
 
