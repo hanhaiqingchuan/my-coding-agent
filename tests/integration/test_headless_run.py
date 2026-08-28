@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -125,7 +126,126 @@ def test_headless_run_uses_injected_runtime_and_writes_versioned_report(tmp_path
         "error_kind",
         "started_at",
         "finished_at",
+        "tool_schema_hash",
+        "model",
+        "tools",
+        "compaction",
+        "durations",
     }
+    assert len(report["tool_schema_hash"]) == 64
+    assert report["model"]["main"]["requests"] == 1
+    assert report["model"]["main"]["attempts"] == 1
+    assert report["model"]["main"]["usage_coverage"] == 1.0
+    assert report["model"]["compaction"]["requests"] == 0
+    assert report["tools"]["proposed"] == 0
+    assert report["compaction"] == {
+        "count": 0,
+        "requests": 0,
+        "above_target": False,
+        "estimator_id": None,
+        "input_tokens_before": None,
+        "input_tokens_after": None,
+        "estimate_error": {
+            "estimated_summary_tokens": None,
+            "provider_summary_output_tokens": None,
+            "estimated_minus_provider_tokens": None,
+        },
+    }
+    assert report["durations"]["agent_monotonic_ms"] == 0
+    assert report["durations"]["retry_wait_monotonic_ms"] == 0
+
+
+def test_report_keeps_missing_provider_usage_components_null(tmp_path: Path) -> None:
+    """Filling a missing cache-token component with zero would falsify cost reporting."""
+    paths = _task_files(tmp_path)
+    dependencies = _dependencies(paths["data_dir"])
+
+    cli.main(
+        [
+            "run",
+            "--config",
+            str(paths["config"]),
+            "--workspace",
+            str(paths["workspace"]),
+            "--data-dir",
+            str(paths["data_dir"]),
+            "--prompt-file",
+            str(paths["prompt"]),
+            "--yes",
+            "--ack-unsafe-auto-approve",
+            "--command-policy",
+            str(paths["policy"]),
+            "--report-out",
+            str(paths["report"]),
+        ],
+        dependencies=dependencies,
+    )
+
+    usage = json.loads(paths["report"].read_text(encoding="utf-8"))["model"]["main"]["usage"]
+    assert usage == {
+        "input_tokens": 12,
+        "output_tokens": 3,
+        "cache_creation_input_tokens": None,
+        "cache_read_input_tokens": None,
+    }
+
+
+def test_report_projects_tool_statistics_with_hashed_arguments(tmp_path: Path) -> None:
+    """Exporting raw tool arguments would publish workspace content from every run."""
+    paths = _task_files(tmp_path)
+    model = ScriptedModel(
+        [
+            AssistantTurn(
+                "turn-command",
+                (ToolUsePart(ToolCall("call-pwd", "run_command", {"command": "pwd", "cwd": "."})),),
+                ModelStopReason.TOOL_USE,
+                Usage(10, 4),
+            ),
+            _final_turn(),
+        ]
+    )
+    dependencies = _dependencies(paths["data_dir"], model)
+
+    exit_code = cli.main(
+        [
+            "run",
+            "--config",
+            str(paths["config"]),
+            "--workspace",
+            str(paths["workspace"]),
+            "--data-dir",
+            str(paths["data_dir"]),
+            "--prompt-file",
+            str(paths["prompt"]),
+            "--yes",
+            "--ack-unsafe-auto-approve",
+            "--command-policy",
+            str(paths["policy"]),
+            "--report-out",
+            str(paths["report"]),
+        ],
+        dependencies=dependencies,
+    )
+
+    report = json.loads(paths["report"].read_text(encoding="utf-8"))
+    expected_hash = hashlib.sha256(
+        json.dumps({"cwd": ".", "command": "pwd"}, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    assert exit_code == 0
+    assert report["tools"]["proposed"] == 1
+    assert report["tools"]["executed"] == 1
+    assert report["tools"]["succeeded"] == 1
+    assert report["tools"]["failed"] == 0
+    assert report["tools"]["duplicate_calls"] == 0
+    assert report["tools"]["by_name"]["run_command"] == {
+        "proposed": 1,
+        "succeeded": 1,
+        "failed": 0,
+    }
+    assert [call["args_hash"] for call in report["tools"]["calls"]] == [expected_hash]
+    assert report["tools"]["output_bytes"] > 0
+    assert report["model"]["main"]["requests"] == 2
+    assert str(paths["workspace"]) not in json.dumps(report)
 
 
 @pytest.mark.parametrize(

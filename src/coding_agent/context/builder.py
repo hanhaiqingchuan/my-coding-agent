@@ -409,11 +409,7 @@ def _recent_completed_rounds(
     selected_indexes: set[int] = set()
     for start in selected_starts:
         end = next(
-            (
-                index
-                for index in range(start + 1, len(groups))
-                if groups[index].kind == "user"
-            ),
+            (index for index in range(start + 1, len(groups)) if groups[index].kind == "user"),
             len(groups),
         )
         selected_indexes.update(range(start, end))
@@ -495,9 +491,7 @@ def _make_view(
 
 def _prune_tool_group(group: _CanonicalGroup) -> tuple[tuple[ModelMessage, ...], int]:
     calls = {
-        part.call.id: part.call
-        for part in group.messages[0].parts
-        if isinstance(part, ToolUsePart)
+        part.call.id: part.call for part in group.messages[0].parts if isinstance(part, ToolUsePart)
     }
     replacement_results: list[ToolResult] = []
     saved_bytes = 0

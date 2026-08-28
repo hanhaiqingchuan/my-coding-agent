@@ -1168,6 +1168,54 @@ class SQLiteStore:
             ).fetchall()
         return [_event_from_row(row) for row in rows]
 
+    def model_requests_for_report(self, run_id: str) -> list[dict[str, object]]:
+        """Return one run's model request facts in start order for the run report."""
+        with self.connection() as connection:
+            rows = connection.execute(
+                """
+                SELECT kind, round_no, result, attempt_count, network_retry_count,
+                       total_wait_ms, input_tokens, output_tokens,
+                       cache_creation_input_tokens, cache_read_input_tokens,
+                       usage_source, started_at, finished_at
+                FROM model_requests
+                WHERE run_id = ?
+                ORDER BY started_at, round_no, id
+                """,
+                (run_id,),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def tool_executions_for_report(self, run_id: str) -> list[dict[str, object]]:
+        """Return one run's tool facts as counts, hashable arguments and byte sizes only."""
+        with self.connection() as connection:
+            rows = connection.execute(
+                """
+                SELECT tool_executions.name AS name,
+                       tool_executions.input_json AS input_json,
+                       tool_executions.execution_state AS execution_state,
+                       tool_executions.effect_started_at AS effect_started_at,
+                       tool_executions.result_json AS result_json
+                FROM tool_executions
+                JOIN messages ON messages.id = tool_executions.assistant_message_id
+                WHERE tool_executions.run_id = ?
+                ORDER BY messages.seq, tool_executions.call_order
+                """,
+                (run_id,),
+            ).fetchall()
+        facts: list[dict[str, object]] = []
+        for row in rows:
+            envelope = _result_facts(row["result_json"])
+            facts.append(
+                {
+                    "name": row["name"],
+                    "args_json": row["input_json"],
+                    "execution_state": row["execution_state"],
+                    "effect_started": row["effect_started_at"] is not None,
+                    **envelope,
+                }
+            )
+        return facts
+
     def recover_interrupted_runs(self) -> list[str]:
         recovered: list[str] = []
         with self._transaction() as connection:
@@ -1647,6 +1695,28 @@ def _result_from_json(value: str) -> ToolResult:
     if not isinstance(result, ToolResult):
         raise ValueError("stored tool result has an invalid part type")
     return result
+
+
+def _result_facts(result_json: str | None) -> dict[str, object]:
+    """Extract only the numeric facts of a stored tool result, never its output text."""
+    if not result_json:
+        return {"duration_ms": None, "output_bytes": None, "truncated": False}
+    value = json.loads(result_json)
+    data = value.get("data") or {}
+    duration: object = None
+    content = value.get("content")
+    if isinstance(content, str):
+        try:
+            envelope = json.loads(content)
+        except json.JSONDecodeError:
+            envelope = None
+        if isinstance(envelope, dict):
+            duration = envelope.get("duration_ms")
+    return {
+        "duration_ms": duration if isinstance(duration, int) else None,
+        "output_bytes": data.get("output_bytes") if isinstance(data, dict) else None,
+        "truncated": bool(value.get("truncated")),
+    }
 
 
 def _message_from_row(row: sqlite3.Row) -> Message:

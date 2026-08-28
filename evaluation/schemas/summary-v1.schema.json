@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/my-coding-agent/evaluation/schemas/summary-v1.schema.json",
+  "title": "summary-v1",
+  "description": "Redacted campaign aggregate. Harness outcomes stay out of the capability denominator, and token totals stay null whenever any run is missing provider usage.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "campaign_id",
+    "agent_commit",
+    "provider",
+    "started_runs",
+    "valid_runs",
+    "harness_setup_runs",
+    "harness_oracle_error_runs",
+    "strict_success_runs",
+    "artifact_correct_runs",
+    "artifact_correct_only_runs",
+    "task_completion_rate",
+    "robust_task_count",
+    "total_input_tokens",
+    "total_output_tokens",
+    "total_cache_creation_input_tokens",
+    "total_cache_read_input_tokens",
+    "usage_coverage",
+    "tasks"
+  ],
+  "properties": {
+    "schema_version": { "const": "summary-v1" },
+    "campaign_id": { "type": ["string", "null"] },
+    "agent_commit": { "type": ["string", "null"] },
+    "provider": { "const": "anthropic_messages" },
+    "started_runs": { "type": "integer", "minimum": 0 },
+    "valid_runs": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Started runs minus HARNESS_SETUP and HARNESS_ORACLE_ERROR outcomes."
+    },
+    "harness_setup_runs": { "type": "integer", "minimum": 0 },
+    "harness_oracle_error_runs": { "type": "integer", "minimum": 0 },
+    "strict_success_runs": { "type": "integer", "minimum": 0 },
+    "artifact_correct_runs": { "type": "integer", "minimum": 0 },
+    "artifact_correct_only_runs": { "type": "integer", "minimum": 0 },
+    "task_completion_rate": {
+      "type": ["number", "null"],
+      "description": "strict_success_runs / valid_runs; null when there is no valid run."
+    },
+    "robust_task_count": { "type": "integer", "minimum": 0 },
+    "total_input_tokens": { "type": ["integer", "null"] },
+    "total_output_tokens": { "type": ["integer", "null"] },
+    "total_cache_creation_input_tokens": { "type": ["integer", "null"] },
+    "total_cache_read_input_tokens": { "type": ["integer", "null"] },
+    "usage_coverage": { "type": ["number", "null"] },
+    "total_main_requests": { "type": "integer", "minimum": 0 },
+    "total_compaction_requests": { "type": "integer", "minimum": 0 },
+    "total_attempts": { "type": "integer", "minimum": 0 },
+    "total_network_retries": { "type": "integer", "minimum": 0 },
+    "tools": {
+      "type": "object",
+      "additionalProperties": { "type": "integer", "minimum": 0 }
+    },
+    "compaction_runs": { "type": "integer", "minimum": 0 },
+    "agent_monotonic_ms": {
+      "type": "object",
+      "additionalProperties": { "type": ["number", "null"] }
+    },
+    "failure_kinds": {
+      "type": "object",
+      "additionalProperties": { "type": "integer", "minimum": 0 }
+    },
+    "tasks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["task_id", "category", "valid_runs", "strict_success_runs", "results"],
+        "properties": {
+          "task_id": { "type": "string" },
+          "category": { "type": "string" },
+          "started_runs": { "type": "integer", "minimum": 0 },
+          "valid_runs": { "type": "integer", "minimum": 0 },
+          "strict_success_runs": { "type": "integer", "minimum": 0 },
+          "artifact_correct_runs": { "type": "integer", "minimum": 0 },
+          "results": {
+            "type": "array",
+            "items": { "type": "boolean" },
+            "description": "Per-repeat strict success flags, kept raw instead of averaged."
+          },
+          "robust": { "type": "boolean" }
+        }
+      }
+    }
+  }
+}

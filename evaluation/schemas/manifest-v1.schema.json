@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/my-coding-agent/evaluation/schemas/manifest-v1.schema.json",
+  "title": "evaluation-manifest-v1",
+  "description": "Documentation schema for the TOML task manifest. Every path is relative to the directory holding the manifest, must stay inside it, and must live outside the read-only baseline.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "manifest_id", "tasks"],
+  "properties": {
+    "schema_version": { "const": "evaluation-manifest-v1" },
+    "manifest_id": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+    "tasks": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/task" }
+    }
+  },
+  "$defs": {
+    "task": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "task_id",
+        "category",
+        "prompt",
+        "baseline",
+        "gold_overlay",
+        "target_oracle",
+        "regression_oracle",
+        "allowed_paths",
+        "timeout_seconds",
+        "commands"
+      ],
+      "properties": {
+        "task_id": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+        "category": {
+          "enum": ["new_file", "local_edit", "locate_and_modify", "large_file_edit"]
+        },
+        "prompt": {
+          "type": "string",
+          "description": "The task prompt file; copied outside the workspace and passed as --prompt-file."
+        },
+        "baseline": {
+          "type": "string",
+          "description": "Read-only baseline tree; every repeat is a fresh copy of it."
+        },
+        "gold_overlay": {
+          "type": "string",
+          "description": "Gold patch expressed as a file overlay so no external patch tool is required."
+        },
+        "error_overlay": {
+          "type": "string",
+          "description": "Optional wrong implementation that the target oracle must reject."
+        },
+        "target_oracle": {
+          "type": "string",
+          "description": "Script run outside the workspace with the candidate workspace as argv[1]. Exit 0 passes, exit 1 fails, any other code is a harness oracle error."
+        },
+        "regression_oracle": {
+          "type": "string",
+          "description": "Script proving pre-existing behaviour survived; same contract as target_oracle."
+        },
+        "allowed_paths": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string" },
+          "description": "Workspace-relative paths the agent may change."
+        },
+        "forbidden_paths": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Workspace-relative paths whose modification blocks strict success."
+        },
+        "timeout_seconds": { "type": "integer", "minimum": 1, "maximum": 3600 },
+        "commands": {
+          "type": "array",
+          "minItems": 1,
+          "description": "Exact command and cwd pairs; the generated command-policy-v1 file matches them literally.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["command", "cwd"],
+            "properties": {
+              "command": { "type": "string", "minLength": 1 },
+              "cwd": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Workspace-relative directory that must already exist in the baseline."
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

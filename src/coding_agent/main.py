@@ -17,13 +17,14 @@ import uvicorn
 from coding_agent.api.app import create_app
 from coding_agent.config import AppSettings, ConfigurationError, resolve_api_key
 from coding_agent.context import Compactor, ContextBuilder
-from coding_agent.core.models import Run, RunState
+from coding_agent.core.models import RunState
 from coding_agent.model import ModelGateway
 from coding_agent.model.anthropic_messages import AnthropicMessagesModel
 from coding_agent.model.retry import RetryingInvoker
 from coding_agent.runtime.approval import ApprovalGate
 from coding_agent.runtime.coordinator import RunCoordinator, RunMutationGate
 from coding_agent.runtime.loop import AgentLoop
+from coding_agent.runtime.metrics import build_run_report
 from coding_agent.runtime.publisher import EventPublisher
 from coding_agent.storage.sqlite import SQLiteStore
 from coding_agent.tools.paths import WorkspaceBoundary
@@ -164,9 +165,18 @@ async def run_headless(
     runtime.store.recover_interrupted_runs()
     coordinator = build_run_coordinator(settings, runtime)
     session = runtime.store.create_session(str(boundary.root), prompt_file.name)
+    started = runtime.clock()
     run = await coordinator.start_run(session.id, prompt, f"headless-start-{uuid4()}")
     finished = await coordinator.wait_for_run(run.id)
-    _write_run_report(report_out, finished)
+    _write_run_report(
+        report_out,
+        build_run_report(
+            runtime.store,
+            finished,
+            tool_schemas=runtime.tool_registry.schemas(),
+            agent_monotonic_ms=max(0, round((runtime.clock() - started) * 1000)),
+        ),
+    )
     return 0 if finished.state is RunState.COMPLETED else 1
 
 
@@ -260,17 +270,7 @@ def _read_prompt(prompt_file: Path) -> str:
     return prompt
 
 
-def _write_run_report(report_out: Path, run: Run) -> None:
-    report = {
-        "schema_version": "run-report-v1",
-        "run_id": run.id,
-        "session_id": run.session_id,
-        "state": run.state.name,
-        "stop_reason": run.stop_reason.name if run.stop_reason is not None else None,
-        "error_kind": run.error_kind.name if run.error_kind is not None else None,
-        "started_at": run.started_at.isoformat(),
-        "finished_at": run.finished_at.isoformat() if run.finished_at is not None else None,
-    }
+def _write_run_report(report_out: Path, report: Mapping[str, object]) -> None:
     try:
         report_out.parent.mkdir(parents=True, exist_ok=True)
         report_out.write_text(

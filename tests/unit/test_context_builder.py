@@ -182,9 +182,9 @@ def test_recent_two_turns_and_current_committed_tool_exchange_remain_complete(
     )
     result_message = result.view.messages[call_message_index + 1]
     assert result_message.role == "user"
-    assert [
-        part.tool_call_id for part in result_message.parts if isinstance(part, ToolResult)
-    ] == ["call-current"]
+    assert [part.tool_call_id for part in result_message.parts if isinstance(part, ToolResult)] == [
+        "call-current"
+    ]
 
 
 def test_active_user_does_not_consume_a_completed_recent_round_slot() -> None:
@@ -290,9 +290,7 @@ def test_snapshot_covered_current_run_tool_exchanges_are_not_mandatory() -> None
 
 
 def test_mandatory_content_overflow_prevents_model_call() -> None:
-    transcript = (
-        _message(1, "user", TextPart("不可截断" * 300), run_id="run-1"),
-    )
+    transcript = (_message(1, "user", TextPart("不可截断" * 300), run_id="run-1"),)
 
     result = ContextBuilder().build(
         transcript,
@@ -432,9 +430,7 @@ def test_compaction_plan_uses_complete_replaceable_groups() -> None:
 
     assert isinstance(result, CompactionRequired)
     old_tool_candidate = next(
-        candidate
-        for candidate in result.plan.candidates
-        if candidate.source_message_seqs == (2, 3)
+        candidate for candidate in result.plan.candidates if candidate.source_message_seqs == (2, 3)
     )
     assert [message.role for message in old_tool_candidate.messages] == ["assistant", "tool"]
     assert [message.seq for message in old_tool_candidate.read_only_user_context] == [1]

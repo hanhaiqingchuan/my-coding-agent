@@ -1,0 +1,70 @@
+schema_version = "evaluation-manifest-v1"
+manifest_id = "public-p0"
+
+# Four self-authored, redistributable P0 tasks, one per category of design section 18.4.
+# Every path is relative to this file, stays inside this directory, and lives outside the
+# read-only baseline so that gold overlays and oracles never reach the agent workspace.
+
+[[tasks]]
+task_id = "new-file-slugify"
+category = "new_file"
+prompt = "new-file-slugify/prompt.md"
+baseline = "new-file-slugify/baseline"
+gold_overlay = "new-file-slugify/gold"
+error_overlay = "new-file-slugify/error"
+target_oracle = "new-file-slugify/oracle/target.py"
+regression_oracle = "new-file-slugify/oracle/regression.py"
+allowed_paths = ["src/textkit"]
+forbidden_paths = ["tests", "README.md"]
+timeout_seconds = 900
+commands = [
+    { command = "PYTHONPATH=src python3 -B -m unittest discover -s tests -t tests", cwd = "." },
+]
+
+[[tasks]]
+task_id = "local-edit-clamp"
+category = "local_edit"
+prompt = "local-edit-clamp/prompt.md"
+baseline = "local-edit-clamp/baseline"
+gold_overlay = "local-edit-clamp/gold"
+error_overlay = "local-edit-clamp/error"
+target_oracle = "local-edit-clamp/oracle/target.py"
+regression_oracle = "local-edit-clamp/oracle/regression.py"
+allowed_paths = ["src/mathkit/ranges.py"]
+forbidden_paths = ["tests", "README.md"]
+timeout_seconds = 900
+commands = [
+    { command = "PYTHONPATH=src python3 -B -m unittest discover -s tests -t tests", cwd = "." },
+]
+
+[[tasks]]
+task_id = "locate-two-files"
+category = "locate_and_modify"
+prompt = "locate-two-files/prompt.md"
+baseline = "locate-two-files/baseline"
+gold_overlay = "locate-two-files/gold"
+error_overlay = "locate-two-files/error"
+target_oracle = "locate-two-files/oracle/target.py"
+regression_oracle = "locate-two-files/oracle/regression.py"
+allowed_paths = ["src/pipeline"]
+forbidden_paths = ["tests", "README.md"]
+timeout_seconds = 900
+commands = [
+    { command = "PYTHONPATH=src python3 -B -m unittest discover -s tests -t tests", cwd = "." },
+]
+
+[[tasks]]
+task_id = "large-file-handlers"
+category = "large_file_edit"
+prompt = "large-file-handlers/prompt.md"
+baseline = "large-file-handlers/baseline"
+gold_overlay = "large-file-handlers/gold"
+error_overlay = "large-file-handlers/error"
+target_oracle = "large-file-handlers/oracle/target.py"
+regression_oracle = "large-file-handlers/oracle/regression.py"
+allowed_paths = ["src/dispatch/handlers.py"]
+forbidden_paths = ["tests", "README.md"]
+timeout_seconds = 900
+commands = [
+    { command = "PYTHONPATH=src python3 -B -m unittest discover -s tests -t tests", cwd = "." },
+]

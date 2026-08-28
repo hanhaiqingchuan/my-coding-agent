@@ -1,0 +1,202 @@
+{
+  "agent_argv_options": [
+    "--config",
+    "--workspace",
+    "--data-dir",
+    "--prompt-file",
+    "--report-out",
+    "--yes",
+    "--ack-unsafe-auto-approve",
+    "--command-policy"
+  ],
+  "agent_commit": "0000000000000000000000000000000000000000",
+  "agent_exit_code": 0,
+  "agent_report": {
+    "compaction": {
+      "above_target": false,
+      "count": 0,
+      "estimate_error": {
+        "estimated_minus_provider_tokens": null,
+        "estimated_summary_tokens": null,
+        "provider_summary_output_tokens": null
+      },
+      "estimator_id": null,
+      "input_tokens_after": null,
+      "input_tokens_before": null,
+      "requests": 0
+    },
+    "durations": {
+      "agent_monotonic_ms": 41277,
+      "compaction_request_elapsed_ms": 0,
+      "model_request_elapsed_ms": 30112,
+      "retry_wait_monotonic_ms": 0,
+      "tool_execution_monotonic_ms": 1904
+    },
+    "error_kind": null,
+    "finished_at": "2026-08-27T09:00:41+00:00",
+    "model": {
+      "compaction": {
+        "attempts": 0,
+        "elapsed_ms": 0,
+        "network_retries": 0,
+        "requests": 0,
+        "results": {},
+        "usage": {
+          "cache_creation_input_tokens": null,
+          "cache_read_input_tokens": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        "usage_coverage": null
+      },
+      "main": {
+        "attempts": 4,
+        "elapsed_ms": 30112,
+        "network_retries": 0,
+        "requests": 4,
+        "results": {
+          "succeeded": 4
+        },
+        "usage": {
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 0,
+          "input_tokens": 18422,
+          "output_tokens": 1301
+        },
+        "usage_coverage": 1.0
+      }
+    },
+    "run_id": "00000000-0000-4000-8000-000000000001",
+    "schema_version": "run-report-v1",
+    "session_id": "00000000-0000-4000-8000-000000000002",
+    "started_at": "2026-08-27T09:00:00+00:00",
+    "state": "COMPLETED",
+    "stop_reason": "COMPLETED",
+    "tool_schema_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+    "tools": {
+      "by_name": {
+        "read_file": {
+          "failed": 0,
+          "proposed": 2,
+          "succeeded": 2
+        },
+        "run_command": {
+          "failed": 0,
+          "proposed": 1,
+          "succeeded": 1
+        },
+        "write_file": {
+          "failed": 0,
+          "proposed": 2,
+          "succeeded": 2
+        }
+      },
+      "calls": [],
+      "cancelled": 0,
+      "duplicate_calls": 0,
+      "duration_ms": 1904,
+      "executed": 5,
+      "failed": 0,
+      "output_bytes": 812,
+      "proposed": 5,
+      "rejected": 0,
+      "skipped": 0,
+      "succeeded": 5,
+      "truncated": 0,
+      "unknown": 0
+    }
+  },
+  "agent_timed_out": false,
+  "artifact_correct": true,
+  "campaign_id": "offline-example-v1",
+  "category": "new_file",
+  "compaction": {
+    "above_target": false,
+    "count": 0,
+    "estimated_minus_provider_tokens": null,
+    "estimated_summary_tokens": null,
+    "input_tokens_after": null,
+    "input_tokens_before": null,
+    "provider_summary_output_tokens": null,
+    "requests": 0
+  },
+  "durations": {
+    "agent_monotonic_ms": 41277,
+    "agent_process_ms": 4,
+    "oracle_ms": 239,
+    "retry_wait_monotonic_ms": 0,
+    "tool_execution_monotonic_ms": 1904,
+    "total_ms": 250,
+    "workspace_prepare_ms": 7
+  },
+  "error_kind": null,
+  "failure_kind": null,
+  "failure_stage": null,
+  "finished_at": "2026-08-28T12:15:54.182792+00:00",
+  "harness_detail": null,
+  "hashes": {
+    "baseline_tree": "7b43c81858e4e878f765d843fdff5d24d3770161422d02efe67c92d4475f5f89",
+    "config": "fcebea1eed6584c65ef1598ea5ce30ba2152c7d3c29d91335c2f8a97a24b9ae5",
+    "diff": "3e89d9e79929d8aa9ccdec0544a22a6b3d273bd77eb27ace80fc76ccdcb442ce",
+    "prompt": "8da3f78102915847b207aa9c3fde2a40a35dfd474f80fa226ded9a1e137c724c",
+    "task": "10c1708994d91eecf17068e6da4fe8031cd3ee461774ace3000ac25406d990b2",
+    "tool_schema": "0000000000000000000000000000000000000000000000000000000000000000",
+    "workspace_tree": "b105451c21c4d28a5827d329ff0382ac2dac0fd5641613ee389c13660489f1cf"
+  },
+  "model": {
+    "attempts": 4,
+    "compaction_requests": 0,
+    "main_requests": 4,
+    "network_retries": 0,
+    "usage": {
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 0,
+      "input_tokens": 18422,
+      "output_tokens": 1301
+    },
+    "usage_coverage": 1.0
+  },
+  "modifications": {
+    "detected_workspace_escape": false,
+    "files_added": 1,
+    "files_deleted": 0,
+    "files_modified": 0,
+    "forbidden_paths_modified": [],
+    "lines_added": 16,
+    "lines_removed": 0,
+    "out_of_scope_paths": []
+  },
+  "oracle": {
+    "regression": {
+      "duration_ms": 118,
+      "errored": false,
+      "exit_code": 0,
+      "passed": true
+    },
+    "target": {
+      "duration_ms": 117,
+      "errored": false,
+      "exit_code": 0,
+      "passed": true
+    }
+  },
+  "outcome": "OK",
+  "provider": "anthropic_messages",
+  "repeat": 1,
+  "schema_version": "run-v1",
+  "started_at": "2026-08-28T12:15:53.932466+00:00",
+  "state": "COMPLETED",
+  "stop_reason": "COMPLETED",
+  "strict_success": true,
+  "task_id": "new-file-slugify",
+  "tools": {
+    "duplicate_calls": 0,
+    "executed": 5,
+    "failed": 0,
+    "output_bytes": 812,
+    "proposed": 5,
+    "skipped": 0,
+    "succeeded": 5,
+    "truncated": 0
+  }
+}

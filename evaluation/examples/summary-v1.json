@@ -1,0 +1,94 @@
+{
+  "agent_commit": "0000000000000000000000000000000000000000",
+  "agent_monotonic_ms": {
+    "max": 41277.0,
+    "mean": 41277.0,
+    "median": 41277.0,
+    "min": 41277.0,
+    "p95": 41277.0,
+    "total": 165108.0
+  },
+  "artifact_correct_only_runs": 0,
+  "artifact_correct_runs": 4,
+  "campaign_id": "offline-example-v1",
+  "compaction_runs": 0,
+  "failure_kinds": {},
+  "harness_oracle_error_runs": 0,
+  "harness_setup_runs": 0,
+  "provider": "anthropic_messages",
+  "robust_task_count": 0,
+  "schema_version": "summary-v1",
+  "started_runs": 4,
+  "strict_success_runs": 4,
+  "task_completion_rate": 1.0,
+  "tasks": [
+    {
+      "artifact_correct_runs": 1,
+      "category": "new_file",
+      "results": [
+        true
+      ],
+      "robust": false,
+      "started_runs": 1,
+      "strict_success_runs": 1,
+      "task_id": "new-file-slugify",
+      "valid_runs": 1
+    },
+    {
+      "artifact_correct_runs": 1,
+      "category": "local_edit",
+      "results": [
+        true
+      ],
+      "robust": false,
+      "started_runs": 1,
+      "strict_success_runs": 1,
+      "task_id": "local-edit-clamp",
+      "valid_runs": 1
+    },
+    {
+      "artifact_correct_runs": 1,
+      "category": "locate_and_modify",
+      "results": [
+        true
+      ],
+      "robust": false,
+      "started_runs": 1,
+      "strict_success_runs": 1,
+      "task_id": "locate-two-files",
+      "valid_runs": 1
+    },
+    {
+      "artifact_correct_runs": 1,
+      "category": "large_file_edit",
+      "results": [
+        true
+      ],
+      "robust": false,
+      "started_runs": 1,
+      "strict_success_runs": 1,
+      "task_id": "large-file-handlers",
+      "valid_runs": 1
+    }
+  ],
+  "tools": {
+    "duplicate_calls": 0,
+    "executed": 20,
+    "failed": 0,
+    "output_bytes": 3248,
+    "proposed": 20,
+    "skipped": 0,
+    "succeeded": 20,
+    "truncated": 0
+  },
+  "total_attempts": 16,
+  "total_cache_creation_input_tokens": 0,
+  "total_cache_read_input_tokens": 0,
+  "total_compaction_requests": 0,
+  "total_input_tokens": 73688,
+  "total_main_requests": 16,
+  "total_network_retries": 0,
+  "total_output_tokens": 5204,
+  "usage_coverage": 1.0,
+  "valid_runs": 4
+}

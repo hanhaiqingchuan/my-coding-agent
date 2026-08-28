@@ -1,0 +1,184 @@
+# Evaluation harness
+
+This directory holds the public part of the quantitative evaluation described in
+section 18 of `doc/项目设计方案.md`: the versioned JSON schemas, four self-authored
+redistributable tasks, and redacted example results. The harness code lives in
+`src/coding_agent/evaluation/`.
+
+The harness measures the shipped product. It launches `coding-agent run` as a
+subprocess with a frozen argv, contains no second planning or agent loop, and never
+imports the Agent Loop, the Run Coordinator, or any tool internals.
+
+## Commands
+
+```bash
+# Validate a manifest and prove every task can be scored.
+uv run --python 3.12 coding-agent-eval validate \
+  --manifest evaluation/tasks/public/manifest.toml
+
+# Show what a real campaign would do without calling the model.
+uv run --python 3.12 coding-agent-eval run \
+  --manifest evaluation/tasks/public/manifest.toml \
+  --repeats 1 --serial --out /path/outside/this/repo --dry-run
+
+# Run the campaign for real. Requires a config file and ANTHROPIC_API_KEY.
+uv run --python 3.12 coding-agent-eval run \
+  --manifest evaluation/tasks/public/manifest.toml \
+  --config config.toml --repeats 1 --serial --out /path/outside/this/repo
+
+# Re-aggregate an existing campaign directory.
+uv run --python 3.12 coding-agent-eval summarize --input /path/outside/this/repo
+```
+
+`--dry-run` prints the task count, the upper bound on main model requests, the
+workspace root and the output location. It creates nothing and calls no model, so it
+does not need the auto-approve acknowledgement.
+
+P0 always runs a campaign serially; `--serial` records that intent explicitly.
+Results are written outside this repository by convention: raw campaign directories
+contain workspaces and databases and are not part of the delivery.
+
+## Directory layout
+
+```text
+evaluation/
+├── README.md
+├── schemas/
+│   ├── manifest-v1.schema.json    # documentation schema for the TOML manifest
+│   ├── run-v1.schema.json         # one immutable evaluation run
+│   └── summary-v1.schema.json     # one redacted campaign aggregate
+├── tasks/public/
+│   ├── manifest.toml
+│   └── <task-id>/
+│       ├── prompt.md              # copied outside the workspace, passed as --prompt-file
+│       ├── baseline/              # read-only; every repeat is a fresh copy
+│       ├── gold/                  # gold patch as a file overlay
+│       ├── error/                 # wrong implementation the target oracle must reject
+│       └── oracle/
+│           ├── target.py          # the task's goal assertions
+│           └── regression.py      # the pre-existing suite must still pass
+└── examples/
+    ├── run-v1.redacted.json
+    └── summary-v1.json
+```
+
+`baseline/`, `gold/`, `error/` and `oracle/` are siblings on purpose. The manifest
+validator rejects any task whose prompt, gold overlay, error overlay or oracle sits
+inside the baseline, because only the baseline is ever copied into a workspace.
+
+## The two documents
+
+Two versioned documents exist, because one process cannot know both halves.
+
+`run-report-v1` is written by the agent itself (`--report-out`). It is a read-only
+projection of facts SQLite already owns: run state, stop reason, error kind, model
+requests and attempts with per-component provider usage, tool statistics with hashed
+arguments, compaction facts, and per-phase durations.
+
+`run-v1` is written by the evaluator. It embeds the agent report verbatim under
+`agent_report` and adds only harness facts: task id, category and repeat,
+`provider = "anthropic_messages"`, the agent commit, the config/task/prompt/tool-schema
+hashes, the failure stage and kind, the workspace tree and diff hashes, the oracle
+results, and `strict_success` / `artifact_correct`. The evaluator never opens the
+agent's database and never re-derives an agent fact.
+
+## Task manifest
+
+Every path in a manifest is relative to the manifest file, must stay inside its
+directory, and must live outside the baseline. Validation rejects an unknown
+`schema_version`, a path escape, a missing baseline or oracle, an unknown or missing
+field, a duplicate task id, an unknown category, an empty or out-of-bounds
+`allowed_paths`, a `forbidden_paths` entry overlapping `allowed_paths`, a timeout
+outside 1–3600 seconds, and an empty, prefix-shaped or out-of-bounds command
+allowlist. `coding-agent-eval validate` additionally proves, by running the oracles,
+that the baseline fails the target oracle, the baseline already passes its regression
+oracle, the gold overlay passes both, and the error variant fails the target oracle.
+Any of those failing is reported as `HARNESS_SETUP` for that task instead of an agent
+failure.
+
+## Oracle contract
+
+An oracle is a stdlib-only Python script invoked as
+`python -B <oracle> <candidate-workspace>` with a working directory outside that
+workspace, an isolated `HOME`, and a minimal environment.
+
+| Exit code | Meaning |
+| --- | --- |
+| `0` | passed |
+| `1` | failed |
+| anything else, or a timeout | `HARNESS_ORACLE_ERROR` |
+
+Oracles never run inside the workspace, so the agent cannot influence its own grade,
+and their stdout and stderr are discarded rather than exported.
+
+## Per-run isolation
+
+Each repeat gets its own directory under `<out>/runs/<task-id>/repeat-<n>/`:
+
+```text
+workspace/              fresh copy of the read-only baseline
+data/                   isolated --data-dir (its own SQLite database)
+prompt.md               the task prompt, outside the workspace
+command-policy.json     generated command-policy-v1 file, outside the workspace
+canary.txt             guards against writes outside the workspace
+oracle/                 oracle working directory
+agent-report.json       the agent's run-report-v1 document
+run.json                the evaluator's run-v1 document
+```
+
+An existing campaign directory or run directory is never overwritten. The generated
+command policy lists the manifest's exact command and cwd pairs; anything else the
+model proposes returns a normal `COMMAND_NOT_ALLOWED` tool error that the model can
+read and react to. This is contamination control, not a malicious-code sandbox.
+
+## Success definition
+
+```text
+strict_success = target oracle passed
+               + regression oracle passed
+               + no forbidden path modified
+               + no workspace escape detected
+               + run finished as COMPLETED
+```
+
+`artifact_correct` reports the same conditions without the run-state requirement, so
+a run whose code is right but which ended in `MAX_ROUNDS` is visible as
+`artifact_correct_only` instead of being counted as a success.
+
+`task_completion_rate = strict_success_runs / valid_runs`, where valid runs exclude
+`HARNESS_SETUP` and `HARNESS_ORACLE_ERROR`. Both harness counts are still reported.
+A task counts toward `robust_task_count` only when at least two of its three repeats
+strictly succeed, and each task keeps its raw per-repeat booleans.
+
+## Token usage and durations
+
+Only provider usage is reported. `input_tokens`, `output_tokens`,
+`cache_creation_input_tokens` and `cache_read_input_tokens` are kept separately, and a
+component stays `null` whenever any request in scope lacks it — a local estimate is
+never substituted, and streaming deltas are never summed. `usage_coverage` reports how
+many finished requests carried provider usage.
+
+Every harness duration comes from a monotonic clock. In the agent report,
+`agent_monotonic_ms`, `retry_wait_monotonic_ms` and `tool_execution_monotonic_ms` are
+monotonic; `model_request_elapsed_ms` and `compaction_request_elapsed_ms` are derived
+from persisted request timestamps and are named accordingly.
+
+The compaction estimate error compares this project's estimate of the summary it
+produced with the provider's output token count for the request that produced it.
+P0 does not persist a per-request context estimate, so no other estimate-versus-usage
+figure is claimed.
+
+## Redaction
+
+Default exports contain no prompt text, no tool arguments, no command output, no
+transcript and no absolute paths. Tool arguments appear only as `args_hash`, computed
+over the canonically sorted JSON of the call input.
+
+## About `examples/`
+
+The two files in `examples/` were produced by a real offline campaign over the four
+public tasks: the baselines, gold overlays, oracles, tree hashes, diff counts and
+oracle durations are genuine. The agent process itself was replaced by a stub that
+applies the gold overlay and emits a fixed `run-report-v1` document, so the model,
+token and agent-duration values are placeholders that demonstrate the schema — they
+are not measurements of a live model run.
