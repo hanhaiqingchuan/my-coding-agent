@@ -59,6 +59,25 @@ def another_tool_turn() -> AssistantTurn:
     )
 
 
+def mixed_tool_turn() -> AssistantTurn:
+    """A read that runs automatically followed by a write that must wait for approval."""
+    return AssistantTurn(
+        id="turn-mixed",
+        parts=(
+            ToolUsePart(ToolCall("call-read", "read_file", {"path": "a.txt"})),
+            ToolUsePart(ToolCall("call-write", "write_file", {"path": "b.txt"})),
+        ),
+        stop_reason=ModelStopReason.TOOL_USE,
+        usage=Usage(),
+    )
+
+
+def advance_to_model_streaming(store: SQLiteStore, run_id: str) -> None:
+    """Reach the only state the product ever stages a tool group from."""
+    store.transition_run(run_id, {RunState.STARTING}, RunState.BUILDING_CONTEXT, None, None)
+    store.transition_run(run_id, {RunState.BUILDING_CONTEXT}, RunState.MODEL_STREAMING, None, None)
+
+
 def test_initialize_creates_v1_schema_and_configures_connections(tmp_path) -> None:
     database = tmp_path / "state.db"
     store = SQLiteStore(database, busy_timeout_ms=3210)
@@ -169,6 +188,7 @@ def test_pending_tool_group_is_excluded_until_results_commit_atomically(
     store: SQLiteStore, session
 ) -> None:
     run = store.begin_run(session.id, "change it", {}, "cmd-start", "hash-start")
+    advance_to_model_streaming(store, run.id)
     pending = store.stage_tool_group(run.id, assistant_turn_with_two_calls())
 
     assert [message.role for message in store.load_committed_transcript(session.id)] == ["user"]
@@ -193,6 +213,7 @@ def test_pending_tool_group_is_excluded_until_results_commit_atomically(
 
 def test_run_rejects_a_second_pending_tool_group(store: SQLiteStore, session) -> None:
     run = store.begin_run(session.id, "change it", {}, "cmd-start", "hash-start")
+    advance_to_model_streaming(store, run.id)
     store.stage_tool_group(run.id, assistant_turn_with_two_calls())
 
     with pytest.raises(StoreError) as raised:
@@ -213,6 +234,7 @@ def test_final_turn_is_rejected_until_pending_tool_group_is_settled(
     store: SQLiteStore, session
 ) -> None:
     run = store.begin_run(session.id, "change it", {}, "cmd-start", "hash-start")
+    advance_to_model_streaming(store, run.id)
     pending = store.stage_tool_group(run.id, assistant_turn_with_two_calls())
     final = AssistantTurn(
         id="final-turn",
@@ -241,6 +263,7 @@ def test_final_turn_is_rejected_until_pending_tool_group_is_settled(
 
 def test_run_cannot_become_terminal_with_a_pending_tool_group(store: SQLiteStore, session) -> None:
     run = store.begin_run(session.id, "change it", {}, "cmd-start", "hash-start")
+    advance_to_model_streaming(store, run.id)
     store.stage_tool_group(run.id, assistant_turn_with_two_calls())
 
     with pytest.raises(StoreError) as raised:
@@ -254,6 +277,43 @@ def test_run_cannot_become_terminal_with_a_pending_tool_group(store: SQLiteStore
 
     assert raised.value.code == "PENDING_TOOL_GROUP_EXISTS"
     assert store.load_snapshot(session.id).active_run.state is RunState.AWAITING_APPROVAL
+
+
+def test_tool_group_staged_after_stop_cannot_overwrite_cancelling(
+    store: SQLiteStore, session
+) -> None:
+    """Overwriting CANCELLING would leave a pending group no terminal transition can pass."""
+    run = store.begin_run(session.id, "change it", {}, "cmd-start", "hash-start")
+    advance_to_model_streaming(store, run.id)
+    store.request_cancellation(run.id, "cmd-stop", "hash-stop")
+
+    with pytest.raises(StoreError) as raised:
+        store.stage_tool_group(run.id, assistant_turn_with_two_calls())
+
+    assert raised.value.code == "RUN_CANCELLING"
+    assert store.get_run(run.id).state is RunState.CANCELLING
+    assert [message.role for message in store.load_committed_transcript(session.id)] == ["user"]
+    cancelled = store.transition_run(
+        run.id, {RunState.CANCELLING}, RunState.CANCELLED, StopReason.USER_STOP, None
+    )
+    assert cancelled.state is RunState.CANCELLED
+
+
+def test_mixed_group_moves_the_run_state_onto_each_current_call(
+    store: SQLiteStore, session
+) -> None:
+    """Both edges are real: an auto-executed read runs first, then a write awaits approval."""
+    run = store.begin_run(session.id, "change it", {}, "cmd-start", "hash-start")
+    advance_to_model_streaming(store, run.id)
+    group = store.stage_tool_group(run.id, mixed_tool_turn())
+
+    assert store.get_run(run.id).state is RunState.MODEL_STREAMING
+    assert store.begin_effect(run.id, "call-read") is EffectStartResult.STARTED
+    assert store.get_run(run.id).state is RunState.TOOL_RUNNING
+
+    store.settle_tool_group(group.id, (ToolResult("call-read", "a.txt", True),))
+
+    assert store.get_run(run.id).state is RunState.AWAITING_APPROVAL
 
 
 def test_terminal_run_rejects_new_assistant_turns(store: SQLiteStore, session) -> None:
@@ -285,6 +345,7 @@ def test_partial_results_enable_next_call_without_exposing_an_unpaired_group(
     store: SQLiteStore, session
 ) -> None:
     run = store.begin_run(session.id, "change it", {}, "cmd-start", "hash-start")
+    advance_to_model_streaming(store, run.id)
     pending = store.stage_tool_group(run.id, assistant_turn_with_two_calls())
     store.resolve_approval(
         run.id, "call-1", ApprovalDecision.APPROVE, "approve-1", "approve-hash-1"
@@ -314,6 +375,7 @@ def test_settle_tool_group_rolls_back_results_and_commit_marker_on_event_failure
     store: SQLiteStore, session
 ) -> None:
     run = store.begin_run(session.id, "change it", {}, "cmd-start", "hash-start")
+    advance_to_model_streaming(store, run.id)
     pending = store.stage_tool_group(run.id, assistant_turn_with_two_calls())
     with store.connection() as connection:
         connection.execute(

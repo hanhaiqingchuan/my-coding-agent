@@ -343,6 +343,10 @@ class SQLiteStore:
         with self._transaction() as connection:
             run = self._get_run_from(connection, run_id)
             self._require_active_run(run)
+            if not _accepts_new_work(run):
+                raise StoreError(
+                    "RUN_CANCELLING", "a tool group cannot be staged during cancellation"
+                )
             self._require_no_pending_group(connection, run.id)
             message_id = turn.id
             connection.execute(
@@ -396,10 +400,7 @@ class SQLiteStore:
                     )
                 )
             if prepared[0].requires_approval:
-                connection.execute(
-                    "UPDATE runs SET state = ? WHERE id = ?",
-                    (RunState.AWAITING_APPROVAL.value, run.id),
-                )
+                self._apply_run_state(connection, run, RunState.AWAITING_APPROVAL)
             self._append_event(
                 connection,
                 run.session_id,
@@ -470,9 +471,11 @@ class SQLiteStore:
                 next_execution = next(
                     execution for execution in executions if execution["result_json"] is None
                 )
+                run = self._get_run_from(connection, message["run_id"])
                 if (
                     next_execution["execution_state"] == ToolExecutionState.QUEUED.value
                     and next_execution["approval_status"] == ApprovalStatus.PENDING.value
+                    and _accepts_new_work(run)
                 ):
                     connection.execute(
                         """
@@ -485,10 +488,7 @@ class SQLiteStore:
                             ToolExecutionState.QUEUED.value,
                         ),
                     )
-                    connection.execute(
-                        "UPDATE runs SET state = ? WHERE id = ?",
-                        (RunState.AWAITING_APPROVAL.value, message["run_id"]),
-                    )
+                    self._apply_run_state(connection, run, RunState.AWAITING_APPROVAL)
                 self._append_event(
                     connection,
                     message["session_id"],
@@ -1086,9 +1086,8 @@ class SQLiteStore:
             ).rowcount
             if changed != 1:
                 return EffectStartResult.NOT_ACTIVE
-            connection.execute(
-                "UPDATE runs SET state = ? WHERE id = ? AND cancellation_requested_at IS NULL",
-                (RunState.TOOL_RUNNING.value, run.id),
+            self._apply_run_state(
+                connection, run, RunState.TOOL_RUNNING, require_no_cancellation=True
             )
             self._append_event(
                 connection,
@@ -1336,6 +1335,33 @@ class SQLiteStore:
     def _require_active_run(run: Run) -> None:
         if run.state in _TERMINAL_STATES:
             raise StoreError("RUN_NOT_ACTIVE", "cannot append messages to a terminal run")
+
+    def _apply_run_state(
+        self,
+        connection: sqlite3.Connection,
+        run: Run,
+        target: RunState,
+        *,
+        require_no_cancellation: bool = False,
+    ) -> None:
+        """Move one run to ``target`` only from the state this transaction observed.
+
+        Spec 5.1 requires every lifecycle write to be an explicitly modeled edge applied
+        with an expected-state condition, so a late model, approval or tool result can
+        never overwrite a terminal or cancelling run. A run already in ``target`` — a
+        second automatic call in the same group, for example — is left untouched because
+        it is not a transition.
+        """
+        if run.state is target:
+            return
+        validate_transition(run.state, target)
+        predicate = " AND cancellation_requested_at IS NULL" if require_no_cancellation else ""
+        changed = connection.execute(
+            f"UPDATE runs SET state = ? WHERE id = ? AND state = ?{predicate}",
+            (target.value, run.id, run.state.value),
+        ).rowcount
+        if changed != 1:
+            raise InvalidStateTransition(self._get_run_from(connection, run.id).state, target)
 
     @staticmethod
     def _require_no_pending_group(connection: sqlite3.Connection, run_id: str) -> None:
@@ -1591,6 +1617,19 @@ _FINAL_TOOL_STATES = frozenset(
 
 def _now() -> str:
     return datetime.now(UTC).isoformat()
+
+
+def _accepts_new_work(run: Run) -> bool:
+    """Report whether a run may still receive newly staged work.
+
+    A persisted Stop is the linearization point of spec 5.3: once ``CANCELLING`` is
+    committed, no tool group may be staged and no further approval may be requested.
+    """
+    return (
+        run.state not in _TERMINAL_STATES
+        and run.state is not RunState.CANCELLING
+        and run.cancellation_requested_at is None
+    )
 
 
 def _json(value: object) -> str:

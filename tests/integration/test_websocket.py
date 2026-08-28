@@ -183,6 +183,8 @@ def _start_command(session_id: str, command_id: str, content: str = "Fix the tes
 
 def _pending_approval(store: SQLiteStore, session_id: str):
     run = store.begin_run(session_id, "change file", {}, "seed-start", "seed-start-hash")
+    store.transition_run(run.id, {RunState.STARTING}, RunState.BUILDING_CONTEXT, None, None)
+    store.transition_run(run.id, {RunState.BUILDING_CONTEXT}, RunState.MODEL_STREAMING, None, None)
     call = ToolCall(
         "call-1",
         "write_file",

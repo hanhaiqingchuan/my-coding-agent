@@ -52,6 +52,8 @@ def two_write_calls() -> AssistantTurn:
 
 def start_pending_group(store: SQLiteStore, session):
     run = store.begin_run(session.id, "change files", {}, "start-1", "start-hash")
+    store.transition_run(run.id, {RunState.STARTING}, RunState.BUILDING_CONTEXT, None, None)
+    store.transition_run(run.id, {RunState.BUILDING_CONTEXT}, RunState.MODEL_STREAMING, None, None)
     group = store.stage_tool_group(run.id, two_write_calls())
     return run, group
 

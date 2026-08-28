@@ -46,6 +46,17 @@ def test_every_active_state_can_enter_cancelling() -> None:
         validate_transition(state, RunState.CANCELLING)
 
 
+def test_tool_phase_edges_the_product_takes_are_modeled() -> None:
+    """An auto-executed read and a mixed group are real paths; unmodeled edges write silently."""
+    validate_transition(RunState.MODEL_STREAMING, RunState.TOOL_RUNNING)
+    validate_transition(RunState.TOOL_RUNNING, RunState.AWAITING_APPROVAL)
+
+    with pytest.raises(InvalidStateTransition):
+        validate_transition(RunState.TOOL_RUNNING, RunState.MODEL_STREAMING)
+    with pytest.raises(InvalidStateTransition):
+        validate_transition(RunState.AWAITING_APPROVAL, RunState.MODEL_STREAMING)
+
+
 def test_cancelling_only_reaches_cancelled() -> None:
     """Allowing cancellation to resume work would violate the persisted Stop linearization point."""
     validate_transition(RunState.CANCELLING, RunState.CANCELLED)

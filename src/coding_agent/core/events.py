@@ -29,6 +29,7 @@ _TRANSITIONS: dict[RunState, frozenset[RunState]] = {
             RunState.BUILDING_CONTEXT,
             RunState.RETRY_WAIT,
             RunState.AWAITING_APPROVAL,
+            RunState.TOOL_RUNNING,
             RunState.COMPLETED,
             RunState.CANCELLING,
         }
@@ -37,7 +38,9 @@ _TRANSITIONS: dict[RunState, frozenset[RunState]] = {
     RunState.AWAITING_APPROVAL: frozenset(
         {RunState.BUILDING_CONTEXT, RunState.TOOL_RUNNING, RunState.CANCELLING}
     ),
-    RunState.TOOL_RUNNING: frozenset({RunState.BUILDING_CONTEXT, RunState.CANCELLING}),
+    RunState.TOOL_RUNNING: frozenset(
+        {RunState.BUILDING_CONTEXT, RunState.AWAITING_APPROVAL, RunState.CANCELLING}
+    ),
     RunState.CANCELLING: frozenset({RunState.CANCELLED}),
     RunState.COMPLETED: frozenset(),
     RunState.STOPPED: frozenset(),

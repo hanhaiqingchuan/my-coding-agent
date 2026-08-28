@@ -100,6 +100,8 @@ def test_lifespan_cancels_unstarted_approval_group_without_an_ack_gate(
     """Replaying or leaving an approved-looking queued tool could create a new side effect."""
     session = store.create_session("/tmp/workspace", "approval")
     run = store.begin_run(session.id, "change files", {}, "start-1", "hash-1")
+    store.transition_run(run.id, {RunState.STARTING}, RunState.BUILDING_CONTEXT, None, None)
+    store.transition_run(run.id, {RunState.BUILDING_CONTEXT}, RunState.MODEL_STREAMING, None, None)
     store.stage_tool_group(run.id, _tool_turn())
 
     with TestClient(_app(store), base_url=BASE_URL) as client:
@@ -129,6 +131,8 @@ def test_lifespan_marks_started_tool_unknown_and_blocks_until_recovery_ack(
     """Treating a started effect as safe could duplicate an unknown write or process."""
     session = store.create_session("/tmp/workspace", "running")
     run = store.begin_run(session.id, "change files", {}, "start-1", "hash-1")
+    store.transition_run(run.id, {RunState.STARTING}, RunState.BUILDING_CONTEXT, None, None)
+    store.transition_run(run.id, {RunState.BUILDING_CONTEXT}, RunState.MODEL_STREAMING, None, None)
     store.stage_tool_group(run.id, _tool_turn())
     store.resolve_approval(
         run.id,

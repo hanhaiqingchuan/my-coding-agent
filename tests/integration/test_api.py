@@ -251,6 +251,8 @@ def test_snapshot_includes_frozen_tools_and_the_current_pending_approval(tmp_pat
         ModelStopReason.TOOL_USE,
         Usage(input_tokens=3, output_tokens=4),
     )
+    store.transition_run(run.id, {RunState.STARTING}, RunState.BUILDING_CONTEXT, None, None)
+    store.transition_run(run.id, {RunState.BUILDING_CONTEXT}, RunState.MODEL_STREAMING, None, None)
     store.stage_tool_group(run.id, turn)
     store.request_approval(
         run.id,
