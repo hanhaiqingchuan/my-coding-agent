@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 
 import contract from "../../api/schema.fixture.json";
-import { ApiClient } from "../../api/client";
+import { ApiClient, ApiError } from "../../api/client";
 import { SessionSocket } from "../../api/socket";
 import {
   APPROVAL_DECISIONS,
@@ -11,6 +11,7 @@ import {
   STOP_REASONS,
   TOOL_EXECUTION_STATES,
   type DurableEvent,
+  type BootstrapDto,
   type RunState,
   type SessionSnapshotDto,
 } from "../../api/types";
@@ -151,6 +152,16 @@ class BrowserSocket {
   }
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
+
 test("switching or reconnecting a session closes the old transport and subscribes again", async () => {
   const sockets: BrowserSocket[] = [];
   const api = {
@@ -180,6 +191,81 @@ test("switching or reconnecting a session closes the old transport and subscribe
     session_id: "session-b",
     payload: {},
   });
+});
+
+test("a stale bootstrap 403 after switching sessions cannot clear the new session token", async () => {
+  const oldBootstrap = deferred<BootstrapDto>();
+  const sockets: BrowserSocket[] = [];
+  const tokens: Array<string | null> = [];
+  let bootstrapCalls = 0;
+  let clearCalls = 0;
+  const api = {
+    bootstrap: () => {
+      bootstrapCalls += 1;
+      if (bootstrapCalls === 1) return oldBootstrap.promise;
+      return Promise.resolve({ csrf_token: "new-token", websocket_url: "ws://local.test/api/ws" });
+    },
+    clearToken: () => {
+      clearCalls += 1;
+    },
+  } as unknown as ApiClient;
+  const socket = new SessionSocket({
+    api,
+    onMessage: () => undefined,
+    onConnection: () => undefined,
+    onToken: (token) => tokens.push(token),
+    createSocket: () => {
+      const connection = new BrowserSocket();
+      sockets.push(connection);
+      return connection;
+    },
+  });
+
+  const oldConnection = socket.connect("session-old");
+  await Promise.resolve();
+  await socket.connect("session-new");
+  oldBootstrap.reject(new ApiError(403, "expired"));
+  await oldConnection;
+  await Promise.resolve();
+
+  expect(clearCalls).toBe(0);
+  expect(bootstrapCalls).toBe(2);
+  expect(sockets).toHaveLength(1);
+  expect(tokens).toEqual(["new-token"]);
+});
+
+test("a stale bootstrap 403 after explicit close leaves shared token state untouched", async () => {
+  const oldBootstrap = deferred<BootstrapDto>();
+  const tokens: Array<string | null> = [];
+  let bootstrapCalls = 0;
+  let clearCalls = 0;
+  const api = {
+    bootstrap: () => {
+      bootstrapCalls += 1;
+      return oldBootstrap.promise;
+    },
+    clearToken: () => {
+      clearCalls += 1;
+    },
+  } as unknown as ApiClient;
+  const socket = new SessionSocket({
+    api,
+    onMessage: () => undefined,
+    onConnection: () => undefined,
+    onToken: (token) => tokens.push(token),
+    createSocket: () => new BrowserSocket(),
+  });
+
+  const oldConnection = socket.connect("session-old");
+  await Promise.resolve();
+  socket.close();
+  oldBootstrap.reject(new ApiError(403, "expired"));
+  await oldConnection;
+  await Promise.resolve();
+
+  expect(clearCalls).toBe(0);
+  expect(bootstrapCalls).toBe(1);
+  expect(tokens).toEqual([]);
 });
 
 test("an expired authentication token is bootstrapped at most once before resubscribing", async () => {

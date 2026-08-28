@@ -58,13 +58,16 @@ export class SessionSocket {
     reconnects: number,
     generation: number,
   ): Promise<void> {
+    if (!this.isCurrent(generation, sessionId)) return;
     let bootstrap;
     try {
       bootstrap = await this.options.api.bootstrap();
     } catch (error) {
+      if (!this.isCurrent(generation, sessionId)) return;
       if (error instanceof ApiError && error.status === 403 && authRetries < 1) {
         this.options.api.clearToken();
         this.options.onToken(null);
+        if (!this.isCurrent(generation, sessionId)) return;
         await this.open(sessionId, authRetries + 1, reconnects, generation);
         return;
       }
@@ -73,7 +76,7 @@ export class SessionSocket {
       }
       return;
     }
-    if (generation !== this.generation || this.sessionId !== sessionId) {
+    if (!this.isCurrent(generation, sessionId)) {
       return;
     }
     this.options.onToken(bootstrap.csrf_token);
@@ -122,5 +125,9 @@ export class SessionSocket {
       }
       this.options.onConnection("offline");
     };
+  }
+
+  private isCurrent(generation: number, sessionId: string): boolean {
+    return generation === this.generation && this.sessionId === sessionId;
   }
 }
