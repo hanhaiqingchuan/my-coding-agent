@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, expect, test, vi } from "vitest";
 
 import type { RunDto, RunState } from "../api/types";
+import "../styles.css";
 import { Composer } from "./Composer";
 
 afterEach(cleanup);
@@ -145,6 +146,26 @@ test("disables Send for empty input and a recovery acknowledgement gate", () => 
   expect(
     screen.getByRole<HTMLButtonElement>("button", { name: "Send" }).disabled,
   ).toBe(true);
+});
+
+test("keeps a visible focus indicator on the message input for keyboard users", async () => {
+  const user = userEvent.setup();
+  render(
+    <Composer
+      activeRun={null}
+      draft=""
+      onDraftChange={vi.fn()}
+      onSend={vi.fn()}
+      onStop={vi.fn()}
+    />,
+  );
+
+  await user.tab();
+  const textarea = screen.getByRole("textbox", { name: "Message" });
+  const composer = textarea.closest("form");
+
+  expect(document.activeElement).toBe(textarea);
+  expect(composer?.className).toContain("composer-focused");
 });
 
 function DraftHarness({

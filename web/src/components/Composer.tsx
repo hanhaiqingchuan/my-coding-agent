@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 import type { RunDto } from "../api/types";
 
 const TERMINAL_RUN_STATES = new Set([
@@ -25,6 +27,7 @@ export function Composer({
   onSend,
   onStop,
 }: ComposerProps) {
+  const [isFocused, setIsFocused] = useState(false);
   const active =
     activeRun !== null && !TERMINAL_RUN_STATES.has(activeRun.state);
   const isCancelling = activeRun?.state === "cancelling";
@@ -32,8 +35,13 @@ export function Composer({
 
   return (
     <form
-      className="composer"
+      className={`composer${isFocused ? " composer-focused" : ""}`}
       aria-label="Message composer"
+      onFocus={() => setIsFocused(true)}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget))
+          setIsFocused(false);
+      }}
       onSubmit={(event) => {
         event.preventDefault();
         if (!active && canSend) onSend(draft.trim());

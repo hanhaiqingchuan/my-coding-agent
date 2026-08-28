@@ -349,8 +349,14 @@ button:disabled {
   font: inherit;
   line-height: 1.45;
 }
+.composer:focus-within,
+.composer.composer-focused {
+  border-color: #74b9ff;
+  box-shadow: 0 0 0 1px #74b9ff66;
+}
 .composer textarea:focus-visible {
-  outline: 0;
+  outline: 2px solid #74b9ff;
+  outline-offset: 2px;
 }
 .recovery-banner {
   margin: 20px 2px 0;
