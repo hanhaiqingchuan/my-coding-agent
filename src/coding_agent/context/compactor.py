@@ -158,7 +158,17 @@ class Compactor:
             next_candidate = chunk_end
 
         cancellation.raise_if_cancelled()
-        snapshot = _new_snapshot(plan, rolling_summary, summary_token_estimate, self._model)
+        effect_error = _validate_compaction_effect(plan, summary_token_estimate)
+        if effect_error is not None:
+            return effect_error
+        mandatory_floor_active = plan.retained_estimate_tokens > plan.soft_target_tokens
+        snapshot = _new_snapshot(
+            plan,
+            rolling_summary,
+            summary_token_estimate,
+            self._model,
+            compaction_above_target=mandatory_floor_active,
+        )
         try:
             self._store.replace_context_snapshot(snapshot)
         except (sqlite3.Error, StoreError):
@@ -184,6 +194,26 @@ def _validate_plan(plan: CompactionPlan) -> CompactionResult | None:
             code="COMPACTION_INPUT_OVERFLOW",
             required_tokens=1,
             available_tokens=max(0, plan.compaction_input_budget_tokens),
+        )
+    if (
+        min(
+            plan.current_estimate_tokens,
+            plan.retained_estimate_tokens,
+            plan.soft_target_tokens,
+            plan.target_tokens,
+            plan.required_reduction_tokens,
+            plan.available_tokens,
+        )
+        < 0
+        or plan.target_tokens != max(plan.soft_target_tokens, plan.retained_estimate_tokens)
+        or plan.required_reduction_tokens
+        != max(0, plan.current_estimate_tokens - plan.target_tokens)
+        or plan.target_tokens > plan.available_tokens
+    ):
+        return _failure(
+            phase="planning",
+            code="INVALID_COMPACTION_PLAN",
+            available_tokens=plan.compaction_input_budget_tokens,
         )
 
     source_seqs = tuple(
@@ -227,6 +257,33 @@ def _validate_plan(plan: CompactionPlan) -> CompactionResult | None:
             phase="planning",
             code="INVALID_COMPACTION_PLAN",
             available_tokens=plan.compaction_input_budget_tokens,
+        )
+    return None
+
+
+def _validate_compaction_effect(
+    plan: CompactionPlan,
+    summary_token_estimate: int,
+) -> CompactionResult | None:
+    final_estimate = plan.retained_estimate_tokens + summary_token_estimate
+    if final_estimate > plan.available_tokens:
+        return _failure(
+            phase="validation",
+            code="COMPACTION_RESULT_OVERFLOW",
+            required_tokens=final_estimate,
+            available_tokens=plan.available_tokens,
+        )
+
+    mandatory_floor_active = plan.retained_estimate_tokens > plan.soft_target_tokens
+    actual_reduction = max(0, plan.current_estimate_tokens - final_estimate)
+    if not mandatory_floor_active and (
+        final_estimate > plan.target_tokens or actual_reduction < plan.required_reduction_tokens
+    ):
+        return _failure(
+            phase="validation",
+            code="INSUFFICIENT_COMPRESSION",
+            required_tokens=plan.required_reduction_tokens,
+            available_tokens=actual_reduction,
         )
     return None
 
@@ -286,20 +343,19 @@ def _make_request(
     candidates: tuple[CompactionCandidate, ...],
     max_tokens: int,
 ) -> ModelRequest:
-    payload = _chunk_payload(candidates)
-    messages: list[ModelMessage] = []
-    if rolling_summary:
-        messages.append(ModelMessage("assistant", (TextPart(rolling_summary),)))
-    messages.append(ModelMessage("user", (TextPart(payload),)))
+    payload = _chunk_payload(candidates, rolling_summary)
     return ModelRequest(
         system=system,
-        messages=tuple(messages),
+        messages=(ModelMessage("user", (TextPart(payload),)),),
         tools=(),
         max_tokens=max_tokens,
     )
 
 
-def _chunk_payload(candidates: tuple[CompactionCandidate, ...]) -> str:
+def _chunk_payload(
+    candidates: tuple[CompactionCandidate, ...],
+    previous_summary: str,
+) -> str:
     read_only_context: list[dict[str, object]] = []
     seen_user_ids: set[str] = set()
     for candidate in candidates:
@@ -309,6 +365,7 @@ def _chunk_payload(candidates: tuple[CompactionCandidate, ...]) -> str:
             seen_user_ids.add(message.id)
             read_only_context.append(_message_value(message))
     value = {
+        "previous_summary": previous_summary or None,
         "read_only_user_context": read_only_context,
         "replaceable_groups": [
             {
@@ -413,6 +470,8 @@ def _new_snapshot(
     summary: str,
     token_estimate: int,
     model: str,
+    *,
+    compaction_above_target: bool,
 ) -> ContextSnapshot:
     previous = plan.previous_snapshot
     session_id = (
@@ -433,7 +492,7 @@ def _new_snapshot(
         model=model,
         estimator_id=plan.estimator_id,
         token_estimate=token_estimate,
-        compaction_above_target=plan.compaction_above_target,
+        compaction_above_target=compaction_above_target,
     )
 
 

@@ -84,6 +84,8 @@ class CompactionPlan:
     source_message_seqs: tuple[int, ...]
     source_event_ids: tuple[str, ...]
     current_estimate_tokens: int
+    retained_estimate_tokens: int
+    soft_target_tokens: int
     target_tokens: int
     required_reduction_tokens: int
     available_tokens: int
@@ -302,6 +304,8 @@ class ContextBuilder:
             source_message_seqs=source_message_seqs,
             source_event_ids=source_event_ids,
             current_estimate_tokens=estimated,
+            retained_estimate_tokens=mandatory_tokens,
+            soft_target_tokens=soft_target_tokens,
             target_tokens=target_tokens,
             required_reduction_tokens=max(0, estimated - target_tokens),
             available_tokens=available,

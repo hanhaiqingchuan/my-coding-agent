@@ -466,6 +466,8 @@ def test_eighty_percent_trigger_uses_sixty_percent_soft_target_with_mandatory_fl
     assert result.estimated_tokens >= result.trigger_tokens
     assert result.mandatory_tokens > int(result.available_tokens * 0.60)
     assert result.target_tokens == result.mandatory_tokens
+    assert result.plan.retained_estimate_tokens == result.mandatory_tokens
+    assert result.plan.soft_target_tokens == 420
     assert result.plan.compaction_above_target is True
 
 

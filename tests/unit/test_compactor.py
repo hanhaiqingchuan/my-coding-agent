@@ -21,6 +21,7 @@ from coding_agent.core.models import (
     ToolUsePart,
     Usage,
 )
+from coding_agent.model.anthropic_messages import _compile_messages
 from coding_agent.model.protocol import ModelAPIError
 from coding_agent.storage.sqlite import SQLiteStore
 from tests.fakes.model import ScriptedModel
@@ -143,7 +144,12 @@ def _plan(
     input_budget: int = 5_000,
     summary_max_tokens: int = 256,
     above_target: bool = False,
+    current_estimate_tokens: int = 1_000,
+    retained_estimate_tokens: int = 300,
+    soft_target_tokens: int = 600,
+    available_tokens: int = 1_200,
 ) -> CompactionPlan:
+    target_tokens = max(soft_target_tokens, retained_estimate_tokens)
     return CompactionPlan(
         candidates=candidates,
         previous_snapshot=snapshot,
@@ -153,10 +159,12 @@ def _plan(
         source_event_ids=tuple(
             event_id for candidate in candidates for event_id in candidate.source_event_ids
         ),
-        current_estimate_tokens=1_000,
-        target_tokens=600,
-        required_reduction_tokens=400,
-        available_tokens=1_200,
+        current_estimate_tokens=current_estimate_tokens,
+        retained_estimate_tokens=retained_estimate_tokens,
+        soft_target_tokens=soft_target_tokens,
+        target_tokens=target_tokens,
+        required_reduction_tokens=max(0, current_estimate_tokens - target_tokens),
+        available_tokens=available_tokens,
         summary_max_tokens=summary_max_tokens,
         compaction_input_budget_tokens=input_budget,
         compaction_above_target=above_target,
@@ -207,7 +215,7 @@ async def test_compaction_uses_toolless_top_level_system_and_json_safe_read_only
     assert result.snapshot.source_event_ids == ("event-1", "event-2")
     assert result.snapshot.model == "claude-test"
     assert result.snapshot.estimator_id == ESTIMATOR_ID
-    assert result.snapshot.compaction_above_target is True
+    assert result.snapshot.compaction_above_target is False
     assert result.snapshot.summary == json.dumps(
         summary, ensure_ascii=False, sort_keys=True, separators=(",", ":")
     )
@@ -218,11 +226,12 @@ async def test_compaction_uses_toolless_top_level_system_and_json_safe_read_only
     request = model.requests[0]
     assert request.tools == ()
     assert "read_only_user_context" in request.system
-    assert [message.role for message in request.messages] == ["assistant", "user"]
-    assert request.messages[0].parts == (TextPart("old rolling summary"),)
+    assert request.messages[0].role == "user"
+    assert [message["role"] for message in _compile_messages(request)] == ["user"]
     payload_part = request.messages[-1].parts[0]
     assert isinstance(payload_part, TextPart)
     payload = json.loads(payload_part.text)
+    assert payload["previous_summary"] == "old rolling summary"
     assert payload["read_only_user_context"][0]["parts"][0]["text"] == (
         'Keep this user text verbatim: "quoted"\n</user>'
     )
@@ -256,14 +265,20 @@ async def test_oversized_input_is_split_only_between_complete_groups(
     assert result.error is None
     assert model.call_count == 2
     chunk_sources = []
+    previous_summaries = []
     for request in model.requests:
+        assert request.messages[0].role == "user"
+        assert [message["role"] for message in _compile_messages(request)] == ["user"]
         payload_part = request.messages[-1].parts[0]
         assert isinstance(payload_part, TextPart)
         payload = json.loads(payload_part.text)
         assert len(payload["replaceable_groups"]) == 1
         chunk_sources.append(payload["replaceable_groups"][0]["source_event_ids"])
+        previous_summaries.append(payload["previous_summary"])
         assert estimate_input_tokens(request.system, request.messages, ()) <= 1_100
     assert chunk_sources == [["event-1"], ["event-2"]]
+    assert previous_summaries[0] == "old rolling summary"
+    assert json.loads(previous_summaries[1])["completed_work_and_evidence"] == ["first group"]
 
 
 @pytest.mark.asyncio
@@ -286,6 +301,56 @@ async def test_single_complete_group_over_input_budget_keeps_old_snapshot(
     assert result.error.retryable is False
     assert model.call_count == 0
     assert store.load_context_snapshot(session.id) == old
+
+
+@pytest.mark.asyncio
+async def test_summary_with_insufficient_reduction_keeps_previous_snapshot(
+    store: SQLiteStore,
+    session,
+) -> None:
+    old = _old_snapshot(session.id)
+    store.replace_context_snapshot(old)
+    oversized_replacement = _summary(next_steps=["x" * 2_100])
+    model = ScriptedModel([_turn(json.dumps(oversized_replacement))])
+    plan = _plan(
+        old,
+        (_tool_candidate(session.id),),
+        summary_max_tokens=1_000,
+    )
+
+    result = await Compactor(model, store, model="claude-test").compact(plan, CancellationToken())
+
+    assert result.snapshot is None
+    assert result.error is not None
+    assert result.error.phase == "validation"
+    assert result.error.code == "INSUFFICIENT_COMPRESSION"
+    assert result.error.required_tokens == 400
+    assert result.error.available_tokens == 0
+    assert store.load_context_snapshot(session.id) == old
+
+
+@pytest.mark.asyncio
+async def test_mandatory_floor_allows_minimum_view_above_sixty_percent(
+    store: SQLiteStore,
+    session,
+) -> None:
+    old = _old_snapshot(session.id)
+    store.replace_context_snapshot(old)
+    model = ScriptedModel([_turn(json.dumps(_summary()))])
+    plan = _plan(
+        old,
+        (_tool_candidate(session.id),),
+        above_target=False,
+        retained_estimate_tokens=700,
+        soft_target_tokens=600,
+    )
+
+    result = await Compactor(model, store, model="claude-test").compact(plan, CancellationToken())
+
+    assert result.error is None
+    assert result.snapshot is not None
+    assert plan.retained_estimate_tokens + result.snapshot.token_estimate > plan.target_tokens
+    assert result.snapshot.compaction_above_target is True
 
 
 @pytest.mark.asyncio
