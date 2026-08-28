@@ -285,6 +285,7 @@ def _map_status_error(error: APIStatusError) -> ModelAPIError:
 
     headers = error.response.headers
     retry_override = headers.get("x-should-retry", "").strip().lower()
+    has_retry_override = retry_override in {"true", "false"}
     if retry_override == "true":
         retryable = True
     elif retry_override == "false":
@@ -295,7 +296,7 @@ def _map_status_error(error: APIStatusError) -> ModelAPIError:
             or status_code in {408, 409, 429}
             or status_code >= 500
         )
-    if error_type == "context_too_large":
+    if error_type == "context_too_large" and not has_retry_override:
         retryable = False
     return ModelAPIError(
         status_code=status_code,

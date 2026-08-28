@@ -406,6 +406,32 @@ async def test_structured_context_error_maps_to_compression_signal(
 
 
 @pytest.mark.asyncio
+async def test_x_should_retry_true_overrides_context_too_large_default(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Applying the context default after an explicit override would drop provider policy."""
+    error = status_error(
+        400,
+        {
+            "type": "error",
+            "error": {
+                "type": "invalid_request_error",
+                "code": "context_length_exceeded",
+            },
+        },
+        headers={"x-should-retry": "true"},
+    )
+    install_fake_client(monkeypatch, error)
+    model = AnthropicMessagesModel(ModelSettings(model="model-a"), api_key="secret")
+
+    with pytest.raises(ModelAPIError) as raised:
+        await model.complete(request_with_tool_history(), lambda _: None, CancellationToken())
+
+    assert raised.value.error_type == "context_too_large"
+    assert raised.value.retryable is True
+
+
+@pytest.mark.asyncio
 async def test_error_message_text_cannot_turn_another_400_into_context_overflow(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
