@@ -467,6 +467,69 @@ def test_eighty_percent_trigger_uses_sixty_percent_soft_target_with_mandatory_fl
     assert result.plan.compaction_above_target is True
 
 
+def _all_mandatory_above_target_transcript() -> tuple[Message, ...]:
+    return (
+        _message(1, "user", TextPart("u" * 3_000), run_id="run-1"),
+        _message(2, "assistant", TextPart("old answer"), run_id="run-1"),
+        _message(3, "user", TextPart("second request"), run_id="run-2"),
+        _message(4, "assistant", TextPart("second answer"), run_id="run-2"),
+        _message(5, "user", TextPart("third request"), run_id="run-3"),
+        _message(6, "assistant", TextPart("third answer"), run_id="run-3"),
+        _message(7, "user", TextPart("latest request"), run_id="run-4"),
+    )
+
+
+def _covering_snapshot(summary: str) -> ContextSnapshot:
+    return ContextSnapshot(
+        session_id="session-1",
+        covered_through_message_seq=2,
+        summary=summary,
+        created_at=datetime(2026, 8, 28, tzinfo=UTC),
+    )
+
+
+def test_minimal_legal_view_above_target_is_ready_when_it_fits_available_budget() -> None:
+    """A view with nothing left to compact must not be reported as a compaction request.
+
+    Spec 7.4 item 10 makes 60% a soft target: once every visible group is mandatory and
+    only the rolling summary pushes the estimate past ``target_tokens``, the minimal legal
+    view still fits the available budget and must be usable.
+    """
+    result = ContextBuilder().build(
+        _all_mandatory_above_target_transcript(),
+        _covering_snapshot("s" * 900),
+        _request(context_window=2_000, max_output_tokens=200, safety_margin_tokens=100),
+    )
+
+    assert isinstance(result, ReadyContext)
+    assert result.estimated_tokens > result.target_tokens
+    assert result.estimated_tokens >= result.trigger_tokens
+    assert result.estimated_tokens <= result.available_tokens
+    assert result.compaction_above_target is True
+    assert _text_user_messages(result) == [
+        "u" * 3_000,
+        "second request",
+        "third request",
+        "latest request",
+    ]
+    assert "s" * 900 in _all_text(result)
+
+
+def test_minimal_legal_view_overflows_only_above_the_available_budget() -> None:
+    """Reserving CONTEXT_OVERFLOW for estimates within the budget would kill healthy runs."""
+    result = ContextBuilder().build(
+        _all_mandatory_above_target_transcript(),
+        _covering_snapshot("s" * 3_000),
+        _request(context_window=2_000, max_output_tokens=200, safety_margin_tokens=100),
+    )
+
+    assert isinstance(result, ContextOverflow)
+    assert result.code == "CONTEXT_OVERFLOW"
+    assert result.mandatory_tokens <= result.available_tokens
+    assert result.required_tokens > result.available_tokens
+    assert result.diagnostic["reason"] == "minimal_view_exceeds_available_input"
+
+
 def test_exactly_eighty_percent_triggers_compaction() -> None:
     transcript = (
         _message(1, "user", TextPart("1"), run_id="run-1"),

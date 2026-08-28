@@ -5,17 +5,20 @@ import inspect
 import json
 from collections.abc import AsyncIterator
 from dataclasses import replace
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 
 from coding_agent.config import AppSettings, ConfigurationError
 from coding_agent.context import Compactor, ContextBuilder
+from coding_agent.context.estimator import ESTIMATOR_ID
 from coding_agent.core.cancellation import CancellationToken
 from coding_agent.core.events import RunOutcome
 from coding_agent.core.models import (
     ApprovalDecision,
     AssistantTurn,
+    ContextSnapshot,
     ErrorKind,
     MessageStatus,
     ModelStopReason,
@@ -1104,3 +1107,67 @@ async def test_second_provider_context_overflow_fails_without_another_compaction
             "SELECT kind FROM model_requests WHERE run_id = ?", (run_id,)
         ).fetchall()
     assert [row[0] for row in kinds].count("compaction") == 1
+
+
+@pytest.mark.asyncio
+async def test_mandatory_view_above_soft_target_keeps_running_with_the_summary(
+    tmp_path: Path, valid_settings: AppSettings
+) -> None:
+    """A session that already has a summary must not die once user originals pass 60%.
+
+    Every visible group is mandatory here, so nothing is left to compact and only the
+    rolling summary pushes the estimate past the 60% soft target. Spec 7.4 item 10 keeps
+    that view legal because it still fits the available input budget.
+    """
+    settings = replace(
+        valid_settings,
+        model=replace(valid_settings.model, context_window=6_000, max_output_tokens=1_000),
+    )
+    loop, store, session_id, run_id, model, _, _ = _make_loop(
+        tmp_path,
+        settings,
+        [_final_turn("answered from the minimal legal view")],
+        prompt="x" * 6_000,
+        history=("first answer", "second answer", "third answer", "fourth answer"),
+    )
+    store.replace_context_snapshot(
+        ContextSnapshot(
+            session_id=session_id,
+            covered_through_message_seq=4,
+            summary="s" * 900,
+            created_at=datetime.now(UTC),
+            source_event_ids=("summarized-event",),
+            model="scripted-compactor",
+            estimator_id=ESTIMATOR_ID,
+            token_estimate=300,
+            compaction_above_target=True,
+        )
+    )
+
+    outcome = await loop.run(run_id, session_id, CancellationToken())
+
+    assert outcome == RunOutcome.complete()
+    assert model.call_count == 1
+    request = model.requests[0]
+    assert [part.text for message in request.messages for part in message.parts] == [
+        "history request 1",
+        "history request 2",
+        "s" * 900,
+        "history request 3",
+        "third answer",
+        "history request 4",
+        "fourth answer",
+        "x" * 6_000,
+    ]
+    snapshot = store.load_context_snapshot(session_id)
+    assert snapshot is not None
+    assert snapshot.summary == "s" * 900
+    assert snapshot.version == 1
+    with store.connection() as connection:
+        assert (
+            connection.execute(
+                "SELECT count(*) FROM model_requests WHERE run_id = ? AND kind = 'compaction'",
+                (run_id,),
+            ).fetchone()[0]
+            == 0
+        )

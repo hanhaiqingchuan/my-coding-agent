@@ -285,6 +285,41 @@ class ContextBuilder:
             for index, group in selected
             if index not in mandatory_indexes and group.kind != "user"
         )
+        if not candidates:
+            # Every visible group is mandatory, so this view is already the minimal legal
+            # one and no compaction request could shrink it. Spec 7.4 item 10 treats 60%
+            # as a soft target: staying above it is normal, and only an estimate above the
+            # available input budget is an overflow.
+            if estimated <= available:
+                return ReadyContext(
+                    view=view,
+                    estimated_tokens=estimated,
+                    available_tokens=available,
+                    trigger_tokens=trigger_tokens,
+                    target_tokens=target_tokens,
+                    mandatory_tokens=mandatory_tokens,
+                    mandatory_user_tokens=mandatory_user_tokens,
+                    pruned_bytes=pruned_bytes,
+                    compaction_above_target=True,
+                )
+            return ContextOverflow(
+                required_tokens=estimated,
+                available_tokens=available,
+                mandatory_tokens=mandatory_tokens,
+                mandatory_user_tokens=mandatory_user_tokens,
+                trigger_tokens=trigger_tokens,
+                target_tokens=target_tokens,
+                diagnostic=MappingProxyType(
+                    {
+                        "reason": "minimal_view_exceeds_available_input",
+                        "context_window": request.context_window,
+                        "max_output_tokens": request.max_output_tokens,
+                        "safety_margin_tokens": request.safety_margin_tokens,
+                        "recent_user_turns": request.recent_user_turns,
+                        "rolling_summary_tokens": max(0, estimated - mandatory_tokens),
+                    }
+                ),
+            )
         source_message_seqs = tuple(
             seq for candidate in candidates for seq in candidate.source_message_seqs
         )
