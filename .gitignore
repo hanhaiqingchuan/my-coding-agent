@@ -1,6 +1,7 @@
 # Local design/runtime artifacts belong to the private outer workspace.
 /.superpowers/
 /.worktrees/
+tmp/
 
 # Secrets and local configuration.
 .env
@@ -21,6 +22,9 @@ __pycache__/
 .coverage
 coverage.xml
 htmlcov/
+/build/
+/dist/
+*.egg-info/
 
 # Application state and logs.
 *.db
@@ -28,8 +32,10 @@ htmlcov/
 *.sqlite
 *.sqlite3
 /logs/
+*.log
 
 # Frontend.
+node_modules/
 /web/node_modules/
 /web/dist/
 /web/.vite/

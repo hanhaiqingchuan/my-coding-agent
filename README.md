@@ -94,7 +94,7 @@ uv run --python 3.12 coding-agent serve \
 | `--data-dir PATH` | SQLite 与运行数据目录；默认启动目录下的 `.coding-agent/` |
 | `--port PORT` | 覆盖 `server.port` |
 | `--open` | 启动后打开浏览器 |
-| `--yes` | 受信任模式，跳过所有审批（见 §7） |
+| `--yes` | 受信任模式，跳过所有审批（见 §8） |
 
 开发模式使用两个终端，Vite 代理 `/api` 与 WebSocket：
 
