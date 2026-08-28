@@ -256,12 +256,11 @@ test("gives every terminal run state its own pill treatment", () => {
     const selector = `.run-state-${state}`;
     const declarations = declarationsFor(selector);
     expect(declarations, selector).not.toBeNull();
-    // Without both of these the pill falls back to the shared neutral fill.
-    expect(Object.keys(declarations ?? {}), selector).toEqual(
-      expect.arrayContaining(["color", "background"]),
-    );
+    // Without its own fill the pill is the shared neutral one.
+    expect(Object.keys(declarations ?? {}), selector).toContain("background");
+    // `.run-details-list dd` outranks these single-class rules for `color`, so the
+    // fill and the border are what separate the states on screen.
     return JSON.stringify([
-      declarations?.color,
       declarations?.background,
       declarations?.["border-color"],
       declarations?.["border-style"],

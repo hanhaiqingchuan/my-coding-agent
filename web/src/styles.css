@@ -1031,9 +1031,10 @@ p.run-details-scope {
   background: var(--success-bg);
 }
 /* Spec 13.3 needs 已停止 told apart from an unrecoverable failure, and a user
-   cancellation apart from a restart interruption. Hue carries the difference and a
-   border style repeats it, so the three survive greyscale too. All three pairs are
-   the palette pairs already checked for AA: 9.2:1, 10.4:1 and 9.4:1. */
+   cancellation apart from a restart interruption. `.run-details-list dd` owns the
+   pill text colour, so the fill and the border style carry the difference and it
+   survives greyscale; the panel text keeps 13.9:1 or better on each fill. The
+   per-state colour mirrors the matching tool-card state for when it applies. */
 .run-state-stopped {
   border-color: var(--refusal-border);
   color: var(--refusal-fg);
