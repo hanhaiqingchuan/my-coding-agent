@@ -438,6 +438,8 @@ def test_compaction_plan_uses_complete_replaceable_groups() -> None:
     )
     assert [message.role for message in old_tool_candidate.messages] == ["assistant", "tool"]
     assert [message.seq for message in old_tool_candidate.read_only_user_context] == [1]
+    assert old_tool_candidate.source_event_ids == ("message-2", "message-3")
+    assert result.plan.source_event_ids == ("message-2", "message-3")
     assert result.plan.required_reduction_tokens > 0
 
 

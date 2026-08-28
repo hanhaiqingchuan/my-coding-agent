@@ -74,6 +74,7 @@ class CompactionCandidate:
     messages: tuple[Message, ...]
     read_only_user_context: tuple[Message, ...]
     source_message_seqs: tuple[int, ...]
+    source_event_ids: tuple[str, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -81,6 +82,7 @@ class CompactionPlan:
     candidates: tuple[CompactionCandidate, ...]
     previous_snapshot: ContextSnapshot | None
     source_message_seqs: tuple[int, ...]
+    source_event_ids: tuple[str, ...]
     current_estimate_tokens: int
     target_tokens: int
     required_reduction_tokens: int
@@ -284,6 +286,9 @@ class ContextBuilder:
         source_message_seqs = tuple(
             seq for candidate in candidates for seq in candidate.source_message_seqs
         )
+        source_event_ids = tuple(
+            event_id for candidate in candidates for event_id in candidate.source_event_ids
+        )
         compaction_input_budget = max(
             0,
             request.context_window
@@ -295,6 +300,7 @@ class ContextBuilder:
             candidates=candidates,
             previous_snapshot=snapshot,
             source_message_seqs=source_message_seqs,
+            source_event_ids=source_event_ids,
             current_estimate_tokens=estimated,
             target_tokens=target_tokens,
             required_reduction_tokens=max(0, estimated - target_tokens),
@@ -540,6 +546,7 @@ def _candidate(group: _CanonicalGroup) -> CompactionCandidate:
         messages=group.messages,
         read_only_user_context=group.read_only_user_context,
         source_message_seqs=tuple(message.seq for message in group.messages),
+        source_event_ids=tuple(message.id for message in group.messages),
     )
 
 

@@ -11,6 +11,7 @@ from coding_agent.context.builder import (
     ContextView,
     ReadyContext,
 )
+from coding_agent.context.compactor import CompactionResult, Compactor, CompressionError
 from coding_agent.context.estimator import ESTIMATOR_ID, estimate_input_tokens
 
 __all__ = [
@@ -18,6 +19,9 @@ __all__ = [
     "CompactionCandidate",
     "CompactionPlan",
     "CompactionRequired",
+    "CompactionResult",
+    "Compactor",
+    "CompressionError",
     "ContextBuildResult",
     "ContextBuilder",
     "ContextOverflow",

@@ -116,6 +116,8 @@ CREATE TABLE IF NOT EXISTS client_commands (
 CREATE INDEX IF NOT EXISTS runs_by_session ON runs(session_id, started_at);
 CREATE INDEX IF NOT EXISTS messages_by_session ON messages(session_id, seq);
 CREATE INDEX IF NOT EXISTS tools_by_message ON tool_executions(assistant_message_id, call_order);
+CREATE UNIQUE INDEX IF NOT EXISTS context_snapshot_current_by_session
+    ON context_snapshots(session_id);
 
 PRAGMA user_version = 1;
 COMMIT;

@@ -285,6 +285,30 @@ class ContextSnapshot:
     covered_through_message_seq: int
     summary: str
     created_at: datetime
+    version: int = 1
+    source_event_ids: tuple[str, ...] = ()
+    model: str = ""
+    estimator_id: str = ""
+    token_estimate: int = 0
+    compaction_above_target: bool = False
+
+    def __post_init__(self) -> None:
+        if not self.session_id:
+            raise ValueError("context snapshot session id must not be empty")
+        if self.covered_through_message_seq < 0:
+            raise ValueError("covered message sequence must not be negative")
+        if self.version < 1:
+            raise ValueError("context snapshot version must be positive")
+        source_event_ids = tuple(self.source_event_ids)
+        if any(not event_id for event_id in source_event_ids):
+            raise ValueError("context snapshot source event ids must not be empty")
+        if len(source_event_ids) != len(set(source_event_ids)):
+            raise ValueError("context snapshot source event ids must be unique")
+        if self.token_estimate < 0:
+            raise ValueError("context snapshot token estimate must not be negative")
+        if not isinstance(self.compaction_above_target, bool):
+            raise ValueError("compaction_above_target must be a boolean")
+        object.__setattr__(self, "source_event_ids", source_event_ids)
 
 
 @dataclass(frozen=True, slots=True)

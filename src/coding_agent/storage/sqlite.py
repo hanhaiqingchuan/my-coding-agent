@@ -19,6 +19,7 @@ from coding_agent.core.models import (
     ApprovalRecord,
     ApprovalStatus,
     AssistantTurn,
+    ContextSnapshot,
     DurableEvent,
     EffectStartResult,
     ErrorKind,
@@ -195,6 +196,61 @@ class SQLiteStore:
                 (session_id, MessageStatus.COMMITTED.value),
             ).fetchall()
         return [_message_from_row(row) for row in rows]
+
+    def load_context_snapshot(self, session_id: str) -> ContextSnapshot | None:
+        with self.connection() as connection:
+            self._require_session(connection, session_id)
+            row = connection.execute(
+                "SELECT * FROM context_snapshots WHERE session_id = ?",
+                (session_id,),
+            ).fetchone()
+        return _context_snapshot_from_row(row) if row is not None else None
+
+    def replace_context_snapshot(self, snapshot: ContextSnapshot) -> None:
+        with self._transaction() as connection:
+            self._require_session(connection, snapshot.session_id)
+            current = connection.execute(
+                "SELECT model_config_json FROM context_snapshots WHERE session_id = ?",
+                (snapshot.session_id,),
+            ).fetchone()
+            expected_version = 1
+            if current is not None:
+                metadata = json.loads(current["model_config_json"])
+                expected_version = int(metadata.get("version", 0)) + 1
+            if snapshot.version != expected_version:
+                raise StoreError(
+                    "SNAPSHOT_VERSION_CONFLICT",
+                    f"context snapshot version must be {expected_version}",
+                )
+
+            connection.execute(
+                "DELETE FROM context_snapshots WHERE session_id = ?",
+                (snapshot.session_id,),
+            )
+            metadata = {
+                "version": snapshot.version,
+                "source_event_ids": snapshot.source_event_ids,
+                "model": snapshot.model,
+                "estimator_id": snapshot.estimator_id,
+                "compaction_above_target": snapshot.compaction_above_target,
+            }
+            connection.execute(
+                """
+                INSERT INTO context_snapshots(
+                    id, session_id, covered_through_message_seq, summary,
+                    model_config_json, token_estimate, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    str(uuid4()),
+                    snapshot.session_id,
+                    snapshot.covered_through_message_seq,
+                    snapshot.summary,
+                    _json(metadata),
+                    snapshot.token_estimate,
+                    snapshot.created_at.isoformat(),
+                ),
+            )
 
     def load_snapshot(self, session_id: str) -> SessionSnapshot:
         with self.connection() as connection:
@@ -1305,6 +1361,22 @@ def _message_from_row(row: sqlite3.Row) -> Message:
         parts=_parts_from_json(row["parts_json"]),
         status=MessageStatus(row["status"]),
         tool_call_id=row["tool_call_id"],
+    )
+
+
+def _context_snapshot_from_row(row: sqlite3.Row) -> ContextSnapshot:
+    metadata = json.loads(row["model_config_json"])
+    return ContextSnapshot(
+        session_id=row["session_id"],
+        covered_through_message_seq=row["covered_through_message_seq"],
+        summary=row["summary"],
+        created_at=datetime.fromisoformat(row["created_at"]),
+        version=metadata["version"],
+        source_event_ids=tuple(metadata["source_event_ids"]),
+        model=metadata["model"],
+        estimator_id=metadata["estimator_id"],
+        token_estimate=row["token_estimate"] or 0,
+        compaction_above_target=metadata["compaction_above_target"],
     )
 
 
