@@ -235,6 +235,8 @@ class SQLiteStore:
             raise StoreError("TOOL_GROUP_EMPTY", "a tool group requires at least one call")
         with self._transaction() as connection:
             run = self._get_run_from(connection, run_id)
+            self._require_active_run(run)
+            self._require_no_pending_group(connection, run.id)
             message_id = turn.id
             connection.execute(
                 """
@@ -362,6 +364,28 @@ class SQLiteStore:
                 (group_id,),
             ).fetchall()
             if any(execution["result_json"] is None for execution in executions):
+                next_execution = next(
+                    execution for execution in executions if execution["result_json"] is None
+                )
+                if (
+                    next_execution["execution_state"] == ToolExecutionState.QUEUED.value
+                    and next_execution["approval_status"] == ApprovalStatus.PENDING.value
+                ):
+                    connection.execute(
+                        """
+                        UPDATE tool_executions SET execution_state = ?
+                        WHERE tool_call_id = ? AND execution_state = ?
+                        """,
+                        (
+                            ToolExecutionState.AWAITING_APPROVAL.value,
+                            next_execution["tool_call_id"],
+                            ToolExecutionState.QUEUED.value,
+                        ),
+                    )
+                    connection.execute(
+                        "UPDATE runs SET state = ? WHERE id = ?",
+                        (RunState.AWAITING_APPROVAL.value, message["run_id"]),
+                    )
                 self._append_event(
                     connection,
                     message["session_id"],
@@ -407,6 +431,8 @@ class SQLiteStore:
             raise StoreError("FINAL_TURN_HAS_TOOLS", "a final turn cannot contain tool calls")
         with self._transaction() as connection:
             run = self._get_run_from(connection, run_id)
+            self._require_active_run(run)
+            self._require_no_pending_group(connection, run.id)
             connection.execute(
                 """
                 INSERT INTO messages(
@@ -553,6 +579,19 @@ class SQLiteStore:
                 raise StoreError("RUN_CANCELLING", "approval cannot be changed during cancellation")
             if row["approval_status"] != ApprovalStatus.PENDING.value:
                 raise StoreError("APPROVAL_ALREADY_RESOLVED", "approval was already resolved")
+            current = connection.execute(
+                """
+                SELECT tool_call_id FROM tool_executions
+                WHERE assistant_message_id = ? AND execution_state = ?
+                ORDER BY call_order LIMIT 1
+                """,
+                (row["assistant_message_id"], ToolExecutionState.AWAITING_APPROVAL.value),
+            ).fetchone()
+            if current is None or current["tool_call_id"] != tool_call_id:
+                raise StoreError(
+                    "TOOL_CALL_NOT_CURRENT",
+                    "only the current awaiting tool call can resolve approval",
+                )
 
             now = _now()
             self._claim_command(
@@ -737,6 +776,8 @@ class SQLiteStore:
             if run.state not in expected:
                 raise InvalidStateTransition(run.state, target)
             validate_transition(run.state, target)
+            if target in _TERMINAL_STATES:
+                self._require_no_pending_group(connection, run.id)
             finished_at = _now() if target in _TERMINAL_STATES else None
             connection.execute(
                 """
@@ -888,6 +929,26 @@ class SQLiteStore:
         if row is None:
             raise StoreError("RUN_NOT_FOUND", f"run not found: {run_id}")
         return _run_from_row(row)
+
+    @staticmethod
+    def _require_active_run(run: Run) -> None:
+        if run.state in _TERMINAL_STATES:
+            raise StoreError("RUN_NOT_ACTIVE", "cannot append messages to a terminal run")
+
+    @staticmethod
+    def _require_no_pending_group(connection: sqlite3.Connection, run_id: str) -> None:
+        pending = connection.execute(
+            """
+            SELECT 1 FROM messages
+            WHERE run_id = ? AND status = ? LIMIT 1
+            """,
+            (run_id, MessageStatus.PENDING_TOOLS.value),
+        ).fetchone()
+        if pending is not None:
+            raise StoreError(
+                "PENDING_TOOL_GROUP_EXISTS",
+                "the run has an unsettled tool group",
+            )
 
     @staticmethod
     def _get_approval(

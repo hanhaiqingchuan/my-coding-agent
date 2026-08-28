@@ -133,6 +133,41 @@ def test_approval_receipt_and_begin_effect_require_current_valid_approval(
         assert row[1] == ToolExecutionState.RUNNING.value
 
 
+@pytest.mark.parametrize("decision", [ApprovalDecision.APPROVE, ApprovalDecision.REJECT])
+def test_resolve_approval_rejects_a_later_queued_call(
+    store: SQLiteStore, session, decision: ApprovalDecision
+) -> None:
+    run, _ = start_pending_group(store, session)
+
+    with pytest.raises(StoreError) as raised:
+        store.resolve_approval(
+            run.id,
+            "call-later",
+            decision,
+            "later-approval",
+            f"later-{decision.value}",
+        )
+
+    assert raised.value.code == "TOOL_CALL_NOT_CURRENT"
+    with store.connection() as connection:
+        statuses = connection.execute(
+            """
+            SELECT tool_call_id, approval_status, execution_state
+            FROM tool_executions ORDER BY call_order
+            """
+        ).fetchall()
+        assert [tuple(row) for row in statuses] == [
+            ("call-current", "pending", "awaiting_approval"),
+            ("call-later", "pending", "queued"),
+        ]
+        assert (
+            connection.execute(
+                "SELECT count(*) FROM client_commands WHERE client_command_id = 'later-approval'"
+            ).fetchone()[0]
+            == 0
+        )
+
+
 def test_approval_and_effect_each_roll_back_when_their_event_fails(
     store: SQLiteStore, session
 ) -> None:

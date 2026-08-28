@@ -4,7 +4,7 @@ import sqlite3
 
 import pytest
 
-from coding_agent.core.errors import CommandIdConflict
+from coding_agent.core.errors import CommandIdConflict, StoreError
 from coding_agent.core.models import (
     ApprovalDecision,
     AssistantTurn,
@@ -12,6 +12,7 @@ from coding_agent.core.models import (
     MessageStatus,
     ModelStopReason,
     RunState,
+    StopReason,
     TextPart,
     ToolCall,
     ToolError,
@@ -45,6 +46,15 @@ def assistant_turn_with_two_calls() -> AssistantTurn:
         ),
         stop_reason=ModelStopReason.TOOL_USE,
         usage=Usage(input_tokens=2, output_tokens=3),
+    )
+
+
+def another_tool_turn() -> AssistantTurn:
+    return AssistantTurn(
+        id="turn-2",
+        parts=(ToolUsePart(ToolCall("call-3", "read_file", {"path": "b.txt"})),),
+        stop_reason=ModelStopReason.TOOL_USE,
+        usage=Usage(),
     )
 
 
@@ -180,6 +190,96 @@ def test_pending_tool_group_is_excluded_until_results_commit_atomically(
     assert [message.tool_call_id for message in history[2:]] == ["call-1", "call-2"]
 
 
+def test_run_rejects_a_second_pending_tool_group(store: SQLiteStore, session) -> None:
+    run = store.begin_run(session.id, "change it", {}, "cmd-start", "hash-start")
+    store.stage_tool_group(run.id, assistant_turn_with_two_calls())
+
+    with pytest.raises(StoreError) as raised:
+        store.stage_tool_group(run.id, another_tool_turn())
+
+    assert raised.value.code == "PENDING_TOOL_GROUP_EXISTS"
+    with store.connection() as connection:
+        assert (
+            connection.execute(
+                "SELECT count(*) FROM messages WHERE run_id = ? AND status = 'pending_tools'",
+                (run.id,),
+            ).fetchone()[0]
+            == 1
+        )
+
+
+def test_final_turn_is_rejected_until_pending_tool_group_is_settled(
+    store: SQLiteStore, session
+) -> None:
+    run = store.begin_run(session.id, "change it", {}, "cmd-start", "hash-start")
+    pending = store.stage_tool_group(run.id, assistant_turn_with_two_calls())
+    final = AssistantTurn(
+        id="final-turn",
+        parts=(TextPart("finished"),),
+        stop_reason=ModelStopReason.END_TURN,
+        usage=Usage(),
+    )
+
+    with pytest.raises(StoreError) as raised:
+        store.commit_final_turn(run.id, final)
+
+    assert raised.value.code == "PENDING_TOOL_GROUP_EXISTS"
+    store.settle_tool_group(
+        pending.id,
+        (ToolResult("call-1", "one", True), ToolResult("call-2", "two", True)),
+    )
+    store.commit_final_turn(run.id, final)
+    assert [message.role for message in store.load_committed_transcript(session.id)] == [
+        "user",
+        "assistant",
+        "tool",
+        "tool",
+        "assistant",
+    ]
+
+
+def test_run_cannot_become_terminal_with_a_pending_tool_group(store: SQLiteStore, session) -> None:
+    run = store.begin_run(session.id, "change it", {}, "cmd-start", "hash-start")
+    store.stage_tool_group(run.id, assistant_turn_with_two_calls())
+
+    with pytest.raises(StoreError) as raised:
+        store.transition_run(
+            run.id,
+            {RunState.AWAITING_APPROVAL},
+            RunState.STOPPED,
+            StopReason.MAX_ROUNDS,
+            None,
+        )
+
+    assert raised.value.code == "PENDING_TOOL_GROUP_EXISTS"
+    assert store.load_snapshot(session.id).active_run.state is RunState.AWAITING_APPROVAL
+
+
+def test_terminal_run_rejects_new_assistant_turns(store: SQLiteStore, session) -> None:
+    run = store.begin_run(session.id, "task", {}, "cmd-start", "hash-start")
+    store.transition_run(
+        run.id,
+        {RunState.STARTING},
+        RunState.STOPPED,
+        StopReason.MAX_ROUNDS,
+        None,
+    )
+    final = AssistantTurn(
+        id="final-turn",
+        parts=(TextPart("too late"),),
+        stop_reason=ModelStopReason.END_TURN,
+        usage=Usage(),
+    )
+
+    with pytest.raises(StoreError) as stage_error:
+        store.stage_tool_group(run.id, assistant_turn_with_two_calls())
+    with pytest.raises(StoreError) as final_error:
+        store.commit_final_turn(run.id, final)
+
+    assert stage_error.value.code == "RUN_NOT_ACTIVE"
+    assert final_error.value.code == "RUN_NOT_ACTIVE"
+
+
 def test_partial_results_enable_next_call_without_exposing_an_unpaired_group(
     store: SQLiteStore, session
 ) -> None:
@@ -193,6 +293,11 @@ def test_partial_results_enable_next_call_without_exposing_an_unpaired_group(
     store.settle_tool_group(pending.id, (ToolResult("call-1", "wrote a.txt", True),))
 
     assert [message.role for message in store.load_committed_transcript(session.id)] == ["user"]
+    with store.connection() as connection:
+        next_state = connection.execute(
+            "SELECT execution_state FROM tool_executions WHERE tool_call_id = 'call-2'"
+        ).fetchone()[0]
+    assert next_state == "awaiting_approval"
     store.resolve_approval(
         run.id, "call-2", ApprovalDecision.APPROVE, "approve-2", "approve-hash-2"
     )
