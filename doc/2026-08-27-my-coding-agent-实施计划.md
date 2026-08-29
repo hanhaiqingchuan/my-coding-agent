@@ -1349,6 +1349,70 @@ Expected: 所有检查通过；`doc/` 仅跟踪两份已审计的公开设计文
 
 ---
 
+### Task 19: GitHub Actions CI（离线门禁）
+
+> 本任务由 `doc/CI-接入计划.md` 合并而来；该计划文档并入后删除，以本节为唯一权威。Task 19 属于 P0 交付后的工程加固，不阻塞任何 P0 里程碑。
+
+**Files:**
+
+- Create: `.github/workflows/ci.yml`
+- Modify: `README.md`（§10 增加 CI 状态徽章一行）
+- Delete: `doc/CI-接入计划.md`（内容已并入本任务）
+
+**Interfaces:**
+
+```yaml
+# 触发：push 到 main + 全部 pull_request；单 job `check`，runs-on ubuntu-latest，timeout-minutes 20
+# 步骤顺序（失败即短路，镜像本地 make check 但拆到步骤级便于定位）：
+#   actions/checkout@v5
+#   astral-sh/setup-uv@v9      (enable-cache: true, python-version: "3.12")
+#   actions/setup-node@v4      (node-version: 20, cache: npm, cache-dependency-path: web/package-lock.json)
+#   uv sync --frozen --python 3.12 --all-groups
+#   npm --prefix web ci
+#   npm --prefix web exec -- playwright install chromium --with-deps
+#   ruff check src tests scripts && npm --prefix web run lint
+#   uv run --python 3.12 pytest --ignore=tests/live
+#   npm --prefix web run test
+#   npm --prefix web run build
+#   npm --prefix web run test:e2e
+#   scripts/audit_public.py --repo .（不带 --history） && scripts/check_readme_txt.py README.txt
+#   coding-agent-eval validate --manifest evaluation/tasks/public/manifest.toml
+```
+
+- [ ] **Step 1: 写 CI 脚本**
+
+按上述接口创建 `.github/workflows/ci.yml`。硬约束：**CI 不进行任何需要 API key 的测试**——`tests/live/` 由 `--ignore` 显式排除（`tests/conftest.py` 的 `RUN_LIVE_TESTS` gate 是第二道防线，且 CI 环境本无任何 secret）；评测只跑 `validate`（manifest 三态校验），不跑真实模型；E2E 使用 ScriptedModel 驱动本地 scripted_server，无网络。不需要操作者提供任何资源：无 secret、无部署、默认 `GITHUB_TOKEN` 即可。
+
+- [ ] **Step 2: 本地静态校验**
+
+```bash
+.venv/bin/python -c "import yaml; yaml.safe_load(open('.github/workflows/ci.yml'))"
+.venv/bin/python scripts/audit_public.py --repo .
+```
+
+Expected: YAML 可解析；工作树审计 0 findings（`.github/` 属正常工程目录，不在禁止路径清单内）。
+
+- [ ] **Step 3: 首跑观察与迭代**
+
+提交并 push 后在 GitHub 仓库 Actions 页签观察首跑。已知首跑风险与对策：E2E `webServer` 的 30 秒启动超时在 CI 冷启动环境可能偏紧（必要时单独调 `web/playwright.config.ts` 的 `timeout`，调整需先过本地 E2E 回归）；uv 缓存以 `uv.lock` 为键，仓库已提交锁文件，命中率高；私有仓库免费额度 2000 分钟/月，单次约 8–12 分钟，远低于额度（转 Public 后无限）。首跑失败的环境差异修复属于正常迭代，预计 1–2 轮。
+
+- [ ] **Step 4: 徽章与验证收口**
+
+```bash
+make check
+uv run --python 3.12 scripts/audit_public.py --repo .
+```
+
+Expected: 本地全绿；README §10 出现指向 `hanhaiqingchuan/my-coding-agent` 的 CI 状态徽章且 URL 从未登录环境可访问（转 Public 前徽章对匿名访问不可见，属预期，转 Public 后自动生效）。
+
+- [ ] **Step 5: 提交检查点（本地 commit 已预授权，push 需当次确认）**
+
+建议提交信息：`ci: add github actions workflow`。
+
+**明确不做（本任务范围外）**：矩阵测试（P0 只支持 Python 3.12，矩阵无意义）；发布/部署步骤；覆盖率上报（Codecov 等第三方服务超出题目需要）；live 测试的任何 CI 触发（需要真实 key 且产生费用，永远不做）。
+
+---
+
 ## Execution Order and Checkpoints
 
 P0 关键路径按 Task 1 → 12 顺序执行；Task 7 先冻结 `ModelRequest/ModelMessage/AssistantTurn/Usage/typed exceptions`，Task 9 才消费这些契约，不并行猜测接口。Task 12 的正式 headless 纵向链路通过后，立即并行起草 Task 18 的 README.txt、demo workspace、视频脚本和发布 checklist，再继续 Task 13–15 与 Task 16 的主链/Stop E2E。随后完成 Task 17 的 4 个公开任务各 1 次 smoke 和 Task 18 发布 gate。P0 可提交后才进入 P1。
