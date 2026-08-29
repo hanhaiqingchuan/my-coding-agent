@@ -36,7 +36,10 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # jsdom 30 -> undici 8.10 needs webidl.util.markAsUncloneable,
+          # which only exists from node 22.14: node 20 cannot boot the jsdom
+          # test environment at all. 22 is the LTS line the suite targets.
+          node-version: 22
           cache: npm
           cache-dependency-path: web/package-lock.json
 
