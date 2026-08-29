@@ -1,0 +1,75 @@
+# Offline CI gate for my-coding-agent.
+#
+# Mirrors `make check` plus the two release gates, split into step-level jobs so a failure points
+# at one command. The pipeline is fully offline: no secret is declared and none is needed --
+#   * `tests/live` is excluded by `--ignore`; the RUN_LIVE_TESTS gate in tests/conftest.py is a
+#     second line of defense that skips live tests even if they were collected.
+#   * E2E drives the ScriptedModel against a local scripted_server, with no network access.
+#   * The evaluation step only validates the manifest; it never runs a real campaign.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    # Least privilege: this pipeline never uses GITHUB_TOKEN; contents: read
+    # guards against repo-default write grants.
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v9
+        with:
+          enable-cache: true
+          python-version: "3.12"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install backend dependencies
+        run: uv sync --frozen --python 3.12 --all-groups
+
+      - name: Install frontend dependencies
+        run: npm --prefix web ci
+
+      - name: Install Playwright Chromium
+        run: npm --prefix web exec -- playwright install chromium --with-deps
+
+      - name: Lint
+        run: |
+          uv run --python 3.12 ruff check src tests scripts
+          npm --prefix web run lint
+
+      - name: Backend tests
+        run: uv run --python 3.12 pytest --ignore=tests/live
+
+      - name: Frontend component tests
+        run: npm --prefix web run test
+
+      - name: Production build
+        run: npm --prefix web run build
+
+      - name: E2E tests
+        run: npm --prefix web run test:e2e
+
+      - name: Release gates
+        run: |
+          uv run --python 3.12 scripts/audit_public.py --repo .
+          uv run --python 3.12 scripts/check_readme_txt.py README.txt
+
+      - name: Evaluation manifest validation
+        run: >
+          uv run --python 3.12 coding-agent-eval validate
+          --manifest evaluation/tasks/public/manifest.toml

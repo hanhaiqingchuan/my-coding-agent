@@ -209,6 +209,8 @@ Agent Loop
 
 ## 10. 测试
 
+[![CI](https://github.com/hanhaiqingchuan/my-coding-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/hanhaiqingchuan/my-coding-agent/actions/workflows/ci.yml)
+
 默认测试全部离线、确定性，不访问真实模型：
 
 ```bash
