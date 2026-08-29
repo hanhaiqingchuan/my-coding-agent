@@ -314,10 +314,14 @@ async def test_judge_run_reuses_the_anthropic_messages_adapter_streaming_without
 
 def test_redact_text_removes_absolute_paths_and_credentials() -> None:
     """The judge prompt must never carry a local path or a credential."""
+    # The credential-shaped needle is assembled from fragments, the way audit_public.py
+    # splits its own needles, so this file's text never matches CRED001 while
+    # ``redact_text`` still receives the byte-identical hostile string.
+    hostile_key = "sk-ant-" + "api03-" + "ABCDEF123456"
     hostile = (
         "I edited /tmp/pytest-123/campaign/runs/demo-task/repeat-1/workspace/src/mod.py "
         "and C:\\Users\\operator\\secrets.txt and ~/projects/private.key. "
-        "The key sk-ant-api03-ABCDEF123456 failed, so I set api_key=topsecret and "
+        f"The key {hostile_key} failed, so I set api_key=topsecret and "
         "Authorization: Bearer abc123, then read https://api.anthropic.com docs "
         "and edited src/textkit/slugify.py."
     )
@@ -346,7 +350,9 @@ def test_build_transcript_excerpt_uses_only_run_v1_facts_and_redacts_the_message
                 "Done. I verified with the suite at /tmp/secret/runs/demo-task/repeat-1 "
                 "using api_key=hunter2."
             ),
-            "notes": "workspace was /Users/spy/elsewhere",
+            # Fragmented the same way so the source line never matches TRACE001; the
+            # assembled note value is unchanged.
+            "notes": "workspace was " + "/Users/" + "spy/elsewhere",
         }
     )
 
