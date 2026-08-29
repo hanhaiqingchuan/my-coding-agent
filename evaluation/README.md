@@ -135,12 +135,15 @@ The judge must answer one fixed JSON object with three 1–5 scores and a ration
 | `process_quality` | were the tool choices and their order sensible — read before write, recovery after failures, no redundant calls |
 | `communication` | does the final assistant message report the work honestly and briefly, and state how it was verified |
 
-One malformed answer is retried once. A second malformed answer — or a failing model
-request — becomes a recorded `judge_error` with an `error_detail`; a judge error never
-aborts the campaign. Each record is a versioned `judgement-v1` document written to
-`runs/<task-id>/repeat-<n>/judgement.json`, never overwriting an existing record, and
-carries the judge model identity and the judge prompt version so scores from different
-prompt versions are not silently compared.
+One malformed answer is retried once. The judge's one model request retries through
+the same `RetryingInvoker` policy the agent uses (`[retry]` in the campaign config), so
+a transient transport failure or rate limit backs off instead of failing. A second
+malformed answer — or a model request that still fails after that retry budget —
+becomes a recorded `judge_error` with an `error_detail` that states the attempt count;
+a judge error never aborts the campaign. Each record is a versioned `judgement-v1`
+document written to `runs/<task-id>/repeat-<n>/judgement.json`, never overwriting an
+existing record, and carries the judge model identity and the judge prompt version so
+scores from different prompt versions are not silently compared.
 
 Fuzzy scores never enter `strict_success`: the capability denominator stays exactly
 the five deterministic conditions of section 18.5. The summary reports them beside the

@@ -12,8 +12,9 @@ before it enters the prompt. Fuzzy scores are reported next to the deterministic
 metrics; they never enter ``strict_success`` (spec section 18.5).
 
 A judge that answers outside the fixed JSON contract gets exactly one retry; a second
-malformed answer — or a failing model call — becomes a recorded ``judge_error``
-judgement that never aborts the campaign.
+malformed answer — or a model request that still fails after the shared retry owner
+(``RetryingInvoker``, configured from the campaign's own retry settings) has backed off
+— becomes a recorded ``judge_error`` judgement that never aborts the campaign.
 """
 
 from __future__ import annotations
@@ -24,11 +25,12 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
-from coding_agent.config import ModelSettings
+from coding_agent.config import ModelSettings, RetrySettings
 from coding_agent.core.cancellation import CancellationToken
 from coding_agent.core.models import AssistantTurn, TextPart
 from coding_agent.model.anthropic_messages import AnthropicMessagesModel
 from coding_agent.model.protocol import ModelGateway, ModelMessage, ModelRequest
+from coding_agent.model.retry import RetryingInvoker, RetryNotice
 
 JUDGEMENT_SCHEMA_VERSION = "judgement-v1"
 PROMPT_VERSION = "judge-v1"
@@ -267,26 +269,45 @@ async def judge_run(
     *,
     gateway: ModelGateway | None = None,
     api_key: str = "",
+    retry: RetrySettings | None = None,
+    invoker: RetryingInvoker | None = None,
 ) -> Judgement:
     """Judge one run with a single-model conversation, never raising.
 
     The gateway defaults to the shipped Anthropic Messages adapter built from
-    ``settings``. One malformed answer is retried once; a second malformed answer or a
-    failing model call becomes a ``judge_error`` Judgement, because a fuzzy score must
-    never abort a deterministic campaign.
+    ``settings``. The one model request runs through the shared ``RetryingInvoker``
+    — built from ``retry`` (the campaign's own retry settings) unless an ``invoker``
+    is injected — so a transient transport failure or a retryable API error backs off
+    and retries exactly like an agent model call; only when the retry owner gives up
+    does the failure become a ``judge_error`` whose ``error_detail`` records the
+    attempt count (judges run unattended, so retry notices sink there). One malformed
+    answer is still retried once; a second malformed answer also becomes a
+    ``judge_error``, because a fuzzy score must never abort a deterministic campaign.
     """
     mismatch = _identity_mismatch(run_document, transcript_excerpt)
     if mismatch is not None:
         return _error_judgement(settings.model, mismatch)
     model = gateway if gateway is not None else AnthropicMessagesModel(settings, api_key)
     prompt = judge_prompt(transcript_excerpt)
+    retry_owner = invoker if invoker is not None else _build_invoker(retry)
+    request_attempts = 1
+
+    async def record_attempts(notice: RetryNotice) -> None:
+        nonlocal request_attempts
+        request_attempts = notice.attempt
+
     detail = "the judge produced no answer"
     for _attempt in (1, 2):
+        request_attempts = 1
         try:
-            text = await _request_judgement(model, prompt, settings)
+            text = await retry_owner.invoke(
+                lambda: _request_judgement(model, prompt, settings),
+                CancellationToken(),
+                record_attempts,
+            )
         except Exception as error:  # noqa: BLE001 - the judge never aborts the campaign
             return _error_judgement(
-                settings.model, f"the judge request failed: {type(error).__name__}"
+                settings.model, _request_failure_detail(request_attempts, error)
             )
         try:
             return parse_judgement(text, judge_model=settings.model)
@@ -329,6 +350,22 @@ async def _request_judgement(model: ModelGateway, prompt: str, settings: ModelSe
     if chunks:
         return "".join(chunks)
     return _turn_text(turn)
+
+
+def _build_invoker(retry: RetrySettings | None) -> RetryingInvoker:
+    """Build the retry owner from the campaign's retry settings (defaults when absent)."""
+    policy = retry if retry is not None else RetrySettings()
+    return RetryingInvoker(
+        max_attempts=policy.max_attempts,
+        initial_delay_seconds=policy.initial_delay_seconds,
+        max_delay_seconds=policy.max_delay_seconds,
+        jitter_ratio=policy.jitter_ratio,
+    )
+
+
+def _request_failure_detail(attempts: int, error: Exception) -> str:
+    noun = "attempt" if attempts == 1 else "attempts"
+    return f"the judge request failed after {attempts} {noun}: {type(error).__name__}"
 
 
 def _turn_text(turn: AssistantTurn) -> str:

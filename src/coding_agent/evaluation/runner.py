@@ -323,8 +323,11 @@ def build_judge_hook(
     """Build the campaign's judge hook from the same configuration the agent uses.
 
     The judge reuses the shipped Anthropic Messages adapter with the campaign's own
-    ``ModelSettings``, so a judged campaign needs no second model configuration. The
-    returned hook never raises: a judge that cannot answer records a ``judge_error``
+    ``ModelSettings``, so a judged campaign needs no second model configuration; its
+    one model request retries through the same ``RetryingInvoker`` policy the agent
+    uses (``settings.retry``), so a transient transport failure or rate limit backs
+    off instead of recording a ``judge_error``. The returned hook never raises: a
+    judge that still cannot answer after its retry budget records a ``judge_error``
     instead of aborting the campaign.
     """
     try:
@@ -337,7 +340,9 @@ def build_judge_hook(
     def hook(result: RunResult, run_dir: Path, campaign_id: str) -> Mapping[str, object] | None:
         document = run_document(result, campaign_id=campaign_id)
         excerpt = build_transcript_excerpt(document)
-        judgement = asyncio.run(judge_run(document, excerpt, settings.model, gateway=model))
+        judgement = asyncio.run(
+            judge_run(document, excerpt, settings.model, gateway=model, retry=settings.retry)
+        )
         write_judgement(
             run_dir / "judgement.json",
             judgement,

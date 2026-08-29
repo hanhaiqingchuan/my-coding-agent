@@ -7,16 +7,18 @@ from __future__ import annotations
 
 import json
 import shutil
+from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
 import pytest
 
-from coding_agent.config import ModelSettings
+from coding_agent.config import ModelSettings, RetrySettings
 from coding_agent.core.cancellation import CancellationToken
 from coding_agent.core.models import AssistantTurn, ModelStopReason, TextPart, Usage
 from coding_agent.evaluation import cli as evaluation_cli
+from coding_agent.evaluation import runner as evaluation_runner
 from coding_agent.evaluation.judge import (
     JUDGE_ERROR,
     JUDGEMENT_SCHEMA_VERSION,
@@ -39,7 +41,13 @@ from coding_agent.evaluation.report import (
     summarize_campaign,
 )
 from coding_agent.evaluation.runner import AgentProcessResult, build_judge_hook, run_campaign
-from coding_agent.model.protocol import ModelRequest, TextDelta
+from coding_agent.model.protocol import (
+    ModelAPIError,
+    ModelRequest,
+    ModelTransportError,
+    TextDelta,
+)
+from coding_agent.model.retry import RetryingInvoker
 from tests.evaluation.conftest import task_table, write_manifest
 
 SCHEMAS = Path(__file__).resolve().parents[2] / "evaluation" / "schemas"
@@ -57,9 +65,15 @@ VALID_RESPONSE = json.dumps(
 class FakeGateway:
     """A ModelGateway stand-in that replies with scripted judge responses."""
 
-    def __init__(self, responses: list[str] | None = None, error: Exception | None = None) -> None:
+    def __init__(
+        self,
+        responses: list[str] | None = None,
+        error: Exception | None = None,
+        failures: list[Exception] | None = None,
+    ) -> None:
         self.responses = list(responses or [])
         self.error = error
+        self.failures = list(failures or [])
         self.requests: list[ModelRequest] = []
 
     async def complete(
@@ -72,6 +86,8 @@ class FakeGateway:
         on_thinking_block_closed: Any = None,
     ) -> AssistantTurn:
         self.requests.append(request)
+        if self.failures:
+            raise self.failures.pop(0)
         if self.error is not None:
             raise self.error
         text = self.responses.pop(0) if self.responses else "{}"
@@ -82,6 +98,38 @@ class FakeGateway:
             stop_reason=ModelStopReason.END_TURN,
             usage=Usage(),
         )
+
+
+class FakeClock:
+    """A deterministic monotonic clock, advanced only by the fake sleeper."""
+
+    def __init__(self, now: float = 100.0) -> None:
+        self.now = now
+
+    def monotonic(self) -> float:
+        return self.now
+
+
+class FakeSleeper:
+    """Record every retry wait instead of really sleeping, advancing the fake clock."""
+
+    def __init__(self, clock: FakeClock) -> None:
+        self._clock = clock
+        self.delays: list[float] = []
+
+    async def __call__(self, delay: float) -> None:
+        self.delays.append(delay)
+        self._clock.now += delay
+
+
+def retry_invoker(sleeper: FakeSleeper, clock: FakeClock) -> RetryingInvoker:
+    """The retry owner with zero jitter and the fake sleeper, so waits are assertable."""
+    return RetryingInvoker(
+        sleep=sleeper,
+        monotonic=clock.monotonic,
+        random=lambda: 0.0,
+        now=lambda: datetime(2026, 8, 28, tzinfo=UTC),
+    )
 
 
 # --- parsing ---------------------------------------------------------------
@@ -237,11 +285,21 @@ async def test_judge_run_recovers_when_the_retry_answers_correctly() -> None:
 
 
 @pytest.mark.asyncio
-async def test_judge_run_records_a_model_failure_without_retrying_or_raising() -> None:
-    """A failing model call is a judge_error, not a campaign abort and not a retry."""
-    from coding_agent.model.protocol import ModelTransportError
-
-    gateway = FakeGateway(error=ModelTransportError(retryable=True, cause=RuntimeError("boom")))
+@pytest.mark.parametrize(
+    "failure",
+    [
+        ModelTransportError(retryable=True, cause=ConnectionError("reset by peer")),
+        ModelAPIError(429, "rate_limit_error", None, retryable=True),
+    ],
+    ids=["transport", "http-429"],
+)
+async def test_judge_run_retries_a_transient_model_failure_then_scores_the_answer(
+    failure: Exception,
+) -> None:
+    """A transient transport or rate-limit failure backs off and retries, not judge_error."""
+    clock = FakeClock()
+    sleeper = FakeSleeper(clock)
+    gateway = FakeGateway(failures=[failure, failure], responses=[VALID_RESPONSE])
     run = _run_document()
 
     judgement = await judge_run(
@@ -249,12 +307,62 @@ async def test_judge_run_records_a_model_failure_without_retrying_or_raising() -
         build_transcript_excerpt(run),
         ModelSettings(model="claude-judge-2026"),
         gateway=gateway,
+        invoker=retry_invoker(sleeper, clock),
+    )
+
+    assert judgement.ok is True
+    assert judgement.scores["task_completion"] == 4
+    assert len(gateway.requests) == 3
+    assert sleeper.delays == [2.0, 4.0]
+
+
+@pytest.mark.asyncio
+async def test_judge_run_fails_fast_on_a_non_retryable_api_error() -> None:
+    """A 401 is not transient: one request, no wait, a judge_error, never an exception."""
+    clock = FakeClock()
+    sleeper = FakeSleeper(clock)
+    gateway = FakeGateway(error=ModelAPIError(401, "authentication_error", None, retryable=False))
+    run = _run_document()
+
+    judgement = await judge_run(
+        run,
+        build_transcript_excerpt(run),
+        ModelSettings(model="claude-judge-2026"),
+        gateway=gateway,
+        invoker=retry_invoker(sleeper, clock),
     )
 
     assert judgement.ok is False
     assert judgement.error == JUDGE_ERROR
-    assert judgement.error_detail is not None and "judge request failed" in judgement.error_detail
+    assert judgement.error_detail == "the judge request failed after 1 attempt: ModelAPIError"
     assert len(gateway.requests) == 1
+    assert sleeper.delays == []
+
+
+@pytest.mark.asyncio
+async def test_judge_run_records_judge_error_after_the_retry_owner_is_exhausted() -> None:
+    """A transport failure that outlives the retry budget is still only a judge_error."""
+    clock = FakeClock()
+    sleeper = FakeSleeper(clock)
+    failure = ModelTransportError(retryable=True, cause=ConnectionError("reset by peer"))
+    gateway = FakeGateway(error=failure)
+    run = _run_document()
+
+    judgement = await judge_run(
+        run,
+        build_transcript_excerpt(run),
+        ModelSettings(model="claude-judge-2026"),
+        gateway=gateway,
+        invoker=retry_invoker(sleeper, clock),
+    )
+
+    assert judgement.ok is False
+    assert judgement.error == JUDGE_ERROR
+    assert (
+        judgement.error_detail == "the judge request failed after 5 attempts: ModelTransportError"
+    )
+    assert len(gateway.requests) == 5
+    assert sleeper.delays == [2.0, 4.0, 8.0, 16.0]
 
 
 @pytest.mark.asyncio
@@ -571,6 +679,46 @@ class StubAgent:
             encoding="utf-8",
         )
         return AgentProcessResult(exit_code=0, timed_out=False)
+
+
+def test_build_judge_hook_passes_the_campaign_retry_settings(
+    manifest_root: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The judge retries with the campaign's own [retry] configuration, not a second policy."""
+    config = tmp_path / "campaign-config.toml"
+    config.write_text(
+        "[agent]\nmax_rounds = 4\n\n"
+        "[retry]\nmax_attempts = 3\ninitial_delay_seconds = 0.5\n"
+        "max_delay_seconds = 4\njitter_ratio = 0.1\n",
+        encoding="utf-8",
+    )
+    captured: dict[str, object] = {}
+
+    async def spy(
+        run_document: Any,
+        excerpt: Any,
+        settings: Any,
+        *,
+        gateway: Any = None,
+        api_key: str = "",
+        retry: Any = None,
+        invoker: Any = None,
+    ) -> Judgement:
+        captured["retry"] = retry
+        return parse_judgement(VALID_RESPONSE, judge_model=settings.model)
+
+    monkeypatch.setattr(evaluation_runner, "judge_run", spy)
+    hook = build_judge_hook(
+        config, gateway=FakeGateway([VALID_RESPONSE]), environ={"ANTHROPIC_API_KEY": "test-key"}
+    )
+
+    hook(_make_strict_run(), tmp_path / "run", "campaign-1")
+
+    assert captured["retry"] == RetrySettings(
+        max_attempts=3, initial_delay_seconds=0.5, max_delay_seconds=4, jitter_ratio=0.1
+    )
 
 
 def test_run_campaign_judge_hook_writes_judgement_records(
