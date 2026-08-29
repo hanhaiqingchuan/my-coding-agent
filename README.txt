@@ -13,7 +13,7 @@ My Coding Agent — 面向本地代码仓库的 coding agent
 1. Anthropic-compatible Messages 流式解析与 tool call 结构校验，只用官方客户端做 HTTP/SSE，无 Agent 框架。
 2. Agent Loop：轮次上限、重复调用防循环、参数错误重试，停止原因是显式枚举。
 3. 上下文预算：确定性 tool 输出裁剪 + 同步 LLM 摘要；user 原文逐字保留，原始历史不被改写。
-4. read_file / write_file / run_command 三个本地工具；写入与命令逐次审批，审批参数在后端冻结，前端只能批准或拒绝。
+4. read_file / write_file / run_command / skill 四个本地工具；写入与命令逐次审批，审批参数在后端冻结，前端只能批准或拒绝。工作区 AGENTS.md 自动注入，.agents/skills/ 技能按需加载。
 5. Stop、限流与网络重试、刷新重连、服务重启后不重放已完成副作用。
 6. SQLite 是唯一事实源，完整历史与带序号事件可恢复。
 7. 确定性评测 harness：在隔离 workspace 与独立 --data-dir 中运行公开任务，产出脱敏报告。

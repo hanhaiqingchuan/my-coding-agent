@@ -1501,3 +1501,179 @@ async def test_model_view_carries_the_current_environment_within_the_estimate(
         static_prompt, (), ()
     )
     assert 0 < environment_cost <= 200
+
+
+def _write_workspace_fixture(
+    workspace: Path,
+    *,
+    agents_md: str | None = "所有回复以'收到'开头",
+    skill: str | None = "git-helper",
+) -> None:
+    if agents_md is not None:
+        (workspace / "AGENTS.md").write_text(agents_md, encoding="utf-8")
+    if skill is not None:
+        skill_dir = workspace / ".agents" / "skills" / skill
+        skill_dir.mkdir(parents=True, exist_ok=True)
+        (skill_dir / "SKILL.md").write_text(
+            "---\n"
+            "name: git-helper\n"
+            "description: Guide routine Git operations.\n"
+            "---\n\n"
+            "1. Inspect the current branch with run_command.\n"
+            "2. Propose the next command and explain it.\n",
+            encoding="utf-8",
+        )
+
+
+@pytest.mark.asyncio
+async def test_run_start_injects_agents_md_and_the_skill_index_into_the_system_prompt(
+    tmp_path: Path, valid_settings: AppSettings
+) -> None:
+    """The workspace scan rides inside the measured system string, never a later append."""
+    loop, _, session_id, run_id, model, _, _ = _make_loop(tmp_path, valid_settings, [_final_turn()])
+    _write_workspace_fixture(tmp_path / "workspace")
+
+    outcome = await loop.run(run_id, session_id, CancellationToken())
+
+    assert outcome == RunOutcome.complete()
+    system = model.requests[0].system
+    assert "## Workspace instructions (AGENTS.md)" in system
+    assert "所有回复以'收到'开头" in system
+    assert "## Available skills" in system
+    assert "- git-helper: Guide routine Git operations." in system
+    assert {tool["name"] for tool in model.requests[0].tools} >= {"skill"}
+
+
+@pytest.mark.asyncio
+async def test_a_workspace_without_agents_md_or_skills_adds_no_sections(
+    tmp_path: Path, valid_settings: AppSettings
+) -> None:
+    loop, _, session_id, run_id, model, _, _ = _make_loop(tmp_path, valid_settings, [_final_turn()])
+
+    outcome = await loop.run(run_id, session_id, CancellationToken())
+
+    assert outcome == RunOutcome.complete()
+    assert "## Workspace instructions" not in model.requests[0].system
+    assert "## Available skills" not in model.requests[0].system
+
+
+@pytest.mark.asyncio
+async def test_skill_tool_call_round_trips_through_the_loop(
+    tmp_path: Path, valid_settings: AppSettings
+) -> None:
+    """The fourth model-visible tool must survive the real registry, approval and persistence."""
+    calls = (
+        ToolCall("call-skill", "skill", {"name": "git-helper"}),
+        ToolCall("call-list", "skill", {"mode": "list"}),
+    )
+    loop, store, session_id, run_id, model, _, _ = _make_loop(
+        tmp_path,
+        valid_settings,
+        [_tool_turn(*calls), _final_turn("received loaded skill")],
+        tools=ToolRegistry(),
+    )
+    _write_workspace_fixture(tmp_path / "workspace", agents_md=None)
+
+    outcome = await loop.run(run_id, session_id, CancellationToken())
+
+    assert outcome == RunOutcome.complete()
+    assert "approval.requested" not in [event.type for event in store.events_after(session_id, 0)]
+    returned = [
+        part
+        for message in model.requests[1].messages
+        for part in message.parts
+        if isinstance(part, ToolResult)
+    ]
+    assert [part.ok for part in returned] == [True, True]
+    assert "Inspect the current branch" in returned[0].content
+    assert "Guide routine Git operations." in returned[1].content
+    with store.connection() as connection:
+        executions = connection.execute(
+            "SELECT name, execution_state FROM tool_executions ORDER BY call_order"
+        ).fetchall()
+    assert [tuple(row) for row in executions] == [
+        ("skill", "succeeded"),
+        ("skill", "succeeded"),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_invalid_skills_are_skipped_with_a_diagnostic_not_a_failure(
+    tmp_path: Path, valid_settings: AppSettings
+) -> None:
+    workspace = tmp_path / "workspace"
+    loop, store, session_id, run_id, model, _, _ = _make_loop(
+        tmp_path, valid_settings, [_final_turn()]
+    )
+    skill_dir = workspace / ".agents" / "skills" / "broken"
+    skill_dir.mkdir(parents=True)
+    (skill_dir / "SKILL.md").write_text("---\nname: broken\n---\nbody\n", encoding="utf-8")
+
+    outcome = await loop.run(run_id, session_id, CancellationToken())
+
+    assert outcome == RunOutcome.complete()
+    assert "## Available skills" not in model.requests[0].system
+    diagnostics = [
+        event for event in store.events_after(session_id, 0) if event.type == "skill.invalid"
+    ]
+    assert len(diagnostics) == 1
+    assert diagnostics[0].payload["skill"] == ".agents/skills/broken"
+    assert diagnostics[0].payload["code"] == "MISSING_DESCRIPTION"
+    assert diagnostics[0].run_id == run_id
+
+
+@pytest.mark.asyncio
+async def test_agents_md_edits_between_runs_take_effect_on_the_next_run(
+    tmp_path: Path, valid_settings: AppSettings
+) -> None:
+    """Run start, not session creation, is the load point: edits must not be frozen forever."""
+    first_turn = _turn("turn-first", ModelStopReason.END_TURN, TextPart("first"))
+    second_turn = _turn("turn-second", ModelStopReason.END_TURN, TextPart("second"))
+    loop, store, session_id, run_id, model, _, _ = _make_loop(
+        tmp_path, valid_settings, [first_turn, second_turn]
+    )
+    workspace = tmp_path / "workspace"
+    (workspace / "AGENTS.md").write_text("第一版规则", encoding="utf-8")
+
+    first = await loop.run(run_id, session_id, CancellationToken())
+    (workspace / "AGENTS.md").write_text("第二版规则", encoding="utf-8")
+    second_run = store.begin_run(session_id, "again", {}, "start-2", "hash-2")
+    second = await loop.run(second_run.id, session_id, CancellationToken())
+
+    assert first == RunOutcome.complete()
+    assert second == RunOutcome.complete()
+    assert "第一版规则" in model.requests[0].system
+    assert "第二版规则" in model.requests[1].system
+    assert "第一版规则" not in model.requests[1].system
+
+
+@pytest.mark.asyncio
+async def test_agents_md_survives_compaction_while_history_is_summarized(
+    tmp_path: Path, valid_settings: AppSettings
+) -> None:
+    """Spec 7.2: workspace instructions are non-compressible, unlike old assistant history."""
+    overflow = _turn("overflow", ModelStopReason.MODEL_CONTEXT_WINDOW_EXCEEDED)
+    loop, store, session_id, run_id, model, _, _ = _make_loop(
+        tmp_path,
+        valid_settings,
+        [overflow, _summary_turn(), _final_turn("收到 done")],
+        history=("a" * 4_000, "b" * 4_000, "c" * 4_000, "d" * 4_000),
+    )
+    (tmp_path / "workspace" / "AGENTS.md").write_text(
+        "工作区规则：所有回复以'收到'开头\n" + "细则条目 " * 600, encoding="utf-8"
+    )
+
+    outcome = await loop.run(run_id, session_id, CancellationToken())
+
+    assert outcome == RunOutcome.complete()
+    assert store.load_context_snapshot(session_id) is not None
+    rebuilt_system = model.requests[2].system
+    assert "工作区规则：所有回复以'收到'开头" in rebuilt_system
+    assert "细则条目 " in rebuilt_system
+    summary_messages = [
+        part.text
+        for message in model.requests[2].messages
+        for part in message.parts
+        if isinstance(part, TextPart)
+    ]
+    assert any("older work summarized" in text for text in summary_messages)

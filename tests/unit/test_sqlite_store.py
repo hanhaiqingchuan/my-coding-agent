@@ -602,3 +602,30 @@ def test_events_are_monotonic_per_session_and_snapshot_uses_latest_cut(
     assert snapshot.snapshot_seq == events[-1].seq
     assert snapshot.active_run is not None
     assert snapshot.active_run.state is RunState.BUILDING_CONTEXT
+
+
+def test_record_diagnostic_appends_a_run_scoped_event_without_state_changes(
+    store: SQLiteStore, session
+) -> None:
+    """A skipped skill is an observation, not a lifecycle change: state must not move."""
+    run = store.begin_run(session.id, "task", {}, "cmd-start", "hash-start")
+    store.transition_run(run.id, {RunState.STARTING}, RunState.BUILDING_CONTEXT, None, None)
+    before = store.events_after(session.id, 0)
+
+    store.record_diagnostic(
+        run.id,
+        "skill.invalid",
+        {"skill": ".agents/skills/broken", "code": "MISSING_DESCRIPTION", "message": "nope"},
+    )
+
+    events = store.events_after(session.id, 0)
+    diagnostic = events[-1]
+    assert len(events) == len(before) + 1
+    assert diagnostic.type == "skill.invalid"
+    assert diagnostic.run_id == run.id
+    assert diagnostic.payload == {
+        "skill": ".agents/skills/broken",
+        "code": "MISSING_DESCRIPTION",
+        "message": "nope",
+    }
+    assert store.get_run(run.id).state is RunState.BUILDING_CONTEXT

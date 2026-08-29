@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import UTC, datetime
 
 import pytest
@@ -645,3 +646,48 @@ def test_exactly_eighty_percent_triggers_compaction() -> None:
 def test_request_rejects_an_invalid_budget_before_building_context() -> None:
     with pytest.raises(ValueError, match="context window must exceed"):
         _request(context_window=200, max_output_tokens=100, safety_margin_tokens=100)
+
+
+def test_system_prompt_with_workspace_instructions_survives_pruning_and_compaction() -> None:
+    """Spec 7.2 makes the compiled system (AGENTS.md included) non-compressible content.
+
+    The workspace instructions ride inside ``request.system``, so pruning old tool
+    output and planning a summary must never touch them: every view this builder
+    returns carries the system verbatim, and the pruned placeholders replace only
+    old tool results.
+    """
+    old_call = ToolCall("call-old", "read_file", {"path": "old.py"})
+    transcript = (
+        _message(1, "user", TextPart("first"), run_id="run-1"),
+        _message(2, "assistant", ToolUsePart(old_call), run_id="run-1"),
+        _message(
+            3,
+            "tool",
+            ToolResult("call-old", "x" * 2_000, True),
+            run_id="run-1",
+            tool_call_id="call-old",
+        ),
+        _message(4, "user", TextPart("second"), run_id="run-2"),
+        _message(5, "assistant", TextPart("second answer"), run_id="run-2"),
+        _message(6, "user", TextPart("third"), run_id="run-3"),
+        _message(7, "assistant", TextPart("third answer"), run_id="run-3"),
+        _message(8, "user", TextPart("current"), run_id="run-4"),
+    )
+    instructions = "所有回复以'收到'开头\n" + "细则 " * 100
+    request = replace(
+        _request(context_window=1_200, max_output_tokens=100, safety_margin_tokens=100),
+        system=(
+            "system instructions\nenvironment=/workspace\n\n"
+            "## Workspace instructions (AGENTS.md)\n\n" + instructions
+        ),
+    )
+
+    result = ContextBuilder().build(transcript, None, request)
+
+    assert isinstance(result, ReadyContext | CompactionRequired)
+    assert result.view.system == request.system
+    assert instructions in result.view.system
+    assert result.pruned_bytes > 0
+    serialized = _all_text(result)
+    assert "context_pruned=true" in serialized
+    assert "x" * 200 not in serialized

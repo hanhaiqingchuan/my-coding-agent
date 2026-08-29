@@ -61,6 +61,12 @@ from coding_agent.storage.sqlite import SQLiteStore
 from coding_agent.tools import ToolContext, error_result
 from coding_agent.tools.paths import WorkspaceBoundary
 from coding_agent.tools.registry import ToolRegistry
+from coding_agent.workspace_context import (
+    SKILL_DIAGNOSTIC_EVENT_TYPE,
+    WorkspaceScan,
+    render_workspace_sections,
+    scan_workspace,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -113,11 +119,20 @@ class AgentLoop:
             await self._transition(
                 run_id, session_id, {RunState.STARTING}, RunState.BUILDING_CONTEXT
             )
+            scan = self._scan_workspace(session_id)
+            self._tools.configure_skills(scan.skills)
+            for diagnostic in scan.diagnostics:
+                await self._mutate(
+                    session_id,
+                    lambda item=diagnostic: self._store.record_diagnostic(
+                        run_id, SKILL_DIAGNOSTIC_EVENT_TYPE, item.payload()
+                    ),
+                )
             for round_no in range(1, self._settings.agent.max_rounds + 1):
                 cancellation.raise_if_cancelled()
                 try:
                     context = await self._build_context(
-                        run_id, session_id, cancellation, round_no=round_no
+                        run_id, session_id, cancellation, round_no=round_no, scan=scan
                     )
                 except ConfigurationError:
                     return await self._finish(
@@ -210,6 +225,7 @@ class AgentLoop:
                         cancellation,
                         round_no=round_no,
                         force_compaction=True,
+                        scan=scan,
                     )
                     if isinstance(rebuilt, RunOutcome):
                         return rebuilt
@@ -436,17 +452,27 @@ class AgentLoop:
             Path(self._store.load_snapshot(session_id).session.workspace_realpath)
         )
 
-    def _compiled_system(self, session_id: str) -> str:
+    def _scan_workspace(self, session_id: str) -> WorkspaceScan:
+        """Freeze the workspace's instructions and skill index for this run.
+
+        The scan happens at run start, not session creation, so edits between runs
+        take effect on the next run; within a run the system prompt stays stable.
+        """
+        return scan_workspace(self._workspace_boundary(session_id))
+
+    def _compiled_system(self, session_id: str, scan: WorkspaceScan) -> str:
         """Compile the developer instructions with the current environment.
 
         Spec 7.2 and 7.3 item 1 make environment information mandatory in every model
         view, so it belongs in the system string the context estimator measures. Only
         facts this process already owns appear here: the session workspace root, the
         platform and the configured tool limits, never a credential or its value.
+        The workspace scan's AGENTS.md section and skill index ride along inside the
+        same mandatory system content (spec 7.2 as amended, 10.5).
         """
         tools = self._settings.tools
         workspace_root = self._store.load_snapshot(session_id).session.workspace_realpath
-        return "\n".join(
+        system = "\n".join(
             (
                 self._system_prompt.rstrip(),
                 "",
@@ -459,6 +485,8 @@ class AgentLoop:
                 f" and truncates output at {tools.command_output_bytes} bytes",
             )
         )
+        sections = render_workspace_sections(scan)
+        return f"{system}\n\n{sections}" if sections else system
 
     async def _build_context(
         self,
@@ -467,10 +495,11 @@ class AgentLoop:
         cancellation: CancellationToken,
         *,
         round_no: int,
+        scan: WorkspaceScan,
         force_compaction: bool = False,
     ) -> ReadyContext | RunOutcome:
         base_request = ContextRequest(
-            system=self._compiled_system(session_id),
+            system=self._compiled_system(session_id, scan),
             context_window=self._settings.model.context_window,
             max_output_tokens=self._settings.model.max_output_tokens,
             safety_margin_tokens=self._settings.context.safety_margin_tokens,

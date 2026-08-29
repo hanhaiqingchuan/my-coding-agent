@@ -138,6 +138,27 @@ uv run --python 3.12 coding-agent run \
 
 `--report-out` 写出 `run-report-v1` 文档：run 状态、停止原因、错误类别、模型标识、主/压缩请求数与 attempts、provider usage 分量、工具统计（参数只以 sha256 哈希出现）、压缩次数与估算误差、各阶段耗时。报告不含 prompt 原文、工具参数原文、命令输出、绝对路径、凭据或 API endpoint。退出码：run 以 `COMPLETED` 结束为 0，否则为 1；配置错误为 2。
 
+### 工作区指令（AGENTS.md）与技能（.agents/skills/）
+
+网页与 headless 共用同一套“运行起点工作区扫描”，对每个 Session 的工作区生效：
+
+- **AGENTS.md**：工作区根目录的 `AGENTS.md`（也接受小写 `agents.md`，其它大小写不识别）会在**每次 run 开始时**读取，作为系统提示的一部分注入（`## Workspace instructions (AGENTS.md)` 小节）。文件在两次 run 之间修改，下一次 run 生效。读取走与工具相同的 workspace 路径边界；超过 16 KiB 截断并附加标记；缺失或不可读时静默忽略。该小节属于 §7.2 意义上的不可压缩内容：上下文压缩永远不会摘要或裁掉它。
+- **技能（skills）**：`<workspace>/.agents/skills/<skill-name>/SKILL.md` 声明一个技能。技能**不会**自动进入上下文；每次 run 开始时扫描一次（只扫一层目录），把技能索引（名称 + 描述）注入系统提示的 `## Available skills` 小节，模型按需通过第 4 个模型可见工具 `skill` 加载。
+
+`SKILL.md` 格式：YAML frontmatter 之外只需 `key: value` 行，`---` 之间必须包含 `name`（小写字母/数字/连字符，且等于目录名）与 `description`（1-1024 字符）；`---` 之后是正文。目录内可捆绑任意伴生文件（脚本、参考文档）。示例：
+
+```markdown
+---
+name: git-helper
+description: Guide routine Git operations with staged, explained commands.
+---
+
+1. Inspect the current branch state first.
+2. Propose one command at a time and explain what it changes.
+```
+
+`skill` 工具参数：`mode` 为 `"read"`（默认，需 `name`）或 `"list"`。`read` 返回完整 SKILL.md 正文与伴生文件清单（相对路径 + 字节数），模型随后可用 `read_file` 自行读取伴生文件（它们本就在工作区内）；`list` 返回索引（名称、描述、文件数）。未知技能名返回 `UNKNOWN_SKILL` 工具错误，模型可自行纠正。`skill` 是只读的 workspace 内操作，**不需要审批**。frontmatter 无效或缺失的技能会被跳过并记录 `skill.invalid` 诊断事件，不会导致 run 失败；技能目录的修改在下一次 run 生效。
+
 ## 6. Makefile 入口
 
 `Makefile` 只编排项目自身命令，不绕过 `uv`、`npm` 或正式 CLI；所有目标声明为 `.PHONY`，任一子命令失败立即返回非零退出码。Makefile **不提供** `clean`、`distclean` 等删除目标。
@@ -197,7 +218,7 @@ Agent Loop
 - **Context Builder / Compactor**（`src/coding_agent/context/`）：按 `context_window - max_output_tokens - safety_margin_tokens` 计算预算；先做确定性 tool-output 裁剪，仍超阈值时发起一次**同步** LLM 摘要。压缩只改变发给模型的临时视图，所有 user 原文逐字保留，SQLite 中的原始历史不被删除或改写。
 - **Model Adapter**（`src/coding_agent/model/`）：把厂商无关的语义对象翻译成 Anthropic content blocks，聚合 Messages SSE 增量为完整 assistant 轮次，并校验 tool call 的结构与参数；协议异常映射为分类错误。Agent Core 不接触 wire payload，Model Adapter 不访问 workspace。
 - **Approval Gate**（`src/coding_agent/runtime/approval.py`）：见 §8。
-- **三个本地工具**（`src/coding_agent/tools/`）：`read_file` 读工作区 UTF-8 文本（按行/字节上限截断）、`write_file` 写入或替换、`run_command` 执行非交互命令。所有路径先归一化到 workspace 边界内，越界返回普通 tool error 而不是崩溃。
+- **四个本地工具**（`src/coding_agent/tools/`）：`read_file` 读工作区 UTF-8 文本（按行/字节上限截断）、`write_file` 写入或替换、`run_command` 执行非交互命令、`skill` 按需读取工作区技能（见 §5）。所有路径先归一化到 workspace 边界内，越界返回普通 tool error 而不是崩溃。
 - **SQLite 是唯一权威状态**：会话、canonical transcript、model requests、tool executions、上下文快照、durable events 和 client command receipts 全部落库，不与 JSONL 双写。事件带单调递增序号，浏览器重连后按序号补发。
 
 ## 8. 审批模型与安全边界

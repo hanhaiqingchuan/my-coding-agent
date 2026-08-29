@@ -1172,6 +1172,21 @@ class SQLiteStore:
             )
             return self._get_run_from(connection, run.id)
 
+    def record_diagnostic(
+        self, run_id: str, event_type: str, payload: Mapping[str, object]
+    ) -> None:
+        """Append a run-scoped diagnostic event without changing run state.
+
+        Observations such as a skipped skill are worth publishing durably, but they
+        are not lifecycle transitions: the run keeps its current state and the event
+        only extends the session's monotonic sequence.
+        """
+        if not event_type:
+            raise ValueError("diagnostic event type must not be empty")
+        with self._transaction() as connection:
+            run = self._get_run_from(connection, run_id)
+            self._append_event(connection, run.session_id, run.id, event_type, payload)
+
     def events_after(self, session_id: str, seq: int) -> list[DurableEvent]:
         with self.connection() as connection:
             rows = connection.execute(

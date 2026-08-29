@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from coding_agent.core.models import PreparedToolCall, ToolCall, ToolResult
 from coding_agent.tools import ToolContext, ToolInputError, error_result
 from coding_agent.tools.paths import WorkspaceBoundary, WorkspacePathError
 from coding_agent.tools.read_file import ReadFileTool
 from coding_agent.tools.run_command import CommandPolicy, RunCommandTool
+from coding_agent.tools.skill import SkillTool
 from coding_agent.tools.write_file import WriteFileTool
+from coding_agent.workspace_context import SkillInfo
 
 
 class ToolRegistry:
@@ -18,10 +22,12 @@ class ToolRegistry:
         read_file: ReadFileTool | None = None,
         write_file: WriteFileTool | None = None,
         run_command: RunCommandTool | None = None,
+        skill: SkillTool | None = None,
     ) -> None:
         self._read_file = read_file or ReadFileTool()
         self._write_file = write_file or WriteFileTool()
         self._run_command = run_command or RunCommandTool()
+        self._skill = skill or SkillTool()
 
     def schemas(self) -> list[dict[str, object]]:
         return [
@@ -76,11 +82,34 @@ class ToolRegistry:
                     "additionalProperties": False,
                 },
             },
+            {
+                "name": "skill",
+                "description": (
+                    "Read a workspace skill's full SKILL.md body and companion file "
+                    "listing, or list the discovered skill index."
+                ),
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "name": {"type": "string"},
+                        "mode": {
+                            "type": "string",
+                            "enum": ["read", "list"],
+                            "default": "read",
+                        },
+                    },
+                    "additionalProperties": False,
+                },
+            },
         ]
 
     def configure_command_policy(self, policy: CommandPolicy | None) -> None:
         """Apply the headless policy at the composition boundary, including injected runtimes."""
         self._run_command.command_policy = policy
+
+    def configure_skills(self, skills: Sequence[SkillInfo]) -> None:
+        """Inject the per-run discovered skill set, mirroring the command policy seam."""
+        self._skill.configure(skills)
 
     def prepare(
         self, call: ToolCall, workspace: WorkspaceBoundary
@@ -91,6 +120,8 @@ class ToolRegistry:
             tool = self._write_file
         elif call.name == RunCommandTool.name:
             tool = self._run_command
+        elif call.name == SkillTool.name:
+            tool = self._skill
         else:
             return error_result(call.id, call.name, "UNKNOWN_TOOL", f"unknown tool: {call.name}")
         try:
@@ -106,6 +137,8 @@ class ToolRegistry:
             tool = self._write_file
         elif prepared.call.name == RunCommandTool.name:
             tool = self._run_command
+        elif prepared.call.name == SkillTool.name:
+            tool = self._skill
         else:
             return error_result(
                 prepared.call.id,

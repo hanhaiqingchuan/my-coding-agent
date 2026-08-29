@@ -15,7 +15,12 @@ def test_registry_exposes_closed_schemas_for_all_model_visible_tools() -> None:
     """Permissive schemas would allow the model to send unvalidated tool arguments."""
     schemas = ToolRegistry().schemas()
 
-    assert {schema["name"] for schema in schemas} == {"read_file", "write_file", "run_command"}
+    assert {schema["name"] for schema in schemas} == {
+        "read_file",
+        "write_file",
+        "run_command",
+        "skill",
+    }
     for schema in schemas:
         input_schema = schema["input_schema"]
         assert isinstance(input_schema, dict)

@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 
 from coding_agent.core.models import PreparedToolCall, ToolCall, ToolResult
 from coding_agent.tools import ToolContext, error_result, result
 from coding_agent.tools.paths import WorkspaceBoundary
+from coding_agent.workspace_context import SkillInfo
 
 
 class RecordingTools:
@@ -14,6 +15,7 @@ class RecordingTools:
     def __init__(self, before_execute: Callable[[PreparedToolCall], None] | None = None) -> None:
         self.before_execute = before_execute
         self.executed: list[str] = []
+        self.skills: tuple[SkillInfo, ...] = ()
 
     @property
     def execution_count(self) -> int:
@@ -26,8 +28,12 @@ class RecordingTools:
                 "description": name,
                 "input_schema": {"type": "object", "additionalProperties": True},
             }
-            for name in ("read_file", "write_file", "run_command")
+            for name in ("read_file", "write_file", "run_command", "skill")
         ]
+
+    def configure_skills(self, skills: Sequence[SkillInfo]) -> None:
+        """Record the per-run discovered skill set without implementing skill reads."""
+        self.skills = tuple(skills)
 
     def prepare(
         self, call: ToolCall, workspace: WorkspaceBoundary
