@@ -14,6 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from coding_agent.api.dependencies import ApiDependencies
 from coding_agent.api.routes import router
 from coding_agent.api.websocket import router as websocket_router
+from coding_agent.evaluation.web import router as evaluation_router
 from coding_agent.runtime.coordinator import RunCoordinator
 from coding_agent.runtime.publisher import EventPublisher
 from coding_agent.storage.sqlite import SQLiteStore
@@ -29,6 +30,7 @@ def create_app(
     development_origin: str | None = None,
     web_dist: Path | None = None,
     recover_on_startup: bool = True,
+    evaluation_results_root: Path | None = None,
 ) -> FastAPI:
     """Build one independently injectable app without module-global mutable state."""
     dependencies = ApiDependencies(
@@ -41,6 +43,7 @@ def create_app(
         public_config=dict(public_config),
         server_port=server_port,
         development_origin=development_origin,
+        evaluation_results_root=evaluation_results_root,
     )
 
     @asynccontextmanager
@@ -75,6 +78,7 @@ def create_app(
 
     app.include_router(router)
     app.include_router(websocket_router)
+    app.include_router(evaluation_router)
     if web_dist is not None:
         app.mount("/", StaticFiles(directory=web_dist, html=True), name="web")
     return app

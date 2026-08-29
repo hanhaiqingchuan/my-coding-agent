@@ -222,13 +222,15 @@ def serve_web(
     data_dir: Path | None,
     dependencies: RuntimeDependencies | None = None,
     auto_approve: bool = False,
+    evaluation_results_root: Path | None = None,
 ) -> int:
     """Run the local browser API on the fixed loopback interface."""
     runtime_workspace = WorkspaceBoundary(workspace or Path.cwd()).root
+    runtime_data_dir = data_dir or Path.cwd() / ".coding-agent"
     runtime = dependencies or build_runtime_dependencies(
         settings=settings,
         workspace=runtime_workspace,
-        data_dir=data_dir or Path.cwd() / ".coding-agent",
+        data_dir=runtime_data_dir,
         auto_approve=auto_approve,
         command_policy=None,
     )
@@ -251,6 +253,9 @@ def serve_web(
         public_config,
         server_port=settings.server.port,
         web_dist=Path(__file__).resolve().parents[2] / "web" / "dist",
+        evaluation_results_root=(
+            evaluation_results_root or runtime_data_dir / "evaluation-results"
+        ),
     )
     if settings.server.open_browser:
         webbrowser.open(f"http://127.0.0.1:{settings.server.port}")

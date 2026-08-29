@@ -30,6 +30,12 @@ def build_parser() -> argparse.ArgumentParser:
     serve.add_argument("--workspace", type=Path)
     serve.add_argument("--data-dir", type=Path)
     serve.add_argument("--port", type=int)
+    serve.add_argument(
+        "--eval-results",
+        type=Path,
+        dest="eval_results",
+        help="read-only evaluation results root (default: <data-dir>/evaluation-results)",
+    )
     serve.add_argument("--open", action="store_true", dest="open_browser", default=None)
     serve.add_argument("--yes", action="store_true")
 
@@ -79,6 +85,7 @@ def main(
             data_dir=args.data_dir,
             dependencies=dependencies,
             auto_approve=args.yes,
+            evaluation_results_root=args.eval_results,
         )
     except (ConfigurationError, WorkspacePathError) as error:
         print(f"CONFIG_ERROR: {error}", file=sys.stderr)

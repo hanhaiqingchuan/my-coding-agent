@@ -101,6 +101,7 @@ uv run --python 3.12 coding-agent serve \
 | `--workspace PATH` | 初始 Session 的工作目录 |
 | `--data-dir PATH` | SQLite 与运行数据目录；默认启动目录下的 `.coding-agent/` |
 | `--port PORT` | 覆盖 `server.port` |
+| `--eval-results PATH` | 评测结果根目录（含多个 campaign 子目录）；默认 `<data-dir>/evaluation-results` |
 | `--open` | 启动后打开浏览器 |
 | `--yes` | 受信任模式，跳过所有审批（见 §8） |
 
@@ -275,6 +276,22 @@ uv run --python 3.12 coding-agent-eval summarize --input /path/outside/this/repo
 `run` 只写它拥有的不可变记录：`runs.jsonl` 与每次 repeat 的 `run.json`；`summarize` 负责聚合，默认写到 `<campaign>/reports/`（也可用 `--out` 指定目录）。两条命令都不覆盖已存在的产物，因此再次聚合到同一目录会直接报错而不是改写已发布结果。
 
 每次 run 使用**全新临时 workspace 和独立 `--data-dir`**，不复用用户的默认数据库；隐藏 oracle 在 workspace 外运行，模型无法影响自己的评分。原始 transcript 和完整结果按约定写到仓库外（`--out` 指向仓库外目录），公开仓库只保留框架、schema、四个可再分发的公开任务和 `evaluation/examples/` 中的**脱敏**示例结果。默认导出不含 prompt 原文、工具参数、命令输出和绝对路径——工具参数只以 `args_hash` 出现。细节见 [`evaluation/README.md`](evaluation/README.md)。
+
+### 评测结果网页
+
+评测结果有专门的只读网页视图：左栏在 Sessions 旁多出 Evaluations 入口，点击进入结果工作台——campaign 列表（时间窗口、任务数、strict success 率、judge 均分、模型身份）→ 单个 campaign 的每任务运行行（轮次、工具调用、输入/输出 token、耗时、strict_success/artifact 徽标、judge 三项小分）→ 单 run 详情（run-v1 事实 + judge 三项分数，judge 理由默认折叠）。网页只“看”：不能从网页发起评测、编辑或删除结果；运行仍走上面的 CLI。
+
+```bash
+# 把 serve 指向你的结果根目录（含多个 campaign 子目录，与 history --results 相同口径）
+npm --prefix web run build
+uv run --python 3.12 coding-agent serve \
+  --config config.toml \
+  --eval-results /path/to/evaluation-results
+
+# 浏览器打开 http://127.0.0.1:8000，左栏切到 Evaluations
+```
+
+`--eval-results` 缺省时读取 `<data-dir>/evaluation-results`（即默认 `./.coding-agent/evaluation-results`）。结果根目录不存在或某条记录损坏时，网页显示空态或降级提示，不会报 500；页面数据来自与 `history` 命令相同的只读扫描，响应中不含任何绝对路径或凭据。
 
 ## 12. 发布前审计
 

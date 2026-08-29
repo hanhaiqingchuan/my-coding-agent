@@ -9,12 +9,15 @@ type ThinkingDisclosureProps = {
   live?: boolean;
   /** The backend's per-block signal: `true` collapses, a later delta re-opens. */
   closed?: boolean;
+  /** What the collapsed pill names; judgement rationales reuse the same control. */
+  label?: string;
 };
 
 export function ThinkingDisclosure({
   text,
   live = false,
   closed = false,
+  label = "Thinking",
 }: ThinkingDisclosureProps) {
   const [open, setOpen] = useState(live && !closed);
   const [seenClosed, setSeenClosed] = useState(closed);
@@ -40,7 +43,7 @@ export function ThinkingDisclosure({
         onClick={() => setOpen((current) => !current)}
       >
         <span className="thinking-chevron" aria-hidden="true" />
-        Thinking · {text.length} chars
+        {label} · {text.length} chars
       </button>
       {/* The body stays mounted so the collapse runs as a CSS transition on
           grid-template-rows; the global prefers-reduced-motion rule removes it. */}

@@ -1020,6 +1020,380 @@ button:disabled:hover {
   border: 0;
 }
 
+/* --- View switch -------------------------------------------------------- */
+/* The left rail's top-level navigation: two tabs styled as quiet signposts,
+   visually one step above the session and campaign lists they introduce. */
+.view-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+}
+.view-tab {
+  padding: 6px 10px;
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  background: transparent;
+  font-size: var(--text-sm);
+  font-weight: 650;
+}
+.view-tab:hover {
+  border-color: var(--border-subtle);
+  background: var(--bg-raised);
+}
+.view-tab[aria-current="page"] {
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+  background: var(--bg-selected);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+/* --- Evaluations -------------------------------------------------------- */
+/* The results dashboard reuses the workbench surfaces but widens the content
+   column: one extra rail would starve the metric table. */
+.evaluations-shell {
+  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+}
+.eval-panel {
+  display: grid;
+  align-content: start;
+  gap: var(--space-5);
+  max-width: 1080px;
+  margin: 0 auto;
+}
+.eval-back {
+  flex: none;
+}
+.eval-muted {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+.eval-note {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--amber-border);
+  border-left: 3px solid var(--amber-line);
+  border-radius: var(--radius-sm);
+  color: var(--amber-fg);
+  background: var(--amber-bg);
+  font-size: var(--text-xs);
+}
+.eval-warning {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--danger-border);
+  border-left: 3px solid var(--danger-line);
+  border-radius: var(--radius-sm);
+  color: var(--danger-fg-strong);
+  background: var(--danger-bg);
+  font-size: var(--text-sm);
+}
+.eval-badge {
+  display: inline-block;
+  border: 1px solid var(--neutral-border);
+  border-radius: var(--radius-pill);
+  padding: 1px 8px;
+  color: var(--neutral-fg);
+  background: var(--neutral-bg);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.eval-badge.eval-pass {
+  border-color: var(--success-border);
+  color: var(--success-fg);
+  background: var(--success-bg);
+}
+.eval-badge.eval-fail {
+  border-color: var(--danger-border);
+  color: var(--danger-fg);
+  background: var(--danger-bg);
+}
+
+/* Campaign list: each row mirrors the session row's stacked identity block. */
+.eval-list ul {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: 0;
+  list-style: none;
+}
+.eval-campaign-row {
+  display: grid;
+  gap: 3px;
+  width: 100%;
+  min-width: 0;
+  padding: var(--space-3);
+  border-color: var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-raised);
+  text-align: left;
+}
+.eval-campaign-row:hover {
+  border-color: var(--border-strong);
+  background: var(--bg-button-hover);
+}
+.eval-campaign-name {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-weight: 650;
+}
+.eval-campaign-window {
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+}
+.eval-campaign-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+}
+.eval-campaign-metrics b {
+  color: var(--text-primary);
+  font-weight: 650;
+}
+.eval-campaign-note {
+  color: var(--amber-fg);
+  font-size: var(--text-2xs);
+}
+
+/* Aggregate strip: three compact cards above the task table. */
+.eval-aggregates {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-3);
+  min-width: 0;
+}
+.eval-aggregates > div {
+  display: grid;
+  gap: var(--space-1);
+  align-content: start;
+  min-width: 0;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-raised);
+}
+.eval-aggregates span {
+  color: var(--text-muted);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+.eval-aggregates strong {
+  color: var(--text-primary);
+  font-size: var(--text-lg);
+  font-weight: 650;
+}
+.eval-aggregates p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+}
+
+/* Task table: machine values in monospace, badges in the state palette. */
+.eval-task-table {
+  width: 100%;
+  min-width: 0;
+  border-collapse: collapse;
+  font-size: var(--text-xs);
+}
+.eval-task-table th {
+  padding: var(--space-2) var(--space-2);
+  border-bottom: 1px solid var(--border-strong);
+  color: var(--text-muted);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-align: left;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.eval-task-table td {
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  white-space: nowrap;
+}
+.eval-task-table tbody tr:hover {
+  background: var(--bg-raised);
+}
+.eval-run-link {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: 2px 8px;
+  border-color: transparent;
+  background: transparent;
+}
+.eval-run-link:hover {
+  border-color: var(--border-subtle);
+  background: var(--bg-button);
+}
+.eval-run-link span {
+  color: var(--accent-soft);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-weight: 650;
+}
+.eval-run-link small {
+  color: var(--text-muted);
+  font-size: var(--text-2xs);
+}
+.eval-judge-scores {
+  color: var(--text-primary);
+  font-weight: 650;
+}
+
+/* Run detail: the facts reuse the run-details list; the judgement card sits
+   beside it with the same collapse treatment as provider reasoning. */
+.eval-run-detail {
+  display: grid;
+  gap: var(--space-5);
+  min-width: 0;
+}
+.eval-run-heading p {
+  margin: 0 0 var(--space-1);
+  color: var(--text-muted);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+.eval-run-heading h2 {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: var(--text-xl);
+  font-weight: 650;
+}
+.eval-final-message {
+  min-width: 0;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-left: 3px solid var(--info-line);
+  border-radius: var(--radius-md);
+  background: var(--bg-raised);
+}
+.eval-final-message h3 {
+  margin: 0 0 var(--space-2);
+  color: var(--text-muted);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+.eval-final-message p {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  white-space: pre-wrap;
+}
+.judgement-card {
+  min-width: 0;
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--border-subtle);
+  border-left: 4px solid var(--compact-line);
+  border-radius: var(--radius-md);
+  background: var(--bg-raised);
+}
+.judgement-card header {
+  margin-bottom: var(--space-3);
+}
+.judgement-card h2 {
+  margin: 0 0 var(--space-1);
+  color: var(--text-muted);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+.judgement-card header p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+}
+.judgement-card header code {
+  color: var(--code-fg);
+  font-family: var(--font-mono);
+}
+.judgement-scores {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+.judgement-score {
+  display: grid;
+  gap: 2px;
+  padding: var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--bg-sunken);
+}
+.judgement-score span {
+  color: var(--text-muted);
+  font-size: var(--text-2xs);
+  font-weight: 650;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.judgement-score strong {
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: var(--text-xl);
+  font-weight: 650;
+}
+.judgement-error {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border: 1px solid var(--danger-border);
+  border-left: 3px solid var(--danger-line);
+  border-radius: var(--radius-sm);
+  background: var(--danger-bg);
+}
+.judgement-error strong {
+  color: var(--danger-fg-strong);
+  font-size: var(--text-sm);
+}
+.judgement-error p {
+  margin: 0;
+  color: var(--danger-fg);
+  font-size: var(--text-xs);
+}
+.judgement-empty p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+.judgement-unreadable header h2 {
+  color: var(--danger-fg);
+}
+.judgement-unreadable header p {
+  color: var(--danger-fg);
+  font-size: var(--text-xs);
+}
+.eval-corrupt-line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
 /* --- Run details -------------------------------------------------------- */
 .run-details-panel p,
 .run-details-drawer p {

@@ -22,6 +22,14 @@ vi.mock("./api/client", () => ({
   },
 }));
 
+vi.mock("./features/evaluation/evaluationApi", () => ({
+  EvaluationClient: class {
+    listCampaigns = async () => [];
+    campaignDetail = vi.fn();
+    runDetail = vi.fn();
+  },
+}));
+
 const snapshot: SessionSnapshotDto = {
   session: {
     id: "session-1",
@@ -134,4 +142,32 @@ test("renders the fixed approval dock and sends only backend commands for approv
       payload: {},
     }),
   );
+});
+
+test("the left rail switches between the sessions workbench and evaluations", async () => {
+  const user = userEvent.setup();
+  render(<App />);
+
+  // The mocked snapshot holds an active run, so the composer shows Stop.
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "Stop" })).toBeTruthy(),
+  );
+
+  await user.click(screen.getByRole("button", { name: "Evaluations" }));
+  const evaluationsTab = screen.getByRole("button", { name: "Evaluations" });
+  expect(evaluationsTab.getAttribute("aria-current")).toBe("page");
+  await waitFor(() =>
+    expect(screen.getByText(/No evaluation campaigns found/)).toBeTruthy(),
+  );
+  expect(screen.queryByRole("button", { name: "Stop" })).toBeNull();
+
+  await user.click(screen.getByRole("button", { name: "Sessions" }));
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "Stop" })).toBeTruthy(),
+  );
+  expect(
+    screen
+      .getByRole("button", { name: "Evaluations" })
+      .getAttribute("aria-current"),
+  ).toBeNull();
 });

@@ -97,6 +97,20 @@ def format_history(summaries: Sequence[CampaignSummary]) -> tuple[str, ...]:
     return tuple(lines)
 
 
+def read_run_documents(directory: Path) -> tuple[list[dict[str, object]], str | None]:
+    """Read one campaign's run documents tolerantly (``runs.jsonl`` first).
+
+    Read-only consumers such as the results web API reuse this exact strategy so a
+    partially corrupt record degrades to a note instead of failing the request.
+    """
+    return _read_run_documents(directory)
+
+
+def read_judgements(directory: Path) -> tuple[list[dict[str, object]], str | None]:
+    """Read one campaign's judgement records tolerantly, skipping unreadable ones."""
+    return _read_judgements(directory)
+
+
 def _is_campaign_directory(directory: Path) -> bool:
     """A campaign holds a runs.jsonl or at least one per-run run.json record."""
     if (directory / "runs.jsonl").is_file():
@@ -280,5 +294,7 @@ __all__ = [
     "CampaignSummary",
     "HistoryError",
     "format_history",
+    "read_judgements",
+    "read_run_documents",
     "scan_campaigns",
 ]

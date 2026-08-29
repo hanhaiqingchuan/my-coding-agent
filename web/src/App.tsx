@@ -8,11 +8,16 @@ import { Composer } from "./components/Composer";
 import { ConversationTimeline } from "./components/ConversationTimeline";
 import { RunDetailsPanel } from "./components/RunDetailsPanel";
 import { SessionSidebar } from "./components/SessionSidebar";
+import { ViewSwitcher, type AppView } from "./components/ViewSwitcher";
 import { WorkspacePicker } from "./components/WorkspacePicker";
+import { EvaluationsPanel } from "./features/evaluation/EvaluationsPanel";
+import { EvaluationClient } from "./features/evaluation/evaluationApi";
 import { useSession } from "./features/sessions/useSession";
 
 export default function App() {
   const api = useMemo(() => new ApiClient(), []);
+  const evaluations = useMemo(() => new EvaluationClient(), []);
+  const [view, setView] = useState<AppView>("sessions");
   const [sessions, setSessions] = useState<SessionDto[]>([]);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(
     null,
@@ -90,10 +95,24 @@ export default function App() {
   const snapshot = state.snapshot;
   const recoveryBlocked = snapshot?.session.requires_recovery_ack ?? false;
 
+  if (view === "evaluations") {
+    return (
+      <div className="app-shell evaluations-shell">
+        <nav className="session-sidebar" aria-label="Sessions and workspace">
+          <ViewSwitcher view={view} onViewChange={setView} />
+        </nav>
+        <main className="conversation-panel" aria-label="Evaluations">
+          <EvaluationsPanel reader={evaluations} />
+        </main>
+      </div>
+    );
+  }
+
   return (
     <AppShell
       sidebar={
         <>
+          <ViewSwitcher view={view} onViewChange={setView} />
           <WorkspacePicker onCreate={createSession} />
           <SessionSidebar
             sessions={sessions}

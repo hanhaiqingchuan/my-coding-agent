@@ -6,6 +6,7 @@ import hmac
 import secrets
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from pathlib import Path
 from urllib.parse import urlsplit
 
 from fastapi import HTTPException, Request, status
@@ -27,6 +28,8 @@ class ApiDependencies:
     public_config: Mapping[str, object]
     server_port: int
     development_origin: str | None = None
+    evaluation_results_root: Path | None = None
+    """The read-only results root the evaluation endpoints scan; None disables them."""
     process_token: str = field(default_factory=lambda: secrets.token_urlsafe(32), repr=False)
 
     def __post_init__(self) -> None:

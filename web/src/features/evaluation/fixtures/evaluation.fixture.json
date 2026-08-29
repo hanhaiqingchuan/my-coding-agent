@@ -1,0 +1,346 @@
+{
+  "campaignDetail": {
+    "aggregates": {
+      "artifact_correct_runs": 2,
+      "failure_kinds": {},
+      "judge_error_runs": 0,
+      "judge_means": {
+        "communication": 3.0,
+        "process_quality": 5.0,
+        "task_completion": 4.0
+      },
+      "judged_runs": 2,
+      "robust_task_count": 0,
+      "started_runs": 2,
+      "strict_success_runs": 2,
+      "task_completion_rate": 1.0,
+      "total_input_tokens": 60,
+      "total_main_requests": 4,
+      "total_output_tokens": 18,
+      "total_tool_calls": 2,
+      "valid_runs": 2
+    },
+    "note": null,
+    "summary": {
+      "campaign_id": "campaign-judged",
+      "corrupt": false,
+      "directory": "judged-campaign",
+      "finished_at": "2026-08-29T12:01:00.645759+00:00",
+      "judge_error_runs": 0,
+      "judge_means": {
+        "communication": 3.0,
+        "process_quality": 5.0,
+        "task_completion": 4.0
+      },
+      "judge_model": "claude-model-name",
+      "judged_runs": 2,
+      "model_name": "claude-stub-model-2026",
+      "note": null,
+      "started_at": "2026-08-29T12:00:59.576888+00:00",
+      "started_runs": 2,
+      "strict_success_rate": 1.0,
+      "strict_success_runs": 2,
+      "task_count": 2,
+      "valid_runs": 2
+    },
+    "tasks": [
+      {
+        "category": "local_edit",
+        "runs": [
+          {
+            "agent_ms": 11,
+            "artifact_correct": true,
+            "category": "local_edit",
+            "failure_kind": null,
+            "failure_stage": null,
+            "input_tokens": 30,
+            "judge_error": false,
+            "judge_scores": {
+              "communication": 3,
+              "process_quality": 5,
+              "task_completion": 4
+            },
+            "outcome": "OK",
+            "output_tokens": 9,
+            "repeat": 1,
+            "rounds": 2,
+            "state": "COMPLETED",
+            "stop_reason": "COMPLETED",
+            "strict_success": true,
+            "task_id": "demo-task",
+            "tool_calls": 1,
+            "total_ms": 231
+          }
+        ],
+        "task_id": "demo-task"
+      },
+      {
+        "category": "new_file",
+        "runs": [
+          {
+            "agent_ms": 11,
+            "artifact_correct": true,
+            "category": "new_file",
+            "failure_kind": null,
+            "failure_stage": null,
+            "input_tokens": 30,
+            "judge_error": false,
+            "judge_scores": {
+              "communication": 3,
+              "process_quality": 5,
+              "task_completion": 4
+            },
+            "outcome": "OK",
+            "output_tokens": 9,
+            "repeat": 1,
+            "rounds": 2,
+            "state": "COMPLETED",
+            "stop_reason": "COMPLETED",
+            "strict_success": true,
+            "task_id": "second-task",
+            "tool_calls": 1,
+            "total_ms": 237
+          }
+        ],
+        "task_id": "second-task"
+      }
+    ]
+  },
+  "campaigns": [
+    {
+      "campaign_id": "campaign-plain",
+      "corrupt": false,
+      "directory": "plain-campaign",
+      "finished_at": "2026-08-29T12:01:02.337533+00:00",
+      "judge_error_runs": 0,
+      "judge_means": {
+        "communication": null,
+        "process_quality": null,
+        "task_completion": null
+      },
+      "judge_model": null,
+      "judged_runs": 0,
+      "model_name": "claude-stub-model-2026",
+      "note": null,
+      "started_at": "2026-08-29T12:01:01.231290+00:00",
+      "started_runs": 2,
+      "strict_success_rate": 1.0,
+      "strict_success_runs": 2,
+      "task_count": 2,
+      "valid_runs": 2
+    },
+    {
+      "campaign_id": "campaign-judged",
+      "corrupt": false,
+      "directory": "judged-campaign",
+      "finished_at": "2026-08-29T12:01:00.645759+00:00",
+      "judge_error_runs": 0,
+      "judge_means": {
+        "communication": 3.0,
+        "process_quality": 5.0,
+        "task_completion": 4.0
+      },
+      "judge_model": "claude-model-name",
+      "judged_runs": 2,
+      "model_name": "claude-stub-model-2026",
+      "note": null,
+      "started_at": "2026-08-29T12:00:59.576888+00:00",
+      "started_runs": 2,
+      "strict_success_rate": 1.0,
+      "strict_success_runs": 2,
+      "task_count": 2,
+      "valid_runs": 2
+    }
+  ],
+  "runDetail": {
+    "campaign": "judged-campaign",
+    "judgement": {
+      "campaign_id": "campaign-judged",
+      "error": null,
+      "error_detail": null,
+      "judge_model": "claude-model-name",
+      "prompt_version": "judge-v1",
+      "rationale": "The goal was met with tidy tool use: the helper was created and the suite verified the change.",
+      "repeat": 1,
+      "schema_version": "judgement-v1",
+      "scores": {
+        "communication": 3,
+        "process_quality": 5,
+        "task_completion": 4
+      },
+      "task_id": "demo-task"
+    },
+    "judgement_note": null,
+    "repeat": 1,
+    "run": {
+      "agent_argv_options": [
+        "--config",
+        "--workspace",
+        "--data-dir",
+        "--prompt-file",
+        "--report-out",
+        "--yes",
+        "--ack-unsafe-auto-approve",
+        "--command-policy"
+      ],
+      "agent_commit": "0f1e2d3c",
+      "agent_exit_code": 0,
+      "agent_report": {
+        "compaction": {
+          "above_target": false,
+          "count": 0,
+          "requests": 0
+        },
+        "durations": {
+          "agent_monotonic_ms": 11,
+          "retry_wait_monotonic_ms": 0,
+          "tool_execution_monotonic_ms": 4
+        },
+        "final_assistant_text": "Created the requested helper and verified it with the existing suite.",
+        "model": {
+          "compaction": {
+            "attempts": 0,
+            "network_retries": 0,
+            "requests": 0,
+            "usage": {
+              "cache_creation_input_tokens": null,
+              "cache_read_input_tokens": null,
+              "input_tokens": null,
+              "output_tokens": null
+            },
+            "usage_coverage": null
+          },
+          "main": {
+            "attempts": 2,
+            "network_retries": 0,
+            "requests": 2,
+            "usage": {
+              "cache_creation_input_tokens": 0,
+              "cache_read_input_tokens": 0,
+              "input_tokens": 30,
+              "output_tokens": 9
+            },
+            "usage_coverage": null
+          }
+        },
+        "model_identity": {
+          "name": "claude-stub-model-2026"
+        },
+        "schema_version": "run-report-v1",
+        "state": "COMPLETED",
+        "stop_reason": "COMPLETED",
+        "tools": {
+          "duplicate_calls": 0,
+          "executed": 1,
+          "failed": 0,
+          "output_bytes": 4,
+          "proposed": 1,
+          "skipped": 0,
+          "succeeded": 1,
+          "truncated": 0
+        }
+      },
+      "agent_timed_out": false,
+      "artifact_correct": true,
+      "campaign_id": "campaign-judged",
+      "category": "local_edit",
+      "compaction": {
+        "above_target": false,
+        "count": 0,
+        "estimated_minus_provider_tokens": null,
+        "estimated_summary_tokens": null,
+        "input_tokens_after": null,
+        "input_tokens_before": null,
+        "provider_summary_output_tokens": null,
+        "requests": 0
+      },
+      "durations": {
+        "agent_monotonic_ms": 11,
+        "agent_process_ms": 1,
+        "oracle_ms": 226,
+        "retry_wait_monotonic_ms": 0,
+        "tool_execution_monotonic_ms": 4,
+        "total_ms": 231,
+        "workspace_prepare_ms": 3
+      },
+      "error_kind": null,
+      "failure_kind": null,
+      "failure_stage": null,
+      "finished_at": "2026-08-29T12:00:59.807620+00:00",
+      "harness_detail": null,
+      "hashes": {
+        "baseline_tree": "696653a1a5b1058bff836fdef71b0589014e68b9ba79427d5f7330c980251d77",
+        "config": "5b771a5cd9bb0d2ef7c71147a46dd7135729bdd21e626dfbc1a381dfacada3ed",
+        "diff": "0da135650e519f71e09c3ede3796b0831ad7648edf55cbb36be8837f8f1aa340",
+        "prompt": "3afdfbe6983576d9ca26f4503c3fa898f2a07ca9f15aebf3d846ca7b73945694",
+        "task": "742140f1f7165b6e51cfad951e27394c62a83e0493ef9fcdf2d49de4f9738052",
+        "tool_schema": null,
+        "workspace_tree": "2cb37b856b502e94436635c4cc5f9c042ac1b96d470d1620ff374f66d955d30a"
+      },
+      "model": {
+        "attempts": 2,
+        "compaction_requests": 0,
+        "main_requests": 2,
+        "network_retries": 0,
+        "usage": {
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 0,
+          "input_tokens": 30,
+          "output_tokens": 9
+        },
+        "usage_coverage": null
+      },
+      "model_identity": {
+        "context_window": null,
+        "max_output_tokens": null,
+        "name": "claude-stub-model-2026",
+        "stream": null
+      },
+      "modifications": {
+        "detected_workspace_escape": false,
+        "files_added": 0,
+        "files_deleted": 0,
+        "files_modified": 1,
+        "forbidden_paths_modified": [],
+        "lines_added": 1,
+        "lines_removed": 1,
+        "out_of_scope_paths": []
+      },
+      "oracle": {
+        "regression": {
+          "duration_ms": 114,
+          "errored": false,
+          "exit_code": 0,
+          "passed": true
+        },
+        "target": {
+          "duration_ms": 110,
+          "errored": false,
+          "exit_code": 0,
+          "passed": true
+        }
+      },
+      "outcome": "OK",
+      "provider": "anthropic_messages",
+      "repeat": 1,
+      "schema_version": "run-v1",
+      "started_at": "2026-08-29T12:00:59.576888+00:00",
+      "state": "COMPLETED",
+      "stop_reason": "COMPLETED",
+      "strict_success": true,
+      "task_id": "demo-task",
+      "tools": {
+        "duplicate_calls": 0,
+        "executed": 1,
+        "failed": 0,
+        "output_bytes": 4,
+        "proposed": 1,
+        "skipped": 0,
+        "succeeded": 1,
+        "truncated": 0
+      }
+    },
+    "run_note": null,
+    "task_id": "demo-task"
+  }
+}
