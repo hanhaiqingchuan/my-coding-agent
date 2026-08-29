@@ -16,6 +16,7 @@ from coding_agent.core.models import (
     MessageStatus,
     ModelStopReason,
     TextPart,
+    ThinkingPart,
     ToolCall,
     ToolResult,
     ToolUsePart,
@@ -55,7 +56,7 @@ def _message(
     event_id: str,
     seq: int,
     role: str,
-    *parts: TextPart | ToolUsePart | ToolResult,
+    *parts: TextPart | ThinkingPart | ToolUsePart | ToolResult,
 ) -> Message:
     return Message(
         id=event_id,
@@ -240,6 +241,62 @@ async def test_compaction_uses_toolless_top_level_system_and_json_safe_read_only
         "tool",
     ]
     assert payload["replaceable_groups"][0]["source_event_ids"] == ["event-1", "event-2"]
+
+
+@pytest.mark.asyncio
+async def test_thinking_parts_stay_valid_candidates_but_never_reach_the_summary_request(
+    store: SQLiteStore,
+    session,
+) -> None:
+    """A reasoning-carrying history must still compact, without feeding reasoning back."""
+    old = _old_snapshot(session.id)
+    store.replace_context_snapshot(old)
+    call = ToolCall("call-1", "read_file", {"path": "src/a.py"})
+    user = _message(
+        session.id,
+        "user-context",
+        1,
+        "user",
+        TextPart("Keep this user text verbatim."),
+    )
+    assistant = _message(
+        session.id,
+        "event-1",
+        2,
+        "assistant",
+        ThinkingPart("Secret reasoning about the file."),
+        TextPart("I inspected the file."),
+        ToolUsePart(call),
+    )
+    tool = _message(
+        session.id,
+        "event-2",
+        3,
+        "tool",
+        ToolResult("call-1", "line=value", True),
+    )
+    candidate = CompactionCandidate(
+        messages=(assistant, tool),
+        read_only_user_context=(user,),
+        source_message_seqs=(2, 3),
+        source_event_ids=("event-1", "event-2"),
+    )
+    summary = _summary(important_files_and_symbols=["src/a.py"])
+    model = ScriptedModel([_turn(json.dumps(summary))])
+
+    result = await Compactor(model, store, model="claude-test").compact(
+        _plan(old, (candidate,)), CancellationToken()
+    )
+
+    assert result.error is None
+    payload_part = model.requests[0].messages[-1].parts[0]
+    assert isinstance(payload_part, TextPart)
+    payload = json.loads(payload_part.text)
+    assert "Secret reasoning about the file." not in payload_part.text
+    assert [item["type"] for item in payload["replaceable_groups"][0]["messages"][0]["parts"]] == [
+        "text",
+        "tool_use",
+    ]
 
 
 @pytest.mark.asyncio

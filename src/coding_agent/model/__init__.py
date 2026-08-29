@@ -8,7 +8,12 @@ from coding_agent.model.protocol import (
     ModelProtocolError,
     ModelRequest,
     ModelTransportError,
+    StreamNotification,
     TextDelta,
+    ThinkingBlockClosed,
+    ThinkingBlockClosedSink,
+    ThinkingDelta,
+    ThinkingDeltaSink,
 )
 
 __all__ = [
@@ -19,5 +24,10 @@ __all__ = [
     "ModelProtocolError",
     "ModelRequest",
     "ModelTransportError",
+    "StreamNotification",
     "TextDelta",
+    "ThinkingBlockClosed",
+    "ThinkingBlockClosedSink",
+    "ThinkingDelta",
+    "ThinkingDeltaSink",
 ]

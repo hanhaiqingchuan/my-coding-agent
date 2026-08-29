@@ -12,8 +12,10 @@ from coding_agent.context.estimator import ESTIMATOR_ID, estimate_input_tokens
 from coding_agent.core.models import (
     ContextSnapshot,
     Message,
+    MessagePart,
     MessageStatus,
     TextPart,
+    ThinkingPart,
     ToolResult,
     ToolUsePart,
 )
@@ -367,6 +369,11 @@ def _require_unique_sequence_numbers(messages: Sequence[Message]) -> None:
         raise ValueError("committed transcript message sequence numbers must be unique")
 
 
+def _model_view_parts(parts: tuple[MessagePart, ...]) -> tuple[MessagePart, ...]:
+    """Thinking is display-only, so the projected model view never carries it."""
+    return tuple(part for part in parts if not isinstance(part, ThinkingPart))
+
+
 def _group_committed_messages(messages: Sequence[Message]) -> tuple[_CanonicalGroup, ...]:
     groups: list[_CanonicalGroup] = []
     current_user: Message | None = None
@@ -384,7 +391,7 @@ def _group_committed_messages(messages: Sequence[Message]) -> tuple[_CanonicalGr
         if message.role != "assistant":
             raise ValueError(f"unsupported canonical message role: {message.role!r}")
 
-        assistant_model = ModelMessage("assistant", message.parts)
+        assistant_model = ModelMessage("assistant", _model_view_parts(message.parts))
         expected_ids = tuple(
             part.call.id for part in message.parts if isinstance(part, ToolUsePart)
         )

@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 from collections.abc import Mapping, Sequence
 
-from coding_agent.core.models import TextPart, ToolResult, ToolUsePart
+from coding_agent.core.models import TextPart, ThinkingPart, ToolResult, ToolUsePart
 from coding_agent.model.protocol import ModelMessage
 
 ESTIMATOR_ID = "utf8-bytes-over-3-v1"
@@ -38,8 +38,11 @@ def estimate_input_tokens(
         total += MESSAGE_FIXED_OVERHEAD_TOKENS
         total += _utf8_byte_tokens(message.role)
         for part in message.parts:
+            wire_part = _wire_part(part)
+            if wire_part is None:
+                continue
             total += CONTENT_BLOCK_FIXED_OVERHEAD_TOKENS
-            total += _utf8_byte_tokens(_wire_json(_wire_part(part)))
+            total += _utf8_byte_tokens(_wire_json(wire_part))
 
     for schema in tool_schemas:
         if not isinstance(schema, Mapping):
@@ -64,9 +67,15 @@ def _wire_json(value: object) -> str:
     )
 
 
-def _wire_part(part: TextPart | ToolUsePart | ToolResult) -> Mapping[str, object]:
+def _wire_part(
+    part: TextPart | ThinkingPart | ToolUsePart | ToolResult,
+) -> Mapping[str, object] | None:
+    """Map a part to its wire block, or ``None`` when the part never reaches the wire."""
     if isinstance(part, TextPart):
         return {"type": "text", "text": part.text}
+    if isinstance(part, ThinkingPart):
+        # Display-only reasoning never compiles to a wire block, so it never counts.
+        return None
     if isinstance(part, ToolUsePart):
         return {
             "type": "tool_use",

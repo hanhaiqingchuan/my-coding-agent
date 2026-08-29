@@ -136,6 +136,8 @@
     "snapshot",
     "durable",
     "assistant.delta",
+    "assistant.thinking.delta",
+    "assistant.thinking.closed",
     "tool.output.delta"
   ]
 }

@@ -13,7 +13,14 @@ from anthropic import APIConnectionError, APIStatusError, AsyncAnthropic
 from coding_agent.config import ModelSettings
 from coding_agent.core.cancellation import CancellationToken
 from coding_agent.core.errors import CancellationRequested
-from coding_agent.core.models import AssistantTurn, JsonValue, TextPart, ToolResult, ToolUsePart
+from coding_agent.core.models import (
+    AssistantTurn,
+    JsonValue,
+    TextPart,
+    ThinkingPart,
+    ToolResult,
+    ToolUsePart,
+)
 from coding_agent.model.message_assembler import MessageStreamAssembler, NormalizedMessageEvent
 from coding_agent.model.protocol import (
     DeltaSink,
@@ -21,6 +28,11 @@ from coding_agent.model.protocol import (
     ModelProtocolError,
     ModelRequest,
     ModelTransportError,
+    StreamNotification,
+    TextDelta,
+    ThinkingBlockClosedSink,
+    ThinkingDelta,
+    ThinkingDeltaSink,
 )
 
 _CONTEXT_ERROR_TYPES = {
@@ -50,6 +62,9 @@ class AnthropicMessagesModel:
         request: ModelRequest,
         on_text_delta: DeltaSink,
         cancellation: CancellationToken,
+        *,
+        on_thinking_delta: ThinkingDeltaSink | None = None,
+        on_thinking_block_closed: ThinkingBlockClosedSink | None = None,
     ) -> AssistantTurn:
         try:
             cancellation.raise_if_cancelled()
@@ -59,7 +74,13 @@ class AnthropicMessagesModel:
                 raise ModelProtocolError(
                     "NON_STREAMING_RESPONSE", "Messages API did not return an async stream"
                 )
-            return await _consume_stream(stream, on_text_delta, cancellation)
+            return await _consume_stream(
+                stream,
+                on_text_delta,
+                cancellation,
+                on_thinking_delta=on_thinking_delta,
+                on_thinking_block_closed=on_thinking_block_closed,
+            )
         except (CancellationRequested, ModelAPIError, ModelProtocolError, ModelTransportError):
             raise
         except APIStatusError as error:
@@ -92,6 +113,8 @@ async def _create_stream(request: Any, cancellation: CancellationToken) -> objec
 
 
 def _request_payload(model: str, request: ModelRequest) -> dict[str, object]:
+    # No `thinking` field: the portable set stays neutral and provider-default reasoning
+    # is tolerated (spec 8.1). Thinking blocks are aggregated for display, never echoed.
     payload: dict[str, object] = {
         "model": model,
         "max_tokens": request.max_tokens,
@@ -121,6 +144,9 @@ def _compile_messages(request: ModelRequest) -> list[dict[str, object]]:
             for part in message.parts:
                 if isinstance(part, TextPart):
                     content.append({"type": "text", "text": part.text})
+                elif isinstance(part, ThinkingPart):
+                    # Display-only reasoning: never echoed back to the provider.
+                    continue
                 elif isinstance(part, ToolUsePart):
                     call = part.call
                     content.append(
@@ -237,6 +263,9 @@ async def _consume_stream(
     stream: object,
     on_text_delta: DeltaSink,
     cancellation: CancellationToken,
+    *,
+    on_thinking_delta: ThinkingDeltaSink | None = None,
+    on_thinking_block_closed: ThinkingBlockClosedSink | None = None,
 ) -> AssistantTurn:
     assembler = MessageStreamAssembler()
     iterator = stream.__aiter__()  # type: ignore[attr-defined]
@@ -262,8 +291,13 @@ async def _consume_stream(
             except StopAsyncIteration:
                 break
             event = NormalizedMessageEvent.from_sdk_event(raw_event)
-            for delta in assembler.feed(event):
-                result = on_text_delta(delta)
+            for notification in assembler.feed(event):
+                result = _dispatch_notification(
+                    notification,
+                    on_text_delta,
+                    on_thinking_delta,
+                    on_thinking_block_closed,
+                )
                 if inspect.isawaitable(result):
                     await result
         return assembler.finish()
@@ -273,6 +307,19 @@ async def _consume_stream(
             result = close()
             if inspect.isawaitable(result):
                 await result
+
+
+def _dispatch_notification(
+    notification: StreamNotification,
+    on_text_delta: DeltaSink,
+    on_thinking_delta: ThinkingDeltaSink | None,
+    on_thinking_block_closed: ThinkingBlockClosedSink | None,
+) -> object:
+    if isinstance(notification, TextDelta):
+        return on_text_delta(notification)
+    if isinstance(notification, ThinkingDelta):
+        return on_thinking_delta(notification) if on_thinking_delta is not None else None
+    return on_thinking_block_closed(notification) if on_thinking_block_closed is not None else None
 
 
 def _map_status_error(error: APIStatusError) -> ModelAPIError:

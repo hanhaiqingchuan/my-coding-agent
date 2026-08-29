@@ -23,12 +23,18 @@ from coding_agent.core.models import (
     SessionSnapshot,
     StopReason,
     TextPart,
+    ThinkingPart,
     ToolExecution,
     ToolExecutionState,
     ToolResult,
     ToolUsePart,
 )
-from coding_agent.runtime.publisher import AssistantDelta, ToolOutputDelta
+from coding_agent.runtime.publisher import (
+    AssistantDelta,
+    AssistantThinkingClosed,
+    AssistantThinkingDelta,
+    ToolOutputDelta,
+)
 
 
 class StrictDto(BaseModel):
@@ -139,6 +145,13 @@ class TextPartDto(StrictDto):
     text: str
 
 
+class ThinkingPartDto(StrictDto):
+    """Provider reasoning, display-only: collapsed in history, never fed back to the model."""
+
+    type: Literal["thinking"] = "thinking"
+    text: str
+
+
 class ToolUsePartDto(StrictDto):
     type: Literal["tool_use"] = "tool_use"
     id: str
@@ -162,7 +175,7 @@ class ToolResultPartDto(StrictDto):
 
 
 MessagePartDto = Annotated[
-    TextPartDto | ToolUsePartDto | ToolResultPartDto,
+    TextPartDto | ThinkingPartDto | ToolUsePartDto | ToolResultPartDto,
     Field(discriminator="type"),
 ]
 
@@ -179,10 +192,12 @@ class MessageDto(StrictDto):
 
     @classmethod
     def from_domain(cls, message: Message) -> MessageDto:
-        parts: list[TextPartDto | ToolUsePartDto | ToolResultPartDto] = []
+        parts: list[TextPartDto | ThinkingPartDto | ToolUsePartDto | ToolResultPartDto] = []
         for part in message.parts:
             if isinstance(part, TextPart):
                 parts.append(TextPartDto(text=part.text))
+            elif isinstance(part, ThinkingPart):
+                parts.append(ThinkingPartDto(text=part.text))
             elif isinstance(part, ToolUsePart):
                 parts.append(
                     ToolUsePartDto(
@@ -497,12 +512,54 @@ class ToolOutputDeltaEnvelope(StrictDto):
         )
 
 
+class AssistantThinkingDeltaEnvelope(StrictDto):
+    """Transient reasoning text; dropped on reconnect, never written to SQLite."""
+
+    type: Literal["assistant.thinking.delta"] = "assistant.thinking.delta"
+    session_id: str
+    run_id: str
+    draft_epoch: str
+    index: int
+    text: str
+
+    @classmethod
+    def from_domain(cls, delta: AssistantThinkingDelta) -> AssistantThinkingDeltaEnvelope:
+        return cls(
+            session_id=delta.session_id,
+            run_id=delta.run_id,
+            draft_epoch=delta.draft_epoch,
+            index=delta.index,
+            text=delta.text,
+        )
+
+
+class AssistantThinkingClosedEnvelope(StrictDto):
+    """One thinking block completed; the frontend's auto-collapse signal."""
+
+    type: Literal["assistant.thinking.closed"] = "assistant.thinking.closed"
+    session_id: str
+    run_id: str
+    draft_epoch: str
+    index: int
+
+    @classmethod
+    def from_domain(cls, closed: AssistantThinkingClosed) -> AssistantThinkingClosedEnvelope:
+        return cls(
+            session_id=closed.session_id,
+            run_id=closed.run_id,
+            draft_epoch=closed.draft_epoch,
+            index=closed.index,
+        )
+
+
 ServerMessage: TypeAlias = (
     AckEnvelope
     | CommandErrorEnvelope
     | SnapshotEnvelope
     | DurableEnvelope
     | AssistantDeltaEnvelope
+    | AssistantThinkingDeltaEnvelope
+    | AssistantThinkingClosedEnvelope
     | ToolOutputDeltaEnvelope
 )
 
@@ -522,6 +579,8 @@ __all__ = [
     "AckEnvelope",
     "ApprovalResolveCommand",
     "AssistantDeltaEnvelope",
+    "AssistantThinkingClosedEnvelope",
+    "AssistantThinkingDeltaEnvelope",
     "BootstrapDto",
     "ClientCommand",
     "CommandErrorEnvelope",
@@ -532,6 +591,7 @@ __all__ = [
     "DurableEventDto",
     "HealthDto",
     "MessageDto",
+    "MessagePartDto",
     "PendingApprovalDto",
     "RunDto",
     "RunStartCommand",
@@ -543,6 +603,8 @@ __all__ = [
     "SessionSubscribeCommand",
     "SessionSnapshotDto",
     "StrictDto",
+    "TextPartDto",
+    "ThinkingPartDto",
     "ToolExecutionDto",
     "ToolOutputDeltaEnvelope",
 ]

@@ -9,6 +9,7 @@ from coding_agent.core.models import (
     ModelStopReason,
     RunTotals,
     TextPart,
+    ThinkingPart,
     ToolCall,
     ToolError,
     ToolResult,
@@ -59,6 +60,28 @@ def test_assistant_turn_preserves_text_and_tool_use_order() -> None:
     )
 
     assert turn.parts == parts
+
+
+def test_assistant_turn_preserves_thinking_between_text_and_tool_use() -> None:
+    """Provider reasoning is a display-only part that keeps its streamed block order."""
+    call = ToolCall(id="call-1", name="read_file", input={"path": "a.py"})
+    parts = (
+        ThinkingPart("I should read the file first."),
+        TextPart("Reading it now."),
+        ToolUsePart(call),
+    )
+
+    turn = AssistantTurn(
+        id="assistant-thinking",
+        parts=parts,
+        stop_reason=ModelStopReason.TOOL_USE,
+        usage=Usage(input_tokens=10, output_tokens=5),
+    )
+
+    assert turn.parts == parts
+    assert turn.tool_calls == (call,)
+    with pytest.raises(FrozenInstanceError):
+        parts[0].text = "changed"  # type: ignore[misc]
 
 
 def test_assistant_turn_rejects_duplicate_tool_call_ids() -> None:

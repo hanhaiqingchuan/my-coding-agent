@@ -37,6 +37,7 @@ from coding_agent.core.models import (
     SessionSnapshot,
     StopReason,
     TextPart,
+    ThinkingPart,
     ToolCall,
     ToolError,
     ToolExecution,
@@ -1705,6 +1706,8 @@ def _part_to_json_value(part: MessagePart) -> str:
 def _part_to_value(part: MessagePart) -> dict[str, object]:
     if isinstance(part, TextPart):
         return {"type": "text", "text": part.text}
+    if isinstance(part, ThinkingPart):
+        return {"type": "thinking", "text": part.text}
     if isinstance(part, ToolUsePart):
         return {
             "type": "tool_use",
@@ -1732,6 +1735,8 @@ def _parts_from_json(value: str) -> tuple[MessagePart, ...]:
     for item in json.loads(value):
         if item["type"] == "text":
             parts.append(TextPart(item["text"]))
+        elif item["type"] == "thinking":
+            parts.append(ThinkingPart(item["text"]))
         elif item["type"] == "tool_use":
             parts.append(ToolUsePart(ToolCall(item["id"], item["name"], item["input"])))
         elif item["type"] == "tool_result":

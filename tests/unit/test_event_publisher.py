@@ -6,7 +6,12 @@ from datetime import UTC, datetime
 import pytest
 
 from coding_agent.core.models import DurableEvent, RunState
-from coding_agent.runtime.publisher import AssistantDelta, EventPublisher
+from coding_agent.runtime.publisher import (
+    AssistantDelta,
+    AssistantThinkingClosed,
+    AssistantThinkingDelta,
+    EventPublisher,
+)
 from coding_agent.storage.sqlite import SQLiteStore
 
 
@@ -180,6 +185,27 @@ async def test_transient_delta_does_not_advance_the_durable_sequence_cut() -> No
     await publisher.publish_committed(next_event)
 
     assert await subscription.receive() == delta
+    assert await subscription.receive() == next_event
+    with pytest.raises(asyncio.TimeoutError):
+        await asyncio.wait_for(subscription.receive(), 0.02)
+
+
+@pytest.mark.asyncio
+async def test_thinking_events_are_transient_and_never_advance_the_durable_cut() -> None:
+    """Reasoning streams live like text deltas and must never claim a durable sequence."""
+    publisher = EventPublisher()
+    async with publisher.session_guard("session-a"):
+        subscription = publisher.subscribe_locked("session-a", after_seq=2)
+
+    delta = AssistantThinkingDelta("session-a", "run-a", "epoch-a", 0, "hmm")
+    closed = AssistantThinkingClosed("session-a", "run-a", "epoch-a", 0)
+    await publisher.publish_transient(delta)
+    await publisher.publish_transient(closed)
+    next_event = _event("session-a", 3)
+    await publisher.publish_committed(next_event)
+
+    assert await subscription.receive() == delta
+    assert await subscription.receive() == closed
     assert await subscription.receive() == next_event
     with pytest.raises(asyncio.TimeoutError):
         await asyncio.wait_for(subscription.receive(), 0.02)

@@ -43,12 +43,20 @@ from coding_agent.model import (
     ModelRequest,
     ModelTransportError,
     TextDelta,
+    ThinkingBlockClosed,
+    ThinkingDelta,
 )
 from coding_agent.model.retry import RetryingInvoker
 from coding_agent.runtime.approval import ApprovalGate
 from coding_agent.runtime.coordinator import RunMutationGate
 from coding_agent.runtime.metrics import model_config_hash
-from coding_agent.runtime.publisher import AssistantDelta, EventPublisher, ToolOutputDelta
+from coding_agent.runtime.publisher import (
+    AssistantDelta,
+    AssistantThinkingClosed,
+    AssistantThinkingDelta,
+    EventPublisher,
+    ToolOutputDelta,
+)
 from coding_agent.storage.sqlite import SQLiteStore
 from coding_agent.tools import ToolContext, error_result
 from coding_agent.tools.paths import WorkspaceBoundary
@@ -583,8 +591,35 @@ class AgentLoop:
                     )
                 )
 
+            async def collect_thinking_delta(delta: ThinkingDelta) -> None:
+                await self._publisher.publish_transient(
+                    AssistantThinkingDelta(
+                        session_id=session_id,
+                        run_id=run_id,
+                        draft_epoch=draft_epoch,
+                        index=delta.index,
+                        text=delta.text,
+                    )
+                )
+
+            async def close_thinking_block(closed: ThinkingBlockClosed) -> None:
+                await self._publisher.publish_transient(
+                    AssistantThinkingClosed(
+                        session_id=session_id,
+                        run_id=run_id,
+                        draft_epoch=draft_epoch,
+                        index=closed.index,
+                    )
+                )
+
             try:
-                return await self._model.complete(request, collect_delta, cancellation)
+                return await self._model.complete(
+                    request,
+                    collect_delta,
+                    cancellation,
+                    on_thinking_delta=collect_thinking_delta,
+                    on_thinking_block_closed=close_thinking_block,
+                )
             except BaseException:
                 parts = tuple(
                     TextPart("".join(draft[index])) for index in sorted(draft) if draft[index]

@@ -46,11 +46,46 @@ class ToolOutputDelta:
 
 
 @dataclass(frozen=True, slots=True)
+class AssistantThinkingDelta:
+    """A live reasoning increment; transient like ``AssistantDelta`` and never durable."""
+
+    session_id: str
+    run_id: str
+    draft_epoch: str
+    index: int
+    text: str
+
+    def __post_init__(self) -> None:
+        if not self.session_id or not self.run_id or not self.draft_epoch:
+            raise ValueError("thinking delta requires session, run, and draft epoch")
+        if self.index < 0:
+            raise ValueError("thinking delta index must not be negative")
+
+
+@dataclass(frozen=True, slots=True)
+class AssistantThinkingClosed:
+    """One thinking block finished; the display-only auto-collapse signal."""
+
+    session_id: str
+    run_id: str
+    draft_epoch: str
+    index: int
+
+    def __post_init__(self) -> None:
+        if not self.session_id or not self.run_id or not self.draft_epoch:
+            raise ValueError("thinking close requires session, run, and draft epoch")
+        if self.index < 0:
+            raise ValueError("thinking close index must not be negative")
+
+
+@dataclass(frozen=True, slots=True)
 class SubscriptionOverflow:
     session_id: str
 
 
-TransientDelta: TypeAlias = AssistantDelta | ToolOutputDelta
+TransientDelta: TypeAlias = (
+    AssistantDelta | ToolOutputDelta | AssistantThinkingDelta | AssistantThinkingClosed
+)
 PublishedMessage: TypeAlias = DurableEvent | TransientDelta | SubscriptionOverflow
 
 
@@ -152,6 +187,8 @@ def _signal_overflow(
 
 __all__ = [
     "AssistantDelta",
+    "AssistantThinkingClosed",
+    "AssistantThinkingDelta",
     "EventPublisher",
     "EventSubscription",
     "PublishedMessage",

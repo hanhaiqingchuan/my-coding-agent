@@ -60,6 +60,9 @@ class BrowserScriptedModel:
         request: ModelRequest,
         on_text_delta: DeltaSink,
         cancellation: CancellationToken,
+        *,
+        on_thinking_delta: object = None,
+        on_thinking_block_closed: object = None,
     ) -> AssistantTurn:
         prompt = _initial_prompt(request)
         results = _tool_results(request)

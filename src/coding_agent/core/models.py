@@ -155,6 +155,18 @@ class TextPart:
 
 
 @dataclass(frozen=True, slots=True)
+class ThinkingPart:
+    """Provider reasoning text, kept for display only.
+
+    Spec 8.2: reasoning blocks are aggregated in block order into this part, persist like
+    any other part, and are shown collapsed in the UI — but they never enter the model
+    view, are never echoed back to the provider, and never drive loop state transitions.
+    """
+
+    text: str
+
+
+@dataclass(frozen=True, slots=True)
 class ToolCall:
     id: str
     name: str
@@ -206,8 +218,8 @@ class ToolResult:
         object.__setattr__(self, "data", _freeze_mapping(self.data))
 
 
-AssistantPart: TypeAlias = TextPart | ToolUsePart
-MessagePart: TypeAlias = TextPart | ToolUsePart | ToolResult
+AssistantPart: TypeAlias = TextPart | ThinkingPart | ToolUsePart
+MessagePart: TypeAlias = TextPart | ThinkingPart | ToolUsePart | ToolResult
 
 
 @dataclass(frozen=True, slots=True)

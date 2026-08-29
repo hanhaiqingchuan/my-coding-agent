@@ -17,6 +17,8 @@ from coding_agent.api.schemas import (
     AckEnvelope,
     ApprovalResolveCommand,
     AssistantDeltaEnvelope,
+    AssistantThinkingClosedEnvelope,
+    AssistantThinkingDeltaEnvelope,
     ClientCommand,
     CommandErrorEnvelope,
     DurableEnvelope,
@@ -34,6 +36,8 @@ from coding_agent.core.errors import StoreError
 from coding_agent.core.models import DurableEvent
 from coding_agent.runtime.publisher import (
     AssistantDelta,
+    AssistantThinkingClosed,
+    AssistantThinkingDelta,
     EventSubscription,
     SubscriptionOverflow,
     ToolOutputDelta,
@@ -241,6 +245,10 @@ class _SessionConnection:
                     )
                 elif isinstance(message, AssistantDelta):
                     envelope = AssistantDeltaEnvelope.from_domain(message)
+                elif isinstance(message, AssistantThinkingDelta):
+                    envelope = AssistantThinkingDeltaEnvelope.from_domain(message)
+                elif isinstance(message, AssistantThinkingClosed):
+                    envelope = AssistantThinkingClosedEnvelope.from_domain(message)
                 elif isinstance(message, ToolOutputDelta):
                     envelope = ToolOutputDeltaEnvelope.from_domain(message)
                 else:  # pragma: no cover - publisher exposes a closed union.

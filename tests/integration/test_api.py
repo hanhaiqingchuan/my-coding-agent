@@ -11,9 +11,12 @@ from coding_agent.api.schemas import (
     AckEnvelope,
     ApprovalResolveCommand,
     AssistantDeltaEnvelope,
+    AssistantThinkingClosedEnvelope,
+    AssistantThinkingDeltaEnvelope,
     CommandErrorEnvelope,
     DurableEnvelope,
     DurableEventDto,
+    MessageDto,
     RunStartCommand,
     RunStopCommand,
     SessionAckRecoveryCommand,
@@ -27,11 +30,14 @@ from coding_agent.core.models import (
     ApprovalStatus,
     AssistantTurn,
     DurableEvent,
+    Message,
+    MessageStatus,
     ModelStopReason,
     PreparedToolCall,
     RunState,
     StopReason,
     TextPart,
+    ThinkingPart,
     ToolCall,
     ToolExecutionState,
     ToolUsePart,
@@ -366,6 +372,37 @@ def test_snapshot_publishes_the_run_counters_the_store_accumulated(tmp_path: Pat
     }
 
 
+def test_snapshot_message_dto_keeps_thinking_parts_in_block_order() -> None:
+    """A refreshed history must show the reasoning exactly where the model produced it."""
+    call = ToolCall("call-1", "read_file", {"path": "a.py"})
+    message = Message(
+        id="message-thinking",
+        session_id="session-1",
+        run_id="run-1",
+        seq=2,
+        role="assistant",
+        parts=(
+            ThinkingPart("Reasoned about the file."),
+            TextPart("Reading it now."),
+            ToolUsePart(call),
+        ),
+        status=MessageStatus.COMMITTED,
+    )
+
+    dto = MessageDto.from_domain(message).model_dump(mode="json")
+
+    assert dto["parts"] == [
+        {"type": "thinking", "text": "Reasoned about the file."},
+        {"type": "text", "text": "Reading it now."},
+        {
+            "type": "tool_use",
+            "id": "call-1",
+            "name": "read_file",
+            "input": {"path": "a.py"},
+        },
+    ]
+
+
 def test_snapshot_json_schema_freezes_domain_enums_for_the_frontend() -> None:
     """Plain string fields would let Python and TypeScript protocol enums silently drift."""
     definitions = SessionSnapshotDto.model_json_schema()["$defs"]
@@ -419,6 +456,8 @@ def test_frontend_contract_fixture_matches_the_backend_dto_schema() -> None:
             SnapshotEnvelope,
             DurableEnvelope,
             AssistantDeltaEnvelope,
+            AssistantThinkingDeltaEnvelope,
+            AssistantThinkingClosedEnvelope,
             ToolOutputDeltaEnvelope,
         )
     ]

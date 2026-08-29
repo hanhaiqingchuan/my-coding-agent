@@ -20,6 +20,7 @@ from coding_agent.core.models import (
     Message,
     ModelStopReason,
     TextPart,
+    ThinkingPart,
     ToolResult,
     ToolUsePart,
 )
@@ -310,7 +311,7 @@ def _is_complete_candidate(candidate: CompactionCandidate) -> bool:
         return False
 
     assistant = candidate.messages[0]
-    if any(not isinstance(part, TextPart | ToolUsePart) for part in assistant.parts):
+    if any(not isinstance(part, TextPart | ThinkingPart | ToolUsePart) for part in assistant.parts):
         return False
     tool_call_ids = tuple(part.call.id for part in assistant.parts if isinstance(part, ToolUsePart))
     results: list[ToolResult] = []
@@ -391,7 +392,10 @@ def _message_value(message: Message) -> dict[str, object]:
     return {
         "event_id": message.id,
         "role": message.role,
-        "parts": [_part_value(part) for part in message.parts],
+        # Thinking is display-only and never reaches the summarization request.
+        "parts": [
+            _part_value(part) for part in message.parts if not isinstance(part, ThinkingPart)
+        ],
     }
 
 
@@ -431,7 +435,7 @@ def _jsonable(value: object) -> object:
 
 
 def _validated_summary(
-    parts: tuple[TextPart | ToolUsePart, ...],
+    parts: tuple[TextPart | ThinkingPart | ToolUsePart, ...],
     stop_reason: ModelStopReason,
     max_tokens: int,
 ) -> tuple[str, int] | CompressionError:

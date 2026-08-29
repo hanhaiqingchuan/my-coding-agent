@@ -7,8 +7,16 @@ import inspect
 from collections.abc import Sequence
 
 from coding_agent.core.cancellation import CancellationToken
-from coding_agent.core.models import AssistantTurn, TextPart
-from coding_agent.model.protocol import DeltaSink, ModelRequest, TextDelta
+from coding_agent.core.models import AssistantTurn, TextPart, ThinkingPart
+from coding_agent.model.protocol import (
+    DeltaSink,
+    ModelRequest,
+    TextDelta,
+    ThinkingBlockClosed,
+    ThinkingBlockClosedSink,
+    ThinkingDelta,
+    ThinkingDeltaSink,
+)
 
 
 class ScriptedModel:
@@ -25,6 +33,9 @@ class ScriptedModel:
         request: ModelRequest,
         on_text_delta: DeltaSink,
         cancellation: CancellationToken,
+        *,
+        on_thinking_delta: ThinkingDeltaSink | None = None,
+        on_thinking_block_closed: ThinkingBlockClosedSink | None = None,
     ) -> AssistantTurn:
         cancellation.raise_if_cancelled()
         self.requests.append(request)
@@ -39,6 +50,18 @@ class ScriptedModel:
                 result = on_text_delta(TextDelta(index=index, text=part.text))
                 if inspect.isawaitable(result):
                     await result
+            elif isinstance(part, ThinkingPart):
+                # Mirror the adapter: two reasoning chunks, then one close per block.
+                middle = len(part.text) // 2
+                for chunk in (part.text[:middle], part.text[middle:]):
+                    if on_thinking_delta is not None and chunk:
+                        result = on_thinking_delta(ThinkingDelta(index=index, text=chunk))
+                        if inspect.isawaitable(result):
+                            await result
+                if on_thinking_block_closed is not None:
+                    result = on_thinking_block_closed(ThinkingBlockClosed(index=index))
+                    if inspect.isawaitable(result):
+                        await result
         return outcome
 
 
@@ -63,6 +86,9 @@ class BlockingModel:
         request: ModelRequest,
         on_text_delta: DeltaSink,
         cancellation: CancellationToken,
+        *,
+        on_thinking_delta: ThinkingDeltaSink | None = None,
+        on_thinking_block_closed: ThinkingBlockClosedSink | None = None,
     ) -> AssistantTurn:
         self.requests.append(request)
         self.started.set()

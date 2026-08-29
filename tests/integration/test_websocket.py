@@ -37,7 +37,13 @@ from coding_agent.core.models import (
     Usage,
 )
 from coding_agent.runtime.coordinator import RunCoordinator, RunMutationGate
-from coding_agent.runtime.publisher import AssistantDelta, EventPublisher, ToolOutputDelta
+from coding_agent.runtime.publisher import (
+    AssistantDelta,
+    AssistantThinkingClosed,
+    AssistantThinkingDelta,
+    EventPublisher,
+    ToolOutputDelta,
+)
 from coding_agent.storage.sqlite import SQLiteStore
 
 SERVER_PORT = 8123
@@ -701,6 +707,43 @@ def test_delta_envelopes_always_identify_run_and_draft_epoch(tmp_path: Path) -> 
         "draft_epoch": "epoch-tool",
         "tool_call_id": "call-1",
         "text": "line\n",
+    }
+
+
+def test_thinking_delta_envelopes_carry_epoch_and_close_per_block(tmp_path: Path) -> None:
+    """The browser needs per-block reasoning text plus one collapse signal per block."""
+    runtime = _runtime(tmp_path)
+    session = runtime.store.create_session(str(tmp_path), "thinking")
+
+    with TestClient(runtime.app, base_url=BASE_URL) as client:
+        with _connect(client, _token(client)) as websocket:
+            _subscribe(websocket, session.id)
+            assert client.portal is not None
+            client.portal.call(
+                runtime.publisher.publish_transient,
+                AssistantThinkingDelta(session.id, "run-1", "epoch-1", 0, "hmm"),
+            )
+            delta = websocket.receive_json()
+            client.portal.call(
+                runtime.publisher.publish_transient,
+                AssistantThinkingClosed(session.id, "run-1", "epoch-1", 0),
+            )
+            closed = websocket.receive_json()
+
+    assert delta == {
+        "type": "assistant.thinking.delta",
+        "session_id": session.id,
+        "run_id": "run-1",
+        "draft_epoch": "epoch-1",
+        "index": 0,
+        "text": "hmm",
+    }
+    assert closed == {
+        "type": "assistant.thinking.closed",
+        "session_id": session.id,
+        "run_id": "run-1",
+        "draft_epoch": "epoch-1",
+        "index": 0,
     }
 
 

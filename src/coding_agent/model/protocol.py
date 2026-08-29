@@ -12,6 +12,7 @@ from coding_agent.core.models import (
     FrozenJsonMapping,
     MessagePart,
     TextPart,
+    ThinkingPart,
     ToolResult,
     ToolUsePart,
     Usage,
@@ -29,7 +30,33 @@ class TextDelta:
             raise ValueError("text delta index must not be negative")
 
 
+@dataclass(frozen=True, slots=True)
+class ThinkingDelta:
+    """A reasoning text increment for one thinking content block, keyed by block index."""
+
+    index: int
+    text: str
+
+    def __post_init__(self) -> None:
+        if self.index < 0:
+            raise ValueError("thinking delta index must not be negative")
+
+
+@dataclass(frozen=True, slots=True)
+class ThinkingBlockClosed:
+    """The provider finished one thinking block; display-only collapse signal."""
+
+    index: int
+
+    def __post_init__(self) -> None:
+        if self.index < 0:
+            raise ValueError("thinking block index must not be negative")
+
+
+StreamNotification: TypeAlias = TextDelta | ThinkingDelta | ThinkingBlockClosed
 DeltaSink: TypeAlias = Callable[[TextDelta], Awaitable[None] | None]
+ThinkingDeltaSink: TypeAlias = Callable[[ThinkingDelta], Awaitable[None] | None]
+ThinkingBlockClosedSink: TypeAlias = Callable[[ThinkingBlockClosed], Awaitable[None] | None]
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,9 +71,11 @@ class ModelMessage:
         if not parts:
             raise ValueError("model message parts must not be empty")
         if self.role == "assistant" and any(
-            not isinstance(part, TextPart | ToolUsePart) for part in parts
+            not isinstance(part, TextPart | ThinkingPart | ToolUsePart) for part in parts
         ):
-            raise ValueError("assistant model messages may only contain text or tool use")
+            raise ValueError(
+                "assistant model messages may only contain text, thinking, or tool use"
+            )
         if self.role == "user" and any(
             not isinstance(part, TextPart | ToolResult) for part in parts
         ):
@@ -82,6 +111,9 @@ class ModelGateway(Protocol):
         request: ModelRequest,
         on_text_delta: DeltaSink,
         cancellation: CancellationToken,
+        *,
+        on_thinking_delta: ThinkingDeltaSink | None = None,
+        on_thinking_block_closed: ThinkingBlockClosedSink | None = None,
     ) -> AssistantTurn: ...
 
 
@@ -126,6 +158,11 @@ __all__ = [
     "ModelProtocolError",
     "ModelRequest",
     "ModelTransportError",
+    "StreamNotification",
     "TextDelta",
+    "ThinkingBlockClosed",
+    "ThinkingBlockClosedSink",
+    "ThinkingDelta",
+    "ThinkingDeltaSink",
     "Usage",
 ]

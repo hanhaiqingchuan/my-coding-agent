@@ -11,12 +11,20 @@ from coding_agent.core.models import (
     AssistantTurn,
     ModelStopReason,
     TextPart,
+    ThinkingPart,
     ToolCall,
     ToolError,
     ToolUsePart,
     Usage,
 )
-from coding_agent.model.protocol import ModelProtocolError, ModelTransportError, TextDelta
+from coding_agent.model.protocol import (
+    ModelProtocolError,
+    ModelTransportError,
+    StreamNotification,
+    TextDelta,
+    ThinkingBlockClosed,
+    ThinkingDelta,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -28,9 +36,11 @@ class NormalizedMessageEvent:
     block_id: str | None = None
     block_name: str | None = None
     initial_text: str | None = None
+    initial_thinking: str | None = None
     initial_input: Mapping[str, object] | None = None
     delta_type: str | None = None
     text: str | None = None
+    thinking: str | None = None
     partial_json: str | None = None
     stop_reason: str | None = None
     usage: Usage | None = None
@@ -58,6 +68,7 @@ class NormalizedMessageEvent:
                 block_id=_optional_str(block.get("id")),
                 block_name=_optional_str(block.get("name")),
                 initial_text=_optional_str(block.get("text")),
+                initial_thinking=_optional_str(block.get("thinking")),
                 initial_input=_optional_mapping(block.get("input")),
             )
         if event_type == "content_block_delta":
@@ -67,6 +78,7 @@ class NormalizedMessageEvent:
                 index=_optional_int(event.get("index")),
                 delta_type=_optional_str(delta.get("type")),
                 text=_optional_str(delta.get("text")),
+                thinking=_optional_str(delta.get("thinking")),
                 partial_json=_optional_str(delta.get("partial_json")),
             )
         if event_type == "content_block_stop":
@@ -130,7 +142,7 @@ class MessageStreamAssembler:
     def cancel(self) -> None:
         self._cancelled = True
 
-    def feed(self, event: NormalizedMessageEvent) -> Sequence[TextDelta]:
+    def feed(self, event: NormalizedMessageEvent) -> Sequence[StreamNotification]:
         if self._cancelled:
             raise ModelProtocolError("STREAM_CANCELLED", "event arrived after cancellation")
         if self._message_stop_seen:
@@ -153,8 +165,7 @@ class MessageStreamAssembler:
         if event.type == "content_block_delta":
             return self._feed_block_delta(event)
         if event.type == "content_block_stop":
-            self._feed_block_stop(event)
-            return ()
+            return self._feed_block_stop(event)
         if event.type == "message_delta":
             self._feed_message_delta(event)
             return ()
@@ -244,6 +255,13 @@ class MessageStreamAssembler:
             if event.initial_text is None:
                 raise ModelProtocolError("MISSING_BLOCK_TEXT", "text block start requires text")
             block = _ContentBlock(type="text", fragments=[event.initial_text])
+        elif event.block_type == "thinking":
+            # Spec 8.2: reasoning streams as its own ordered block. The signature never
+            # leaves the adapter; the text becomes a display-only part on the turn.
+            block = _ContentBlock(
+                type="thinking",
+                fragments=[event.initial_thinking] if event.initial_thinking else [],
+            )
         elif event.block_type == "tool_use":
             if not event.block_id:
                 raise ModelProtocolError("MISSING_TOOL_USE_ID", "tool_use block requires an id")
@@ -269,7 +287,7 @@ class MessageStreamAssembler:
             )
         self._blocks.append(block)
 
-    def _feed_block_delta(self, event: NormalizedMessageEvent) -> Sequence[TextDelta]:
+    def _feed_block_delta(self, event: NormalizedMessageEvent) -> Sequence[StreamNotification]:
         block = self._open_block(event.index)
         self._validate_block_identity(block, event)
         if event.delta_type == "text_delta":
@@ -297,11 +315,30 @@ class MessageStreamAssembler:
                 )
             block.fragments.append(event.partial_json)
             return ()
+        if event.delta_type == "thinking_delta":
+            if block.type != "thinking":
+                raise ModelProtocolError(
+                    "BLOCK_TYPE_CONFLICT", "thinking delta targeted a non-thinking block"
+                )
+            if event.thinking is None:
+                raise ModelProtocolError(
+                    "MISSING_THINKING_DELTA", "thinking_delta requires thinking text"
+                )
+            block.fragments.append(event.thinking)
+            return (ThinkingDelta(index=_required_index(event.index), text=event.thinking),)
+        if event.delta_type == "signature_delta":
+            # Signatures only exist to echo thinking back, which this agent never does;
+            # consume and drop them so the wire history stays thinking-free.
+            if block.type != "thinking":
+                raise ModelProtocolError(
+                    "BLOCK_TYPE_CONFLICT", "signature delta targeted a non-thinking block"
+                )
+            return ()
         raise ModelProtocolError(
             "UNKNOWN_DELTA_TYPE", f"unsupported content delta type {event.delta_type!r}"
         )
 
-    def _feed_block_stop(self, event: NormalizedMessageEvent) -> None:
+    def _feed_block_stop(self, event: NormalizedMessageEvent) -> Sequence[StreamNotification]:
         if event.index is None or event.index < 0:
             raise ModelProtocolError("MISSING_BLOCK_INDEX", "content block stop requires an index")
         if event.index >= len(self._blocks):
@@ -318,6 +355,9 @@ class MessageStreamAssembler:
                 "BLOCK_INDEX_OUT_OF_ORDER", f"content block {event.index} is not active"
             )
         block.closed = True
+        if block.type == "thinking":
+            return (ThinkingBlockClosed(index=_required_index(event.index)),)
+        return ()
 
     def _feed_message_delta(self, event: NormalizedMessageEvent) -> None:
         if self._message_delta_seen:
@@ -392,6 +432,8 @@ class MessageStreamAssembler:
         """
         if block.type == "text":
             return TextPart("".join(block.fragments)), None
+        if block.type == "thinking":
+            return ThinkingPart("".join(block.fragments)), None
         if not block.id or not block.name:  # pragma: no cover - guarded at block start
             raise ModelProtocolError(
                 "MISSING_TOOL_USE_ID", "tool_use block requires an id and a name"

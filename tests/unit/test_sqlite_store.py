@@ -16,6 +16,7 @@ from coding_agent.core.models import (
     RunTotals,
     StopReason,
     TextPart,
+    ThinkingPart,
     ToolCall,
     ToolError,
     ToolResult,
@@ -497,6 +498,34 @@ def test_commit_final_turn_round_trips_as_a_committed_assistant_message(
     history = store.load_committed_transcript(session.id)
     assert [message.role for message in history] == ["user", "assistant"]
     assert history[-1].parts == (TextPart("finished"),)
+
+
+def test_all_four_part_kinds_round_trip_through_parts_json_in_order(
+    store: SQLiteStore, session
+) -> None:
+    """A thinking part must survive the parts codec like text, tool use and tool results."""
+    run = store.begin_run(session.id, "task", {}, "cmd-start", "hash-start")
+    store.transition_run(run.id, {RunState.STARTING}, RunState.BUILDING_CONTEXT, None, None)
+    store.transition_run(run.id, {RunState.BUILDING_CONTEXT}, RunState.MODEL_STREAMING, None, None)
+    turn = AssistantTurn(
+        id="turn-all-parts",
+        parts=(
+            ThinkingPart("Reasoning about the plan."),
+            TextPart("I will read the file."),
+            ToolUsePart(ToolCall("call-1", "read_file", {"path": "a.txt"})),
+        ),
+        stop_reason=ModelStopReason.TOOL_USE,
+        usage=Usage(input_tokens=2, output_tokens=3),
+    )
+
+    group = store.stage_tool_group(run.id, turn)
+    store.settle_tool_group(group.id, (ToolResult("call-1", "three lines", True),))
+
+    history = store.load_committed_transcript(session.id)
+    assert history[-2].parts == turn.parts
+    assert history[-1].parts == (ToolResult("call-1", "three lines", True),)
+    snapshot = store.load_snapshot(session.id)
+    assert snapshot.messages[-2].parts == turn.parts
 
 
 def test_run_totals_load_back_the_usage_and_counters_the_run_accumulated(

@@ -2,9 +2,22 @@ from __future__ import annotations
 
 import pytest
 
-from coding_agent.core.models import ModelStopReason, TextPart, Usage
+from coding_agent.core.models import (
+    ModelStopReason,
+    TextPart,
+    ThinkingPart,
+    ToolUsePart,
+    Usage,
+)
 from coding_agent.model.message_assembler import MessageStreamAssembler, NormalizedMessageEvent
-from coding_agent.model.protocol import ModelProtocolError, ModelTransportError, TextDelta
+from coding_agent.model.protocol import (
+    ModelProtocolError,
+    ModelTransportError,
+    StreamNotification,
+    TextDelta,
+    ThinkingBlockClosed,
+    ThinkingDelta,
+)
 from tests.fixtures.anthropic_events import text_response_events, two_tool_use_event_stream
 
 
@@ -12,11 +25,342 @@ def normalized(raw: dict[str, object]) -> NormalizedMessageEvent:
     return NormalizedMessageEvent.from_mapping(raw)
 
 
-def feed_all(assembler: MessageStreamAssembler, events: list[dict[str, object]]) -> list[TextDelta]:
-    deltas: list[TextDelta] = []
+def feed_all(
+    assembler: MessageStreamAssembler, events: list[dict[str, object]]
+) -> list[StreamNotification]:
+    notifications: list[StreamNotification] = []
     for event in events:
-        deltas.extend(assembler.feed(normalized(event)))
-    return deltas
+        notifications.extend(assembler.feed(normalized(event)))
+    return notifications
+
+
+def thinking_block_events(*, index: int = 0) -> list[dict[str, object]]:
+    """Bailian-compatible shape: a reasoning block streams before any text or tool block."""
+    return [
+        {
+            "type": "content_block_start",
+            "index": index,
+            "content_block": {"type": "thinking", "thinking": "Let me", "signature": "sig-0"},
+        },
+        {
+            "type": "content_block_delta",
+            "index": index,
+            "delta": {"type": "thinking_delta", "thinking": " plan."},
+        },
+        {
+            "type": "content_block_delta",
+            "index": index,
+            "delta": {"type": "signature_delta", "signature": "sig-1"},
+        },
+        {"type": "content_block_stop", "index": index},
+    ]
+
+
+def thinking_then_text_events() -> list[dict[str, object]]:
+    base = text_response_events()
+    return [
+        base[0],
+        *thinking_block_events(),
+        {
+            "type": "content_block_start",
+            "index": 1,
+            "content_block": {"type": "text", "text": ""},
+        },
+        {
+            "type": "content_block_delta",
+            "index": 1,
+            "delta": {"type": "text_delta", "text": "done"},
+        },
+        {"type": "content_block_stop", "index": 1},
+        base[-2],
+        base[-1],
+    ]
+
+
+def thinking_then_tool_use_events() -> list[dict[str, object]]:
+    shifted: list[dict[str, object]] = []
+    for event in two_tool_use_event_stream():
+        if "index" in event:
+            event = {**event, "index": event["index"] + 1}
+        shifted.append(event)
+    return [shifted[0], *thinking_block_events(), *shifted[1:]]
+
+
+def two_thinking_blocks_then_text_events() -> list[dict[str, object]]:
+    base = text_response_events()
+    second = thinking_block_events()
+    second[0] = {
+        **second[0],
+        "index": 1,
+        "content_block": {"type": "thinking", "thinking": "Second"},
+    }
+    second[1] = {**second[1], "index": 1, "delta": {"type": "thinking_delta", "thinking": " pass."}}
+    second[2] = {
+        **second[2],
+        "index": 1,
+        "delta": {"type": "signature_delta", "signature": "sig-2"},
+    }
+    second[3] = {**second[3], "index": 1}
+    return [
+        base[0],
+        *thinking_block_events(),
+        *second,
+        {
+            "type": "content_block_start",
+            "index": 2,
+            "content_block": {"type": "text", "text": ""},
+        },
+        {
+            "type": "content_block_delta",
+            "index": 2,
+            "delta": {"type": "text_delta", "text": "done"},
+        },
+        {"type": "content_block_stop", "index": 2},
+        base[-2],
+        base[-1],
+    ]
+
+
+def test_thinking_block_before_text_becomes_an_ordered_part() -> None:
+    """Provider reasoning must survive aggregation as a display-only part before its text."""
+    assembler = MessageStreamAssembler()
+
+    notifications = feed_all(assembler, thinking_then_text_events())
+    turn = assembler.finish()
+
+    assert notifications == [
+        ThinkingDelta(index=0, text=" plan."),
+        ThinkingBlockClosed(index=0),
+        TextDelta(index=1, text="done"),
+    ]
+    assert turn.parts == (ThinkingPart("Let me plan."), TextPart("done"))
+    assert turn.stop_reason is ModelStopReason.END_TURN
+    assert turn.tool_calls == ()
+
+
+def test_thinking_block_before_tool_use_keeps_tool_identity_intact() -> None:
+    """Tool calls must survive a leading reasoning block without inheriting its index."""
+    assembler = MessageStreamAssembler()
+
+    notifications = feed_all(assembler, thinking_then_tool_use_events())
+    turn = assembler.finish()
+
+    assert notifications == [
+        ThinkingDelta(index=0, text=" plan."),
+        ThinkingBlockClosed(index=0),
+        TextDelta(index=1, text="Checking files."),
+    ]
+    assert [type(part) for part in turn.parts] == [ThinkingPart, TextPart, ToolUsePart, ToolUsePart]
+    assert turn.parts[0] == ThinkingPart("Let me plan.")
+    assert [call.name for call in turn.tool_calls] == ["read_file", "run_command"]
+    assert dict(turn.tool_calls[0].input) == {"path": "a.py"}
+    assert turn.stop_reason is ModelStopReason.TOOL_USE
+
+
+def test_multiple_thinking_blocks_each_become_their_own_part() -> None:
+    """Merging consecutive reasoning blocks would erase which text belongs to which block."""
+    assembler = MessageStreamAssembler()
+
+    notifications = feed_all(assembler, two_thinking_blocks_then_text_events())
+    turn = assembler.finish()
+
+    assert [item for item in notifications if isinstance(item, ThinkingDelta)] == [
+        ThinkingDelta(index=0, text=" plan."),
+        ThinkingDelta(index=1, text=" pass."),
+    ]
+    assert [item for item in notifications if isinstance(item, ThinkingBlockClosed)] == [
+        ThinkingBlockClosed(index=0),
+        ThinkingBlockClosed(index=1),
+    ]
+    assert turn.parts == (
+        ThinkingPart("Let me plan."),
+        ThinkingPart("Second pass."),
+        TextPart("done"),
+    )
+
+
+def test_signature_deltas_are_consumed_without_reaching_the_turn() -> None:
+    """Signatures exist only to echo thinking back, which this agent never does."""
+    assembler = MessageStreamAssembler()
+
+    feed_all(assembler, thinking_then_text_events())
+    turn = assembler.finish()
+
+    assert turn.parts == (ThinkingPart("Let me plan."), TextPart("done"))
+    assert "sig-0" not in repr(turn)
+    assert "sig-1" not in repr(turn)
+
+
+def test_thinking_only_turn_keeps_empty_text_semantics() -> None:
+    """A reasoning-only response carries no text or tool use, so it stays an empty answer."""
+    assembler = MessageStreamAssembler()
+    base = text_response_events()
+
+    notifications = feed_all(assembler, [base[0], *thinking_block_events(), base[-2], base[-1]])
+    turn = assembler.finish()
+
+    assert notifications == [ThinkingDelta(index=0, text=" plan."), ThinkingBlockClosed(index=0)]
+    assert turn.parts == (ThinkingPart("Let me plan."),)
+    assert not any(isinstance(part, TextPart) for part in turn.parts)
+    assert turn.tool_calls == ()
+    assert turn.stop_reason is ModelStopReason.END_TURN
+
+
+def test_thinking_block_that_never_closes_is_a_protocol_error() -> None:
+    """Tolerating reasoning blocks must not tolerate unfinished block lifecycles."""
+    assembler = MessageStreamAssembler()
+    base = text_response_events()
+    feed_all(assembler, [base[0], *thinking_block_events()[:-1]])
+
+    with pytest.raises(ModelProtocolError) as raised:
+        assembler.finish()
+
+    assert raised.value.code == "UNCLOSED_CONTENT_BLOCK"
+
+
+@pytest.mark.parametrize(
+    "delta",
+    [
+        {"type": "thinking_delta", "thinking": "x"},
+        {"type": "signature_delta", "signature": "x"},
+    ],
+)
+def test_thinking_deltas_targeting_non_thinking_blocks_are_protocol_errors(
+    delta: dict[str, object],
+) -> None:
+    """Reasoning deltas may only feed a thinking block."""
+    base = text_response_events()
+    events = [
+        base[0],
+        {
+            "type": "content_block_start",
+            "index": 0,
+            "content_block": {"type": "text", "text": ""},
+        },
+        {"type": "content_block_delta", "index": 0, "delta": delta},
+    ]
+    assembler = MessageStreamAssembler()
+
+    with pytest.raises(ModelProtocolError) as raised:
+        feed_all(assembler, events)
+
+    assert raised.value.code == "BLOCK_TYPE_CONFLICT"
+
+
+@pytest.mark.parametrize(
+    "delta",
+    [
+        {"type": "text_delta", "text": "x"},
+        {"type": "input_json_delta", "partial_json": "{}"},
+    ],
+)
+def test_text_and_tool_deltas_targeting_thinking_blocks_are_protocol_errors(
+    delta: dict[str, object],
+) -> None:
+    """A thinking block must not accept text or tool input either."""
+    base = text_response_events()
+    events = [
+        base[0],
+        {
+            "type": "content_block_start",
+            "index": 0,
+            "content_block": {"type": "thinking", "thinking": ""},
+        },
+        {"type": "content_block_delta", "index": 0, "delta": delta},
+    ]
+    assembler = MessageStreamAssembler()
+
+    with pytest.raises(ModelProtocolError) as raised:
+        feed_all(assembler, events)
+
+    assert raised.value.code == "BLOCK_TYPE_CONFLICT"
+
+
+@pytest.mark.parametrize(
+    "delta",
+    [
+        {"type": "thinking_delta"},
+        {"type": "thinking_delta", "thinking": None},
+    ],
+)
+def test_thinking_delta_without_text_is_a_protocol_error(delta: dict[str, object]) -> None:
+    """Symmetry with text_delta keeps malformed reasoning frames detectable."""
+    base = text_response_events()
+    events = [
+        base[0],
+        {
+            "type": "content_block_start",
+            "index": 0,
+            "content_block": {"type": "thinking", "thinking": ""},
+        },
+        {"type": "content_block_delta", "index": 0, "delta": delta},
+    ]
+    assembler = MessageStreamAssembler()
+
+    with pytest.raises(ModelProtocolError) as raised:
+        feed_all(assembler, events)
+
+    assert raised.value.code == "MISSING_THINKING_DELTA"
+
+
+@pytest.mark.parametrize("block_type", ["image", "redacted_thinking", "reasoning"])
+def test_only_the_thinking_block_type_is_tolerated(block_type: str) -> None:
+    """Every other unknown block type keeps failing as a protocol error."""
+    base = text_response_events()
+    events = [
+        base[0],
+        {
+            "type": "content_block_start",
+            "index": 0,
+            "content_block": {"type": block_type},
+        },
+    ]
+    assembler = MessageStreamAssembler()
+
+    with pytest.raises(ModelProtocolError) as raised:
+        feed_all(assembler, events)
+
+    assert raised.value.code == "UNKNOWN_BLOCK_TYPE"
+
+
+@pytest.mark.parametrize(
+    ("following_start", "code"),
+    [
+        (
+            {
+                "type": "content_block_start",
+                "index": 0,
+                "content_block": {"type": "text", "text": ""},
+            },
+            "DUPLICATE_BLOCK_INDEX",
+        ),
+        (
+            {
+                "type": "content_block_start",
+                "index": 0,
+                "content_block": {
+                    "type": "tool_use",
+                    "id": "tool-1",
+                    "name": "read_file",
+                    "input": {},
+                },
+            },
+            "DUPLICATE_BLOCK_INDEX",
+        ),
+    ],
+)
+def test_thinking_block_index_conflicts_are_protocol_errors(
+    following_start: dict[str, object], code: str
+) -> None:
+    """Reasoning blocks occupy a real index, so collisions stay detectable."""
+    base = text_response_events()
+    events = [base[0], *thinking_block_events(), following_start]
+    assembler = MessageStreamAssembler()
+
+    with pytest.raises(ModelProtocolError) as raised:
+        feed_all(assembler, events)
+
+    assert raised.value.code == code
 
 
 def test_tool_inputs_and_parts_are_assembled_by_content_block_index() -> None:

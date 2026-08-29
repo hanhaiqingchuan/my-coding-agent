@@ -14,6 +14,7 @@ from coding_agent.core.models import (
     AssistantTurn,
     ModelStopReason,
     TextPart,
+    ThinkingPart,
     ToolCall,
     ToolError,
     ToolResult,
@@ -29,6 +30,8 @@ from coding_agent.model.protocol import (
     ModelRequest,
     ModelTransportError,
     TextDelta,
+    ThinkingBlockClosed,
+    ThinkingDelta,
 )
 from tests.fixtures.anthropic_events import text_response_events
 
@@ -283,6 +286,158 @@ async def test_toolless_request_omits_tools_and_tool_choice(
 
     assert "tools" not in client.messages.calls[0]
     assert "tool_choice" not in client.messages.calls[0]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("tools", [True, False])
+async def test_requests_send_no_thinking_field_and_tolerate_provider_default_reasoning(
+    monkeypatch: pytest.MonkeyPatch, tools: bool
+) -> None:
+    """Provider defaults apply; the portable field set never negotiates reasoning controls."""
+    client, _ = install_fake_client(monkeypatch, FakeStream(text_response_events()))
+    model = AnthropicMessagesModel(ModelSettings(model="model-a"), api_key="secret")
+
+    await model.complete(
+        request_with_tool_history(tools=tools), lambda _: None, CancellationToken()
+    )
+
+    assert "thinking" not in client.messages.calls[0]
+
+
+@pytest.mark.asyncio
+async def test_thinking_history_compiles_to_text_and_tool_use_blocks_only(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Thinking is display-only; echoing it back would feed reasoning to the provider again."""
+    request = ModelRequest(
+        system="system",
+        messages=(
+            ModelMessage(role="user", parts=(TextPart("please think"),)),
+            ModelMessage(
+                role="assistant",
+                parts=(ThinkingPart("reasoned already"), TextPart("answer")),
+            ),
+            ModelMessage(role="user", parts=(TextPart("continue"),)),
+        ),
+        tools=(),
+        max_tokens=100,
+    )
+    client, _ = install_fake_client(monkeypatch, FakeStream(text_response_events()))
+    model = AnthropicMessagesModel(ModelSettings(model="model-a"), api_key="secret")
+
+    await model.complete(request, lambda _: None, CancellationToken())
+
+    wire_messages = client.messages.calls[0]["messages"]
+    assert isinstance(wire_messages, list)
+    assert [[block["type"] for block in message["content"]] for message in wire_messages] == [
+        ["text"],
+        ["text"],
+        ["text"],
+    ]
+    assert wire_messages[1]["content"] == [{"type": "text", "text": "answer"}]
+
+
+@pytest.mark.asyncio
+async def test_streaming_thinking_reaches_the_thinking_callbacks_in_order(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The loop needs reasoning text while streaming and one close signal per block."""
+    base = text_response_events()
+    events = [
+        base[0],
+        {
+            "type": "content_block_start",
+            "index": 0,
+            "content_block": {"type": "thinking", "thinking": "Let me"},
+        },
+        {
+            "type": "content_block_delta",
+            "index": 0,
+            "delta": {"type": "thinking_delta", "thinking": " plan."},
+        },
+        {
+            "type": "content_block_delta",
+            "index": 0,
+            "delta": {"type": "signature_delta", "signature": "sig-1"},
+        },
+        {"type": "content_block_stop", "index": 0},
+        {
+            "type": "content_block_start",
+            "index": 1,
+            "content_block": {"type": "text", "text": ""},
+        },
+        {
+            "type": "content_block_delta",
+            "index": 1,
+            "delta": {"type": "text_delta", "text": "done"},
+        },
+        {"type": "content_block_stop", "index": 1},
+        base[-2],
+        base[-1],
+    ]
+    install_fake_client(monkeypatch, FakeStream(events))
+    model = AnthropicMessagesModel(ModelSettings(model="model-a"), api_key="secret")
+    text_deltas: list[TextDelta] = []
+    thinking_deltas: list[ThinkingDelta] = []
+    thinking_closed: list[ThinkingBlockClosed] = []
+
+    turn = await model.complete(
+        request_with_tool_history(tools=False),
+        text_deltas.append,
+        CancellationToken(),
+        on_thinking_delta=thinking_deltas.append,
+        on_thinking_block_closed=thinking_closed.append,
+    )
+
+    assert text_deltas == [TextDelta(index=1, text="done")]
+    assert thinking_deltas == [ThinkingDelta(index=0, text=" plan.")]
+    assert thinking_closed == [ThinkingBlockClosed(index=0)]
+    assert turn.parts == (ThinkingPart("Let me plan."), TextPart("done"))
+
+
+@pytest.mark.asyncio
+async def test_thinking_callbacks_are_optional_and_default_to_dropped(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A caller that only wants text must still be able to consume a thinking stream."""
+    base = text_response_events()
+    events = [
+        base[0],
+        {
+            "type": "content_block_start",
+            "index": 0,
+            "content_block": {"type": "thinking", "thinking": "Let me"},
+        },
+        {
+            "type": "content_block_delta",
+            "index": 0,
+            "delta": {"type": "thinking_delta", "thinking": " plan."},
+        },
+        {"type": "content_block_stop", "index": 0},
+        {
+            "type": "content_block_start",
+            "index": 1,
+            "content_block": {"type": "text", "text": ""},
+        },
+        {
+            "type": "content_block_delta",
+            "index": 1,
+            "delta": {"type": "text_delta", "text": "done"},
+        },
+        {"type": "content_block_stop", "index": 1},
+        base[-2],
+        base[-1],
+    ]
+    install_fake_client(monkeypatch, FakeStream(events))
+    model = AnthropicMessagesModel(ModelSettings(model="model-a"), api_key="secret")
+    text_deltas: list[TextDelta] = []
+
+    turn = await model.complete(
+        request_with_tool_history(tools=False), text_deltas.append, CancellationToken()
+    )
+
+    assert text_deltas == [TextDelta(index=1, text="done")]
+    assert turn.parts == (ThinkingPart("Let me plan."), TextPart("done"))
 
 
 @pytest.mark.asyncio

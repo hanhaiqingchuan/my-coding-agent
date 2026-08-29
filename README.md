@@ -195,6 +195,8 @@ Agent Loop
 
 不支持的第二协议：不支持 OpenAI Chat Completions、Responses API 或其它非 Messages 语义的接口；不支持 Claude Agent SDK、LangChain、LlamaIndex、AutoGen、CrewAI、MCP SDK 等 Agent 框架/SDK；不支持服务端托管的执行或文件能力（server tools、code interpreter、files API）；不使用 extended thinking 与 beta headers。首版也不做多 run 并发、多 Agent/子 Agent、RAG/向量库/代码索引、独立的 search/grep/edit/patch 工具、PTY 与交互式 stdin、远程部署与账号系统。
 
+推理输出保持中性：请求不携带 `thinking` 字段，是否开启推理由服务端默认决定（例如阿里云百炼的 Qwen 默认思考，Anthropic 官方默认不思考）。兼容服务返回 `thinking` block 时，后端按 block 聚合文本、随消息持久化，并以瞬态事件推送到 UI 折叠展示；`signature_delta` 直接丢弃，推理内容从不回传给模型，也不计入上下文估算。`[model]` 的 `base_url` 可指向任何 Anthropic-compatible 端点，例如 Anthropic 官方 `https://api.anthropic.com` 或阿里云百炼 Token Plan 入口 `https://token-plan.cn-beijing.maas.aliyuncs.com/apps/anthropic`（模型名与凭据环境变量按所用服务调整）。
+
 `stream = false` 的非流式兼容、`pause_turn` 自动 continuation 属于后续增量，当前配置校验会直接拒绝 `stream = false`，不留“可配置但不可用”的分支。
 
 ## 10. 测试

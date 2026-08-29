@@ -28,6 +28,7 @@ from coding_agent.core.models import (
     RunState,
     StopReason,
     TextPart,
+    ThinkingPart,
     ToolCall,
     ToolError,
     ToolResult,
@@ -47,7 +48,13 @@ from coding_agent.model.retry import RetryingInvoker
 from coding_agent.runtime.approval import ApprovalGate
 from coding_agent.runtime.coordinator import RunMutationGate
 from coding_agent.runtime.loop import AgentLoop
-from coding_agent.runtime.publisher import AssistantDelta, EventPublisher, ToolOutputDelta
+from coding_agent.runtime.publisher import (
+    AssistantDelta,
+    AssistantThinkingClosed,
+    AssistantThinkingDelta,
+    EventPublisher,
+    ToolOutputDelta,
+)
 from coding_agent.storage.sqlite import SQLiteStore
 from coding_agent.tools.registry import ToolRegistry
 from tests.fakes.model import BlockingModel, ScriptedModel
@@ -84,7 +91,7 @@ class PartialFailureModel:
     def __init__(self) -> None:
         self.requests: list[ModelRequest] = []
 
-    async def complete(self, request, on_text_delta, cancellation):
+    async def complete(self, request, on_text_delta, cancellation, **_kwargs):
         self.requests.append(request)
         emitted = on_text_delta(TextDelta(0, "partial draft"))
         if inspect.isawaitable(emitted):
@@ -217,6 +224,85 @@ async def test_live_deltas_include_run_and_distinct_draft_epochs(
     assert [(item.tool_call_id, item.text) for item in tool] == [("call-read", "output:call-read")]
     assert tool[0].run_id == run_id
     assert tool[0].draft_epoch
+
+
+@pytest.mark.asyncio
+async def test_thinking_streams_transient_events_without_durable_writes(
+    tmp_path: Path, valid_settings: AppSettings
+) -> None:
+    """Reasoning streams live like text deltas but never lands in the durable event log."""
+    turn = AssistantTurn(
+        "turn-thinking",
+        (ThinkingPart("Reasoning first."), TextPart("done")),
+        ModelStopReason.END_TURN,
+        Usage(30, 4),
+    )
+    loop, store, session_id, run_id, _, _, mutation_gate = _make_loop(
+        tmp_path, valid_settings, [turn]
+    )
+    publisher = mutation_gate.event_publisher
+    async with publisher.session_guard(session_id):
+        subscription = publisher.subscribe_locked(session_id)
+
+    await loop.run(run_id, session_id, CancellationToken())
+    published = []
+    while True:
+        try:
+            published.append(await asyncio.wait_for(subscription.receive(), timeout=0.01))
+        except TimeoutError:
+            break
+
+    thinking_deltas = [item for item in published if isinstance(item, AssistantThinkingDelta)]
+    thinking_closed = [item for item in published if isinstance(item, AssistantThinkingClosed)]
+    text_deltas = [item for item in published if isinstance(item, AssistantDelta)]
+    assert len(thinking_deltas) == 2
+    assert "".join(delta.text for delta in thinking_deltas) == "Reasoning first."
+    assert len(thinking_closed) == 1
+    assert all(item.run_id == run_id and item.session_id == session_id for item in thinking_deltas)
+    assert all(item.run_id == run_id for item in thinking_closed)
+    assert thinking_closed[0].index == 0
+    epochs = {item.draft_epoch for item in [*thinking_deltas, *thinking_closed, *text_deltas]}
+    assert len(epochs) == 1
+    assert next(iter(epochs))
+    thinking_index = published.index(thinking_deltas[0])
+    closed_index = published.index(thinking_closed[0])
+    text_index = published.index(text_deltas[0])
+    assert thinking_index < closed_index < text_index
+
+    events = store.events_after(session_id, 0)
+    assert all("thinking" not in event.type for event in events)
+    with store.connection() as connection:
+        thinking_rows = connection.execute(
+            "SELECT type FROM events WHERE type LIKE '%thinking%'"
+        ).fetchall()
+    assert thinking_rows == []
+    transcript = store.load_committed_transcript(session_id)
+    assert transcript[-1].parts == (ThinkingPart("Reasoning first."), TextPart("done"))
+
+
+@pytest.mark.asyncio
+async def test_thinking_only_turn_keeps_empty_response_semantics(
+    tmp_path: Path, valid_settings: AppSettings
+) -> None:
+    """A reasoning-only answer is still silence: retry once, then stop with EMPTY_RESPONSE."""
+    thinking_only = AssistantTurn(
+        "turn-thinking-only",
+        (ThinkingPart("Only reasoning, no answer."),),
+        ModelStopReason.END_TURN,
+        Usage(30, 4),
+    )
+    loop, store, session_id, run_id, model, _, _ = _make_loop(
+        tmp_path, valid_settings, [thinking_only, thinking_only]
+    )
+
+    outcome = await loop.run(run_id, session_id, CancellationToken())
+
+    assert outcome == RunOutcome.stop(StopReason.EMPTY_RESPONSE)
+    assert model.call_count == 2
+    transcript = store.load_committed_transcript(session_id)
+    assert not any(
+        isinstance(part, ThinkingPart) for message in transcript for part in message.parts
+    )
 
 
 @pytest.mark.asyncio

@@ -16,6 +16,7 @@ from coding_agent.core.models import (
     Message,
     MessageStatus,
     TextPart,
+    ThinkingPart,
     ToolCall,
     ToolResult,
     ToolUsePart,
@@ -25,7 +26,7 @@ from coding_agent.core.models import (
 def _message(
     seq: int,
     role: str,
-    *parts: TextPart | ToolUsePart | ToolResult,
+    *parts: TextPart | ThinkingPart | ToolUsePart | ToolResult,
     run_id: str | None = None,
     status: MessageStatus = MessageStatus.COMMITTED,
     tool_call_id: str | None = None,
@@ -156,6 +157,89 @@ def test_projection_preserves_each_committed_user_verbatim_once_and_is_pure(
     assert "pending.py" not in _all_text(result)
     assert "interrupted draft" not in _all_text(result)
     assert "Earlier assistant work was summarized." in _all_text(result)
+
+
+def test_committed_thinking_parts_never_enter_the_model_view(
+    transcript: tuple[Message, ...],
+) -> None:
+    """Reasoning is display-only; the provider must never see it again as context."""
+    thinking_transcript = (
+        _message(1, "user", TextPart("first\nexact"), run_id="run-1"),
+        _message(
+            2,
+            "assistant",
+            ThinkingPart("I wonder about the answer."),
+            TextPart("first answer"),
+            run_id="run-1",
+        ),
+        _message(3, "user", TextPart("second 🧪"), run_id="run-2"),
+        _message(
+            4,
+            "assistant",
+            ThinkingPart("Deeper reasoning this round."),
+            ToolUsePart(ToolCall("call-old", "read_file", {"path": "old.py"})),
+            run_id="run-2",
+        ),
+        _message(
+            5,
+            "tool",
+            ToolResult("call-old", "x" * 1_200, True),
+            run_id="run-2",
+            tool_call_id="call-old",
+        ),
+        _message(6, "user", TextPart("third"), run_id="run-3"),
+        _message(7, "assistant", TextPart("third answer"), run_id="run-3"),
+    )
+
+    result = ContextBuilder().build(thinking_transcript, None, _request())
+
+    assert isinstance(result, ReadyContext)
+    assert all(
+        not isinstance(part, ThinkingPart)
+        for message in result.view.messages
+        for part in message.parts
+    )
+    assert "I wonder about the answer." not in _all_text(result)
+    assert "Deeper reasoning this round." not in _all_text(result)
+    assert "first answer" in _all_text(result)
+
+
+def test_mandatory_content_accounting_ignores_thinking_parts() -> None:
+    """Thinking must not change which groups are mandatory or the mandatory token floor."""
+    call = ToolCall("call-mandatory", "read_file", {"path": "current.py"})
+    with_thinking = (
+        _message(1, "user", TextPart("current"), run_id="run-active"),
+        _message(
+            2,
+            "assistant",
+            ThinkingPart("reasoning before the call"),
+            ToolUsePart(call),
+            run_id="run-active",
+        ),
+        _message(
+            3,
+            "tool",
+            ToolResult("call-mandatory", "current result", True),
+            run_id="run-active",
+            tool_call_id="call-mandatory",
+        ),
+    )
+    without_thinking = (
+        with_thinking[0],
+        _message(2, "assistant", ToolUsePart(call), run_id="run-active"),
+        with_thinking[2],
+    )
+    request = _request()
+
+    with_result = ContextBuilder().build(with_thinking, None, request)
+    without_result = ContextBuilder().build(without_thinking, None, request)
+
+    assert isinstance(with_result, ReadyContext)
+    assert isinstance(without_result, ReadyContext)
+    assert with_result.view.messages == without_result.view.messages
+    assert with_result.mandatory_tokens == without_result.mandatory_tokens
+    assert with_result.mandatory_user_tokens == without_result.mandatory_user_tokens
+    assert with_result.estimated_tokens == without_result.estimated_tokens
 
 
 def test_recent_two_turns_and_current_committed_tool_exchange_remain_complete(
