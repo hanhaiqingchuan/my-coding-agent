@@ -150,6 +150,10 @@ uv run --python 3.12 coding-agent run \
 | `make start` | 依赖 `build`，启动生产形态的单进程服务 |
 | `make dev-api` | 只启动 FastAPI 开发后端 |
 | `make dev-web` | 只启动 Vite 开发服务器 |
+| `make eval-run` | 跑一轮测评 campaign（12 个公开任务；真实模型，需要 API key 环境变量） |
+| `make eval-judge` | 同 `eval-run`，并在每次运行后用 LLM 裁判打三项分（需要 API key） |
+| `make eval-history` | 在终端列出历史 campaign（成功率与裁判均分） |
+| `make eval-web` | 依赖 `build`，启动服务并浏览测评结果网页（只读，可看历史数据） |
 | `make test-backend` | 运行后端单元与集成测试（`--ignore=tests/live`） |
 | `make test-frontend` | 运行前端组件测试 |
 | `make test` | 顺序执行 `test-backend` 和 `test-frontend`，默认不访问网络 |
@@ -158,7 +162,15 @@ uv run --python 3.12 coding-agent run \
 | `make format` | 后端 Ruff formatter（`src tests scripts`）与前端 format |
 | `make check` | 依次执行 lint、默认测试、E2E 和生产构建 |
 
-启动参数通过 Make 变量传递：`CONFIG` 默认 `config.toml`，`ARGS` 原样追加到正式 CLI，因此参数校验仍由 CLI 完成。
+启动参数通过 Make 变量传递：`CONFIG` 默认 `config.toml`，`ARGS` 原样追加到正式 CLI，因此参数校验仍由 CLI 完成。测评目标使用 `EVAL_OUT`（结果目录，默认 `evaluation-results/`，已被 gitignore）、`EVAL_REPEATS`（每任务重复次数，默认 `1`）与 `MANIFEST`（任务清单，默认公开任务集）。
+
+测评的典型工作流（需要模型凭据在环境变量中）：
+
+```bash
+make eval-judge                                # 跑 12 任务 × 1 次 + LLM 裁判
+make eval-history                              # 终端看历史汇总
+make eval-web                                  # 网页浏览结果（#/evaluations）
+```
 
 ## 7. 架构
 

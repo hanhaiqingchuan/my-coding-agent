@@ -48,3 +48,6 @@ node_modules/
 .DS_Store
 .idea/
 .vscode/
+
+# Evaluation campaign outputs (raw run documents stay outside the public repo).
+/evaluation-results/
