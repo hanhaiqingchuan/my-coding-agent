@@ -9,9 +9,9 @@ export const SCORE_NAMES = [
 export type ScoreName = (typeof SCORE_NAMES)[number];
 
 export const SCORE_LABELS: Record<ScoreName, string> = {
-  task_completion: "Task completion",
-  process_quality: "Process quality",
-  communication: "Communication",
+  task_completion: "任务完成",
+  process_quality: "过程质量",
+  communication: "沟通表达",
 };
 
 export type JudgeScores = {

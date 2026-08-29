@@ -36,7 +36,7 @@ export function Composer({
   return (
     <form
       className={`composer${isFocused ? " composer-focused" : ""}`}
-      aria-label="Message composer"
+      aria-label="消息输入框"
       onFocus={() => setIsFocused(true)}
       onBlur={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget))
@@ -48,11 +48,11 @@ export function Composer({
       }}
     >
       <label className="sr-only" htmlFor="composer-message">
-        Message
+        消息
       </label>
       <textarea
         id="composer-message"
-        aria-label="Message"
+        aria-label="消息"
         aria-describedby={
           isRecoveryBlocked ? "composer-recovery-note" : undefined
         }
@@ -60,14 +60,14 @@ export function Composer({
         disabled={isRecoveryBlocked}
         placeholder={
           isRecoveryBlocked
-            ? "Confirm recovery before sending a message"
-            : "Message the agent"
+            ? "请先确认已检查工作区/进程，再发送消息"
+            : "给智能体发消息"
         }
         onChange={(event) => onDraftChange(event.target.value)}
       />
       {isRecoveryBlocked ? (
         <p className="composer-note" id="composer-recovery-note">
-          输入框已禁用：请先确认已检查 workspace/进程。
+          输入框已禁用：请先确认已检查工作区/进程。
         </p>
       ) : null}
       <div className="composer-actions">
@@ -80,11 +80,11 @@ export function Composer({
               if (activeRun !== null && !isCancelling) onStop(activeRun.id);
             }}
           >
-            {isCancelling ? "正在停止" : "Stop"}
+            {isCancelling ? "正在停止" : "停止"}
           </button>
         ) : (
           <button className="composer-send" type="submit" disabled={!canSend}>
-            Send
+            发送
           </button>
         )}
       </div>

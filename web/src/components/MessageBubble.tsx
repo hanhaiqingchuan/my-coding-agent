@@ -1,4 +1,5 @@
 import type { MessageDto, MessagePartDto } from "../api/types";
+import { roleLabel } from "../api/labels";
 import type { ThinkingDraft } from "../features/sessions/sessionReducer";
 import { ThinkingDisclosure } from "./ThinkingDisclosure";
 
@@ -50,7 +51,7 @@ export function MessageBubble({
     if (!hasThinking && !hasText) return null;
     return (
       <article className="message-bubble message-assistant" data-transient>
-        <header>Assistant · streaming</header>
+        <header>助手 · 生成中</header>
         {hasThinking ? (
           <ThinkingDisclosure
             text={thinking.text}
@@ -68,7 +69,7 @@ export function MessageBubble({
 
   return (
     <article className={`message-bubble message-${message.role}`}>
-      <header>{message.role}</header>
+      <header>{roleLabel(message.role)}</header>
       {segments.map((segment, index) =>
         segment.kind === "thinking" ? (
           <ThinkingDisclosure key={index} text={segment.text} />

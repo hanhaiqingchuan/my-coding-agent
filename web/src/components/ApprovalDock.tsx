@@ -17,9 +17,9 @@ export function ApprovalDock({
   const isWrite = pendingApproval.name.includes("write");
 
   return (
-    <section className="approval-dock" aria-label="Pending approval">
+    <section className="approval-dock" aria-label="待审批">
       <header>
-        <p>Approval required</p>
+        <p>需要审批</p>
         <h2>{pendingApproval.name}</h2>
       </header>
       {isWrite && pendingApproval.preview !== null ? (
@@ -40,14 +40,14 @@ export function ApprovalDock({
           className="approval-reject"
           onClick={() => onResolve(pendingApproval.tool_call_id, "reject")}
         >
-          Reject
+          拒绝
         </button>
         <button
           type="button"
           className="approval-approve"
           onClick={() => onResolve(pendingApproval.tool_call_id, "approve")}
         >
-          Approve
+          批准
         </button>
       </div>
     </section>

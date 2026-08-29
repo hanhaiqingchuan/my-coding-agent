@@ -18,10 +18,10 @@ export function JudgementCard({ judgement, note = null }: JudgementCardProps) {
       return (
         <section
           className="judgement-card judgement-unreadable"
-          aria-label="Judgement"
+          aria-label="裁判"
         >
           <header>
-            <h2>Judgement record unreadable</h2>
+            <h2>裁判记录无法读取</h2>
             <p>{note}</p>
           </header>
         </section>
@@ -30,26 +30,26 @@ export function JudgementCard({ judgement, note = null }: JudgementCardProps) {
     return (
       <section
         className="judgement-card judgement-empty"
-        aria-label="Judgement"
+        aria-label="裁判"
       >
-        <p>No judgement record for this run.</p>
+        <p>该运行没有裁判记录。</p>
       </section>
     );
   }
 
   const errored = judgement.error !== null;
   return (
-    <section className="judgement-card" aria-label="Judgement">
+    <section className="judgement-card" aria-label="裁判">
       <header>
-        <h2>Judge</h2>
+        <h2>裁判</h2>
         <p>
-          {judgement.judge_model} · prompt{" "}
+          {judgement.judge_model} · 提示词{" "}
           <code>{judgement.prompt_version}</code>
         </p>
       </header>
       {errored ? (
         <div className="judgement-error">
-          <strong>Judge error</strong>
+          <strong>裁判错误</strong>
           {judgement.error_detail !== null ? (
             <p>{judgement.error_detail}</p>
           ) : null}
@@ -64,7 +64,7 @@ export function JudgementCard({ judgement, note = null }: JudgementCardProps) {
               </div>
             ))}
           </div>
-          <ThinkingDisclosure text={judgement.rationale} label="Rationale" />
+          <ThinkingDisclosure text={judgement.rationale} label="裁判理由" />
         </>
       )}
     </section>

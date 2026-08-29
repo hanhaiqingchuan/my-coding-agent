@@ -72,11 +72,11 @@ test("shows the frozen run_command timeout in seconds and always warns that the 
     <ApprovalDock pendingApproval={pendingRunCommand} onResolve={vi.fn()} />,
   );
 
-  const dock = screen.getByRole("region", { name: "Pending approval" });
+  const dock = screen.getByRole("region", { name: "待审批" });
   expect(dock.textContent).toContain("pytest -q");
   expect(dock.textContent).toContain("Run the offline suite");
   expect(screen.getByText("10s")).not.toBeNull();
-  expect(dock.textContent).toContain("This command is not sandboxed");
+  expect(dock.textContent).toContain("本命令不在沙箱中运行");
 });
 
 test("prefers the effective cwd and timeout the backend froze for a bare command call", () => {
@@ -103,11 +103,11 @@ test("prefers the effective cwd and timeout the backend froze for a bare command
     />,
   );
 
-  const dock = screen.getByRole("region", { name: "Pending approval" });
+  const dock = screen.getByRole("region", { name: "待审批" });
   expect(dock.textContent).toContain("pytest -q");
   expect(screen.getByText("/workspace/services")).not.toBeNull();
   expect(screen.getByText("120s")).not.toBeNull();
-  expect(dock.textContent).toContain("This command is not sandboxed");
+  expect(dock.textContent).toContain("本命令不在沙箱中运行");
 });
 
 test("marks the timeout as absent instead of inventing the schema default", () => {
@@ -131,10 +131,10 @@ test("marks the timeout as absent instead of inventing the schema default", () =
     />,
   );
 
-  const dock = screen.getByRole("region", { name: "Pending approval" });
+  const dock = screen.getByRole("region", { name: "待审批" });
   expect(dock.textContent).not.toContain("120");
   expect(screen.getByText("—")).not.toBeNull();
-  expect(dock.textContent).toContain("This command is not sandboxed");
+  expect(dock.textContent).toContain("本命令不在沙箱中运行");
 });
 
 test("docks the current approval above the composer and resolves by call id and decision only", async () => {
@@ -161,8 +161,8 @@ test("docks the current approval above the composer and resolves by call id and 
     </div>,
   );
 
-  const dock = screen.getByRole("region", { name: "Pending approval" });
-  const composer = screen.getByRole("textbox", { name: "Message" });
+  const dock = screen.getByRole("region", { name: "待审批" });
+  const composer = screen.getByRole("textbox", { name: "消息" });
   expect(
     dock.compareDocumentPosition(composer) & Node.DOCUMENT_POSITION_FOLLOWING,
   ).toBeTruthy();
@@ -170,9 +170,9 @@ test("docks the current approval above the composer and resolves by call id and 
   expect(dock.textContent).toContain("/workspace");
   expect(dock.textContent).toContain("Inspect changes");
   expect(dock.textContent).toContain("120s");
-  expect(dock.textContent).toContain("This command is not sandboxed");
+  expect(dock.textContent).toContain("本命令不在沙箱中运行");
 
-  await user.click(screen.getByRole("button", { name: "Approve" }));
+  await user.click(screen.getByRole("button", { name: "批准" }));
   expect(onResolve).toHaveBeenCalledTimes(1);
   expect(onResolve).toHaveBeenCalledWith("call-1", "approve");
 });
@@ -191,7 +191,7 @@ test("removes a handled approval dock while its tool card remains in the timelin
     </>,
   );
   expect(
-    screen.getByRole("region", { name: "Pending approval" }),
+    screen.getByRole("region", { name: "待审批" }),
   ).not.toBeNull();
 
   rerender(
@@ -207,7 +207,7 @@ test("removes a handled approval dock while its tool card remains in the timelin
     </>,
   );
 
-  expect(screen.queryByRole("region", { name: "Pending approval" })).toBeNull();
+  expect(screen.queryByRole("region", { name: "待审批" })).toBeNull();
   expect(screen.getByText("command")).not.toBeNull();
 });
 

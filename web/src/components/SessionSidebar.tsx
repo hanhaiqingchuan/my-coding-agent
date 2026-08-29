@@ -13,7 +13,7 @@ export function SessionSidebar({
 }: SessionSidebarProps) {
   return (
     <section aria-labelledby="sessions-heading">
-      <h2 id="sessions-heading">Sessions</h2>
+      <h2 id="sessions-heading">会话</h2>
       <ul className="session-list">
         {sessions.map((session) => (
           <li key={session.id}>
@@ -25,7 +25,7 @@ export function SessionSidebar({
               }
               onClick={() => onSelect(session.id)}
             >
-              <span>{session.title ?? "Untitled session"}</span>
+              <span>{session.title ?? "未命名会话"}</span>
               <small>{session.workspace_realpath}</small>
             </button>
           </li>

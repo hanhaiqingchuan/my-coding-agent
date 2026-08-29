@@ -25,12 +25,12 @@ function oracle(outcome: {
   errored: boolean;
 }): string {
   if (outcome.errored) {
-    return "errored";
+    return "出错";
   }
   if (outcome.passed === null) {
     return "—";
   }
-  return outcome.passed ? "passed" : "failed";
+  return outcome.passed ? "通过" : "未通过";
 }
 
 /** One run's verbatim run-v1 facts plus its judgement, read-only. */
@@ -41,33 +41,33 @@ export function RunDetail({ detail }: RunDetailProps) {
     <div className="eval-run-detail">
       <header className="eval-run-heading">
         <p>
-          Run in {detail.campaign} · {text(detail.run?.category)}
+          {detail.campaign} 中的运行 · {text(detail.run?.category)}
         </p>
         <h2>
-          {detail.task_id} · repeat {detail.repeat}
+          {detail.task_id} · 第 {detail.repeat} 次
         </h2>
       </header>
       {run === null ? (
         <div className="eval-warning" role="alert">
-          {detail.run_note ?? "The run record is unreadable."}
+          {detail.run_note ?? "该运行记录无法读取。"}
         </div>
       ) : (
         <>
           <dl className="run-details-list">
             <div>
-              <dt>State</dt>
+              <dt>状态</dt>
               <dd>{text(run.state)}</dd>
             </div>
             <div>
-              <dt>Stop reason</dt>
+              <dt>停止原因</dt>
               <dd>{text(run.stop_reason)}</dd>
             </div>
             <div>
-              <dt>Outcome</dt>
+              <dt>结果</dt>
               <dd>{run.outcome}</dd>
             </div>
             <div>
-              <dt>Failure</dt>
+              <dt>失败</dt>
               <dd>
                 {run.failure_kind === null
                   ? "—"
@@ -75,79 +75,79 @@ export function RunDetail({ detail }: RunDetailProps) {
               </dd>
             </div>
             <div>
-              <dt>Model</dt>
+              <dt>模型</dt>
               <dd>{text(run.model_identity?.name)}</dd>
             </div>
             <div>
-              <dt>Agent commit</dt>
+              <dt>智能体提交</dt>
               <dd className="run-details-mono">{text(run.agent_commit)}</dd>
             </div>
             <div>
-              <dt>Rounds</dt>
+              <dt>轮次</dt>
               <dd>{count(run.model.main_requests)}</dd>
             </div>
             <div>
-              <dt>Attempts</dt>
+              <dt>尝试次数</dt>
               <dd>{count(run.model.attempts)}</dd>
             </div>
             <div>
-              <dt>Network retries</dt>
+              <dt>网络重试</dt>
               <dd>{count(run.model.network_retries)}</dd>
             </div>
             <div>
-              <dt>Input tokens</dt>
+              <dt>输入 Token</dt>
               <dd>{count(run.model.usage.input_tokens)}</dd>
             </div>
             <div>
-              <dt>Output tokens</dt>
+              <dt>输出 Token</dt>
               <dd>{count(run.model.usage.output_tokens)}</dd>
             </div>
             <div>
-              <dt>Cache tokens</dt>
+              <dt>缓存 Token</dt>
               <dd>
-                {count(run.model.usage.cache_creation_input_tokens)} created ·{" "}
-                {count(run.model.usage.cache_read_input_tokens)} read
+                写入 {count(run.model.usage.cache_creation_input_tokens)} · 读取{" "}
+                {count(run.model.usage.cache_read_input_tokens)}
               </dd>
             </div>
             <div>
-              <dt>Tool calls</dt>
+              <dt>工具调用</dt>
               <dd>
-                {run.tools.executed} of {run.tools.proposed} proposed
+                已执行 {run.tools.executed} / 共提议 {run.tools.proposed}
               </dd>
             </div>
             <div>
-              <dt>Failed tool calls</dt>
+              <dt>失败的工具调用</dt>
               <dd>{run.tools.failed}</dd>
             </div>
             <div>
-              <dt>Compactions</dt>
+              <dt>上下文压缩</dt>
               <dd>{run.compaction.count}</dd>
             </div>
             <div>
-              <dt>Target oracle</dt>
+              <dt>目标校验</dt>
               <dd>{oracle(run.oracle.target)}</dd>
             </div>
             <div>
-              <dt>Regression oracle</dt>
+              <dt>回归校验</dt>
               <dd>{oracle(run.oracle.regression)}</dd>
             </div>
             <div>
-              <dt>Files</dt>
+              <dt>文件</dt>
               <dd>
-                {run.modifications.files_added} added ·{" "}
-                {run.modifications.files_modified} modified ·{" "}
-                {run.modifications.files_deleted} deleted
+                新增 {run.modifications.files_added} · 修改{" "}
+                {run.modifications.files_modified} · 删除{" "}
+                {run.modifications.files_deleted}
               </dd>
             </div>
             <div>
-              <dt>Lines</dt>
+              <dt>行数</dt>
               <dd>
                 +{run.modifications.lines_added} / −
                 {run.modifications.lines_removed}
               </dd>
             </div>
             <div>
-              <dt>Agent duration</dt>
+              <dt>智能体耗时</dt>
               <dd>
                 {ms(
                   run.durations.agent_monotonic_ms ??
@@ -156,16 +156,16 @@ export function RunDetail({ detail }: RunDetailProps) {
               </dd>
             </div>
             <div>
-              <dt>Total duration</dt>
+              <dt>总耗时</dt>
               <dd>{ms(run.durations.total_ms)}</dd>
             </div>
           </dl>
           {typeof finalMessage === "string" && finalMessage !== "" ? (
             <section
               className="eval-final-message"
-              aria-label="Final assistant message"
+              aria-label="最终助手消息"
             >
-              <h3>Final assistant message</h3>
+              <h3>最终助手消息</h3>
               <p>{finalMessage}</p>
             </section>
           ) : null}

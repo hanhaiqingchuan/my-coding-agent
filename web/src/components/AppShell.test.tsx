@@ -16,14 +16,14 @@ test("renders semantic session, conversation, and run-details regions", () => {
   );
 
   expect(
-    screen.getByRole("navigation", { name: "Sessions and workspace" })
+    screen.getByRole("navigation", { name: "会话与工作区" })
       .textContent,
   ).toContain("Sessions");
   expect(
-    screen.getByRole("main", { name: "Conversation" }).textContent,
+    screen.getByRole("main", { name: "对话" }).textContent,
   ).toContain("Conversation");
   expect(
-    screen.getByRole("complementary", { name: "Run details" }).textContent,
+    screen.getByRole("complementary", { name: "运行详情" }).textContent,
   ).toContain("Idle");
 });
 
@@ -37,10 +37,10 @@ test("opens run details in an accessible drawer on a narrow layout", async () =>
     />,
   );
 
-  await user.click(screen.getByRole("button", { name: "Open run details" }));
+  await user.click(screen.getByRole("button", { name: "打开运行详情" }));
 
   expect(
-    screen.getByRole("dialog", { name: "Run details" }).textContent,
+    screen.getByRole("dialog", { name: "运行详情" }).textContent,
   ).toContain("Idle");
 });
 
@@ -56,7 +56,7 @@ test("does not infer a completed run from a shell interaction", async () => {
     />,
   );
 
-  await user.click(screen.getByRole("button", { name: "Open run details" }));
+  await user.click(screen.getByRole("button", { name: "打开运行详情" }));
 
   expect(screen.getAllByText("model_streaming")).toHaveLength(2);
   expect(onDetailsDrawerChange).toHaveBeenCalledWith(true);
@@ -71,13 +71,13 @@ test("drawer manages focus, traps Tab, and restores focus after Escape", async (
       runDetails={<button type="button">Inspect run</button>}
     />,
   );
-  const trigger = screen.getByRole("button", { name: "Open run details" });
+  const trigger = screen.getByRole("button", { name: "打开运行详情" });
 
   await user.click(trigger);
 
-  const drawer = screen.getByRole("dialog", { name: "Run details" });
+  const drawer = screen.getByRole("dialog", { name: "运行详情" });
   const close = within(drawer).getByRole("button", {
-    name: "Close run details",
+    name: "关闭运行详情",
   });
   const inspect = within(drawer).getByRole("button", { name: "Inspect run" });
   expect(document.activeElement).toBe(close);
@@ -90,6 +90,6 @@ test("drawer manages focus, traps Tab, and restores focus after Escape", async (
 
   await user.keyboard("{Escape}");
 
-  expect(screen.queryByRole("dialog", { name: "Run details" })).toBeNull();
+  expect(screen.queryByRole("dialog", { name: "运行详情" })).toBeNull();
   expect(document.activeElement).toBe(trigger);
 });

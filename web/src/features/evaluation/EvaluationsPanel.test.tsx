@@ -38,7 +38,7 @@ test("renders the campaign list with the headline metrics, newest first", async 
   // time window, task count, strict rate, judge means and model name.
   expect(screen.getByText("campaign-plain")).toBeTruthy();
   expect(screen.getAllByText("100.0%").length).toBe(2);
-  expect(screen.getAllByText("2 tasks").length).toBe(2);
+  expect(screen.getAllByText("2 个任务").length).toBe(2);
   expect(screen.getByText("4.0 · 5.0 · 3.0")).toBeTruthy();
   expect(screen.getAllByText("claude-stub-model-2026").length).toBe(2);
   expect(screen.getAllByText(/2026-/).length).toBe(2);
@@ -54,7 +54,7 @@ test("shows the empty state when the results root has no campaigns", async () =>
   await waitFor(() =>
     expect(
       screen.getByText(
-        "No evaluation campaigns found — run `coding-agent-eval run` to create one",
+        "尚无评测记录——先运行 make eval-judge 生成",
       ),
     ).toBeTruthy(),
   );
@@ -69,7 +69,7 @@ test("shows a loading state while the campaign index is read", () => {
     />,
   );
 
-  expect(screen.getByText("Loading evaluation campaigns…")).toBeTruthy();
+  expect(screen.getByText("正在加载评测轮次…")).toBeTruthy();
 });
 
 test("shows an error state when the campaign index cannot be read", async () => {
@@ -83,7 +83,7 @@ test("shows an error state when the campaign index cannot be read", async () => 
 
   await waitFor(() =>
     expect(
-      screen.getByText("Unable to load evaluation campaigns."),
+      screen.getByText("无法加载评测轮次。"),
     ).toBeTruthy(),
   );
 });
@@ -102,7 +102,7 @@ test("marks a corrupt campaign row instead of hiding it", async () => {
     />,
   );
 
-  await waitFor(() => expect(screen.getByText("corrupt")).toBeTruthy());
+  await waitFor(() => expect(screen.getByText("已损坏")).toBeTruthy());
   expect(screen.getByText("unreadable runs.jsonl")).toBeTruthy();
 });
 
@@ -123,9 +123,9 @@ test("opens a campaign and then one run, and returns along the same path", async
   );
   expect(api.runDetail).toHaveBeenCalledWith("judged-campaign", "demo-task", 1);
 
-  await user.click(screen.getByRole("button", { name: /Back to campaign/ }));
+  await user.click(screen.getByRole("button", { name: /返回该轮次/ }));
   await waitFor(() => expect(screen.getByText("second-task")).toBeTruthy());
 
-  await user.click(screen.getByRole("button", { name: /Back to campaigns/ }));
+  await user.click(screen.getByRole("button", { name: /返回轮次列表/ }));
   await waitFor(() => expect(screen.getByText("campaign-plain")).toBeTruthy());
 });

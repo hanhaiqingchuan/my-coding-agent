@@ -124,30 +124,26 @@ test("shows the run state, model, rounds, retries and stop reason the backend pu
 
   render(<RunDetailsPanel snapshot={snapshot} />);
 
-  expect(rowValue("State")).toBe("failed");
-  expect(rowValue("Run ID")).toBe("run-1");
-  expect(rowValue("Model")).toBe("demo-model");
-  expect(rowValue("Rounds")).toBe("3");
-  expect(rowValue("Retries")).toBe("2");
-  expect(rowValue("Stop reason")).toBe("retry exhausted");
-  expect(rowValue("Error kind")).toBe("retry exhausted");
+  expect(rowValue("状态")).toBe("失败");
+  expect(rowValue("运行 ID")).toBe("run-1");
+  expect(rowValue("模型")).toBe("demo-model");
+  expect(rowValue("轮次")).toBe("3");
+  expect(rowValue("重试")).toBe("2");
+  expect(rowValue("停止原因")).toBe("请求重试用尽");
+  expect(rowValue("错误类型")).toBe("请求重试用尽");
 });
 
-test("keeps the finished run and its stop reason visible once no run is active", () => {
+test("presents a failed run's stop reason as a friendly cause, hint and raw code", () => {
   render(<RunDetailsPanel snapshot={finishedRunSnapshot()} />);
 
-  expect(
-    screen.getByText("Last finished run. No run is active."),
-  ).not.toBeNull();
-  expect(screen.queryByText("No active run.")).toBeNull();
-  expect(rowValue("State")).toBe("failed");
-  expect(rowValue("Stop reason")).toBe("retry exhausted");
-  expect(rowValue("Finished")).toBe(
-    new Date("2026-08-28T00:04:00Z").toLocaleString(),
-  );
+  expect(screen.getByText(/限流 429、服务端 5xx 或网络波动/)).not.toBeNull();
+  expect(screen.getByText(/稍等片刻后重新发送消息即可重试/)).not.toBeNull();
+  // The raw code stays visible so the operator can quote it verbatim.
+  expect(screen.getByText("原始代码：retry_exhausted")).not.toBeNull();
+  expect(screen.queryByText(/retry exhausted/)).toBeNull();
 });
 
-test("reports the internal error stop reason the backend can publish", () => {
+test("presents an internal error with the run id hint the operator needs to quote", () => {
   const snapshot = finishedRunSnapshot({
     state: "failed",
     stop_reason: "internal_error",
@@ -156,8 +152,55 @@ test("reports the internal error stop reason the backend can publish", () => {
 
   render(<RunDetailsPanel snapshot={snapshot} />);
 
-  expect(rowValue("Stop reason")).toBe("internal error");
-  expect(rowValue("Error kind")).toBe("internal error");
+  expect(rowValue("停止原因")).toBe("内部错误");
+  expect(screen.getByText("原始代码：internal_error")).not.toBeNull();
+  expect(screen.getByText(/查看运行 ID 后重试/)).not.toBeNull();
+  expect(screen.getByText(/智能体内部发生错误/)).not.toBeNull();
+});
+
+test("presents a user stop as a neutral fact without a hint", () => {
+  const snapshot = finishedRunSnapshot({
+    state: "cancelled",
+    stop_reason: "user_stop",
+    error_kind: null,
+  });
+
+  render(<RunDetailsPanel snapshot={snapshot} />);
+
+  expect(rowValue("停止原因")).toBe("已手动停止");
+  expect(screen.getByText("本次运行已按你的请求停止。")).not.toBeNull();
+  expect(screen.getByText("原始代码：user_stop")).not.toBeNull();
+  // A neutral outcome carries no remediation advice.
+  expect(screen.queryByText(/建议|请检查|可以/)).toBeNull();
+});
+
+test("falls back gracefully for an unknown stop reason by quoting the raw code", () => {
+  // Spec 5.2 fixes a minimum stop-reason vocabulary, not a closed one, so the
+  // cast stands in for a value the contract does not name yet.
+  const snapshot = finishedRunSnapshot({
+    state: "failed",
+    stop_reason: "totally_unknown" as RunDto["stop_reason"],
+    error_kind: null,
+  });
+
+  render(<RunDetailsPanel snapshot={snapshot} />);
+
+  expect(rowValue("停止原因")).toBe("运行异常结束");
+  expect(screen.getByText(/原始代码：totally_unknown/)).not.toBeNull();
+});
+
+test("keeps the finished run and its stop reason visible once no run is active", () => {
+  render(<RunDetailsPanel snapshot={finishedRunSnapshot()} />);
+
+  expect(
+    screen.getByText("上一个完成的任务。当前没有运行中的任务。"),
+  ).not.toBeNull();
+  expect(screen.queryByText("当前没有运行中的任务。")).toBeNull();
+  expect(rowValue("状态")).toBe("失败");
+  expect(rowValue("停止原因")).toBe("请求重试用尽");
+  expect(rowValue("结束时间")).toBe(
+    new Date("2026-08-28T00:04:00Z").toLocaleString(),
+  );
 });
 
 test("presents a live run as the active one instead of the finished run", () => {
@@ -168,12 +211,13 @@ test("presents a live run as the active one instead of the finished run", () => 
 
   render(<RunDetailsPanel snapshot={snapshot} />);
 
-  expect(screen.getByText("Active run.")).not.toBeNull();
-  expect(screen.queryByText(/Last finished run/)).toBeNull();
-  expect(rowValue("Run ID")).toBe("run-2");
-  expect(rowValue("State")).toBe("model_streaming");
-  expect(screen.queryByText("Stop reason")).toBeNull();
-  expect(screen.queryByText("Finished")).toBeNull();
+  expect(screen.getByText("运行中的任务。")).not.toBeNull();
+  expect(screen.queryByText(/上一个完成的任务/)).toBeNull();
+  expect(rowValue("运行 ID")).toBe("run-2");
+  expect(rowValue("状态")).toBe("生成中");
+  expect(screen.queryByText("停止原因")).toBeNull();
+  expect(screen.queryByText("结束时间")).toBeNull();
+  expect(screen.queryByText("原始代码：")).toBeNull();
 });
 
 test("labels the token totals as cumulative known usage across rounds", () => {
@@ -182,10 +226,10 @@ test("labels the token totals as cumulative known usage across rounds", () => {
   render(<RunDetailsPanel snapshot={snapshot} />);
 
   expect(
-    screen.getByText("input 24 · output 12 · cache create 2 · cache read 5"),
+    screen.getByText("输入 24 · 输出 12 · 缓存写入 2 · 缓存读取 5"),
   ).not.toBeNull();
   expect(
-    screen.getByText(/Known usage summed across rounds, not current context/),
+    screen.getByText(/跨轮次累计的已知用量，非当前上下文占用/),
   ).not.toBeNull();
 });
 
@@ -194,9 +238,9 @@ test("never presents a context-occupancy figure the run row cannot support", () 
 
   render(<RunDetailsPanel snapshot={snapshot} />);
 
-  expect(screen.queryByText("Context")).toBeNull();
+  expect(screen.queryByText("上下文占用率")).toBeNull();
   expect(screen.queryByText(/%/)).toBeNull();
-  expect(screen.queryByText(/4096/)).toBeNull();
+  expect(screen.queryByText("4096")).toBeNull();
 });
 
 test("omits run-detail rows when the backend did not provide their values", () => {
@@ -207,46 +251,46 @@ test("omits run-detail rows when the backend did not provide their values", () =
 
   render(<RunDetailsPanel snapshot={snapshot} />);
 
-  expect(screen.queryByText("Model")).toBeNull();
-  expect(screen.queryByText("Context")).toBeNull();
-  expect(screen.queryByText("Stop reason")).toBeNull();
-  expect(screen.queryByText("Error kind")).toBeNull();
+  expect(screen.queryByText("模型")).toBeNull();
+  expect(screen.queryByText("上下文窗口")).toBeNull();
+  expect(screen.queryByText("停止原因")).toBeNull();
+  expect(screen.queryByText("错误类型")).toBeNull();
   // Rounds and retries are stored counters, so zero is the published fact.
-  expect(rowValue("Rounds")).toBe("0");
-  expect(rowValue("Retries")).toBe("0");
+  expect(rowValue("轮次")).toBe("0");
+  expect(rowValue("重试")).toBe("0");
 });
 
 test("reports that there is no active run when the snapshot has none", () => {
   render(<RunDetailsPanel snapshot={null} />);
 
-  expect(screen.getByText("No active run.")).not.toBeNull();
+  expect(screen.getByText("当前没有运行中的任务。")).not.toBeNull();
 });
 
 test("reports no run at all when the session never finished one", () => {
   render(<RunDetailsPanel snapshot={snapshotWith({})} />);
 
-  expect(screen.getByText("No active run.")).not.toBeNull();
-  expect(screen.queryByText("State")).toBeNull();
+  expect(screen.getByText("当前没有运行中的任务。")).not.toBeNull();
+  expect(screen.queryByText("状态")).toBeNull();
 });
 
 // Spec 5.2 pairs each terminal state with the stop reasons that can produce it.
 const TERMINAL_RUNS = [
-  ["completed", "completed"],
-  ["stopped", "max_rounds"],
-  ["cancelled", "user_stop"],
-  ["failed", "retry_exhausted"],
-  ["interrupted", "server_restart"],
+  ["completed", "completed", "已完成"],
+  ["stopped", "max_rounds", "已停止"],
+  ["cancelled", "user_stop", "已取消"],
+  ["failed", "retry_exhausted", "失败"],
+  ["interrupted", "server_restart", "已中断"],
 ] as const;
 
 test.each(TERMINAL_RUNS)(
   "marks a %s run with its own state class",
-  (state, stopReason) => {
+  (state, stopReason, label) => {
     const snapshot = finishedRunSnapshot({ state, stop_reason: stopReason });
 
     render(<RunDetailsPanel snapshot={snapshot} />);
 
-    const pill = rowCell("State");
-    expect(pill?.textContent).toBe(state);
+    const pill = rowCell("状态");
+    expect(pill?.textContent).toBe(label);
     expect(pill?.className).toBe(`run-state run-state-${state}`);
   },
 );

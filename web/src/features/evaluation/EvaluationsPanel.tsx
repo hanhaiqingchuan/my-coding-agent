@@ -25,12 +25,12 @@ type EvaluationsPanelProps = {
 };
 
 function percent(rate: number | null): string {
-  return rate === null ? "n/a" : `${(rate * 100).toFixed(1)}%`;
+  return rate === null ? "—" : `${(rate * 100).toFixed(1)}%`;
 }
 
 function timestamp(value: string | null): string {
   if (value === null) {
-    return "unknown";
+    return "未知";
   }
   return value.replace(/\.\d+/, "");
 }
@@ -41,7 +41,7 @@ function campaignName(summary: CampaignSummaryDto): string {
 
 function judgeMeans(summary: CampaignSummaryDto): string {
   if (summary.judged_runs === 0) {
-    return "not judged";
+    return "未评判";
   }
   return SCORE_NAMES.map((name) => {
     const value = summary.judge_means[name];
@@ -134,21 +134,20 @@ export function EvaluationsPanel({
       <div className="eval-panel">
         <header className="conversation-heading">
           <div>
-            <p>Evaluations</p>
-            <h1>Evaluation campaigns</h1>
+            <p>评测记录</p>
+            <h1>评测轮次</h1>
           </div>
         </header>
-        <section className="eval-list" aria-label="Evaluation campaigns">
+        <section className="eval-list" aria-label="评测轮次">
           {campaigns.status === "loading" ? (
-            <p className="eval-muted">Loading evaluation campaigns…</p>
+            <p className="eval-muted">正在加载评测轮次…</p>
           ) : campaigns.status === "error" ? (
             <p className="eval-warning" role="alert">
-              Unable to load evaluation campaigns.
+              无法加载评测轮次。
             </p>
           ) : campaigns.data.length === 0 ? (
             <p className="eval-muted">
-              No evaluation campaigns found — run `coding-agent-eval run` to
-              create one
+              尚无评测记录——先运行 make eval-judge 生成
             </p>
           ) : (
             <ul>
@@ -167,7 +166,7 @@ export function EvaluationsPanel({
                     <span className="eval-campaign-name">
                       {campaignName(summary)}
                       {summary.corrupt ? (
-                        <span className="eval-badge eval-fail">corrupt</span>
+                        <span className="eval-badge eval-fail">已损坏</span>
                       ) : null}
                     </span>
                     <small className="eval-campaign-window">
@@ -175,19 +174,19 @@ export function EvaluationsPanel({
                       {timestamp(summary.finished_at)}
                     </small>
                     <small className="eval-campaign-metrics">
-                      <span>{summary.task_count} tasks</span>
-                      <span>{summary.started_runs} runs</span>
+                      <span>{summary.task_count} 个任务</span>
+                      <span>{summary.started_runs} 次运行</span>
                       <span>
-                        <b>{percent(summary.strict_success_rate)}</b> strict
+                        严格成功 <b>{percent(summary.strict_success_rate)}</b>
                       </span>
                       {summary.judged_runs > 0 ? (
                         <span>
-                          judge <b>{judgeMeans(summary)}</b>
+                          裁判 <b>{judgeMeans(summary)}</b>
                         </span>
                       ) : (
-                        <span>not judged</span>
+                        <span>未评判</span>
                       )}
-                      <span>{summary.model_name ?? "unknown model"}</span>
+                      <span>{summary.model_name ?? "未知模型"}</span>
                     </small>
                     {summary.corrupt && summary.note !== null ? (
                       <small className="eval-campaign-note">
@@ -209,7 +208,7 @@ export function EvaluationsPanel({
       <div className="eval-panel">
         <header className="conversation-heading">
           <div>
-            <p>Campaign</p>
+            <p>评测轮次</p>
             <h1>{screen.campaign}</h1>
           </div>
           <button
@@ -217,14 +216,14 @@ export function EvaluationsPanel({
             className="eval-back"
             onClick={() => setScreen({ kind: "list" })}
           >
-            Back to campaigns
+            返回轮次列表
           </button>
         </header>
         {detail.status === "loading" ? (
-          <p className="eval-muted">Loading campaign…</p>
+          <p className="eval-muted">正在加载轮次…</p>
         ) : detail.status === "error" ? (
           <p className="eval-warning" role="alert">
-            Unable to load this campaign.
+            无法加载该轮次。
           </p>
         ) : (
           <EvaluationDetail
@@ -247,7 +246,7 @@ export function EvaluationsPanel({
     <div className="eval-panel">
       <header className="conversation-heading">
         <div>
-          <p>Campaign</p>
+          <p>评测轮次</p>
           <h1>{screen.campaign}</h1>
         </div>
         <button
@@ -257,14 +256,14 @@ export function EvaluationsPanel({
             setScreen({ kind: "campaign", campaign: screen.campaign })
           }
         >
-          Back to campaign
+          返回该轮次
         </button>
       </header>
       {run.status === "loading" ? (
-        <p className="eval-muted">Loading run…</p>
+        <p className="eval-muted">正在加载运行…</p>
       ) : run.status === "error" ? (
         <p className="eval-warning" role="alert">
-          Unable to load this run.
+          无法加载该运行。
         </p>
       ) : (
         <RunDetail detail={run.data} />

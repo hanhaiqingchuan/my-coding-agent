@@ -62,10 +62,10 @@ export function AppShell({
 
   return (
     <div className="app-shell">
-      <nav className="session-sidebar" aria-label="Sessions and workspace">
+      <nav className="session-sidebar" aria-label="会话与工作区">
         {sidebar}
       </nav>
-      <main className="conversation-panel" aria-label="Conversation">
+      <main className="conversation-panel" aria-label="对话">
         <button
           ref={triggerRef}
           className="run-details-toggle"
@@ -74,11 +74,11 @@ export function AppShell({
           aria-controls="run-details-drawer"
           onClick={() => setDrawer(true)}
         >
-          Open run details
+          打开运行详情
         </button>
         {conversation}
       </main>
-      <aside className="run-details-panel" aria-label="Run details">
+      <aside className="run-details-panel" aria-label="运行详情">
         {runDetails}
       </aside>
       {detailsOpen ? (
@@ -87,7 +87,7 @@ export function AppShell({
           id="run-details-drawer"
           className="run-details-drawer"
           role="dialog"
-          aria-label="Run details"
+          aria-label="运行详情"
           aria-modal="true"
           onKeyDown={handleDrawerKeyDown}
         >
@@ -96,7 +96,7 @@ export function AppShell({
             className="drawer-close"
             onClick={() => setDrawer(false)}
           >
-            Close run details
+            关闭运行详情
           </button>
           {runDetails}
         </div>

@@ -2,8 +2,10 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, test, vi } from "vitest";
 
+import { toolStateLabel } from "../api/labels";
 import type {
   MessageDto,
+  RunDto,
   ToolExecutionDto,
   ToolExecutionState,
 } from "../api/types";
@@ -200,10 +202,10 @@ test("renders a committed thinking part collapsed by default and expands on dema
     />,
   );
 
-  const disclosure = screen.getByRole("button", { name: /^Thinking · / });
+  const disclosure = screen.getByRole("button", { name: /^思考中 · / });
   expect(disclosure.getAttribute("aria-expanded")).toBe("false");
   // The summary row reports the size of the reasoning it guards.
-  expect(disclosure.textContent).toBe("Thinking · 37 chars");
+  expect(disclosure.textContent).toBe("思考中 · 37 字");
 
   await user.click(disclosure);
   expect(disclosure.getAttribute("aria-expanded")).toBe("true");
@@ -213,7 +215,7 @@ test("renders a committed thinking part collapsed by default and expands on dema
 
   // Part order is authoritative: the thinking disclosure precedes the answer text.
   const article = screen.getByText("Committed answer").closest("article");
-  expect((article?.textContent ?? "").indexOf("Thinking")).toBeLessThan(
+  expect((article?.textContent ?? "").indexOf("思考中")).toBeLessThan(
     (article?.textContent ?? "").indexOf("Committed answer"),
   );
 });
@@ -232,7 +234,7 @@ test("renders a live thinking draft expanded while streaming and collapsed once 
     />,
   );
 
-  const disclosure = screen.getByRole("button", { name: /^Thinking · / });
+  const disclosure = screen.getByRole("button", { name: /^思考中 · / });
   expect(disclosure.getAttribute("aria-expanded")).toBe("true");
   expect(screen.getByText("Live reasoning.")).not.toBeNull();
   expect(
@@ -283,7 +285,7 @@ test("keeps the streaming text draft below the live thinking box of the same epo
     .getByText("Streaming answer")
     .closest("article[data-transient='true']");
   expect(article?.textContent).toContain("Live reasoning.");
-  expect((article?.textContent ?? "").indexOf("Thinking")).toBeLessThan(
+  expect((article?.textContent ?? "").indexOf("思考中")).toBeLessThan(
     (article?.textContent ?? "").indexOf("Streaming answer"),
   );
   // One bubble per epoch: the thinking box never replaces the text draft.
@@ -311,7 +313,7 @@ test.each<ToolExecutionState>([
     />,
   );
 
-  expect(screen.getByText(state.replaceAll("_", " "))).not.toBeNull();
+  expect(screen.getByText(toolStateLabel(state))).not.toBeNull();
 });
 
 test("requires recovery acknowledgement before continuing after a server restart", async () => {
@@ -335,10 +337,10 @@ test("requires recovery acknowledgement before continuing after a server restart
   );
 
   expect(screen.getByRole("alert").textContent).toContain(
-    "上一 run 因服务重启而中断",
+    "上一轮运行因服务重启而中断",
   );
   await user.click(
-    screen.getByRole("button", { name: "我已检查 workspace/进程" }),
+    screen.getByRole("button", { name: "我已检查工作区/进程" }),
   );
   expect(onAcknowledgeRecovery).toHaveBeenCalledTimes(1);
 });
@@ -361,6 +363,84 @@ test("shows a non-blocking historical interruption banner when acknowledgement i
 
   expect(screen.getByRole("alert").textContent).toContain("可以继续对话");
   expect(
-    screen.queryByRole("button", { name: "我已检查 workspace/进程" }),
+    screen.queryByRole("button", { name: "我已检查工作区/进程" }),
   ).toBeNull();
+});
+
+const failedRun: RunDto = {
+  id: "run-failed",
+  session_id: "session-1",
+  state: "failed",
+  stop_reason: "retry_exhausted",
+  error_kind: "retry_exhausted",
+  cancellation_requested_at: null,
+  config_snapshot: {},
+  started_at: "2026-08-28T00:00:00Z",
+  finished_at: "2026-08-28T00:04:00Z",
+  totals: {
+    input_tokens: 10,
+    output_tokens: 5,
+    cache_creation_input_tokens: 0,
+    cache_read_input_tokens: 0,
+    round_count: 1,
+    retry_count: 3,
+  },
+};
+
+test("summarizes a failed run as a dismissible banner with the retry fact and hint", async () => {
+  const user = userEvent.setup();
+  render(
+    <ConversationTimeline
+      messages={[]}
+      tools={[]}
+      assistantDrafts={{}}
+      thinkingDrafts={{}}
+      toolOutputDrafts={{}}
+      lastFinishedRun={failedRun}
+    />,
+  );
+
+  expect(screen.getByText("请求重试用尽")).not.toBeNull();
+  expect(screen.getByText(/限流 429、服务端 5xx 或网络波动/)).not.toBeNull();
+  expect(screen.getByText("已自动重试 3 次。")).not.toBeNull();
+  expect(screen.getByText(/稍等片刻后重新发送消息即可重试/)).not.toBeNull();
+
+  await user.click(screen.getByRole("button", { name: "关闭提示" }));
+  expect(screen.queryByText("请求重试用尽")).toBeNull();
+});
+
+test("renders no failure banner when the last finished run was a user stop", () => {
+  render(
+    <ConversationTimeline
+      messages={[]}
+      tools={[]}
+      assistantDrafts={{}}
+      thinkingDrafts={{}}
+      toolOutputDrafts={{}}
+      lastFinishedRun={{
+        ...failedRun,
+        id: "run-stopped",
+        state: "cancelled",
+        stop_reason: "user_stop",
+        error_kind: null,
+      }}
+    />,
+  );
+
+  expect(screen.queryByTestId("run-failure-banner")).toBeNull();
+});
+
+test("renders no failure banner while a run is still active", () => {
+  render(
+    <ConversationTimeline
+      messages={[]}
+      tools={[]}
+      assistantDrafts={{}}
+      thinkingDrafts={{}}
+      toolOutputDrafts={{}}
+      lastFinishedRun={null}
+    />,
+  );
+
+  expect(screen.queryByTestId("run-failure-banner")).toBeNull();
 });

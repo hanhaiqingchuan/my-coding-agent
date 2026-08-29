@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { ApiClient } from "./api/client";
 import type { ApprovalDecision, SessionDto } from "./api/types";
+import { connectionLabel } from "./api/labels";
 import { ApprovalDock } from "./components/ApprovalDock";
 import { AppShell } from "./components/AppShell";
 import { Composer } from "./components/Composer";
@@ -131,10 +132,10 @@ export default function App() {
   if (route.view === "evaluations") {
     return (
       <div className="app-shell evaluations-shell">
-        <nav className="session-sidebar" aria-label="Sessions and workspace">
+        <nav className="session-sidebar" aria-label="会话与工作区">
           <ViewSwitcher view={route.view} onViewChange={switchView} />
         </nav>
-        <main className="conversation-panel" aria-label="Evaluations">
+        <main className="conversation-panel" aria-label="评测记录">
           <EvaluationsPanel
             key={route.campaign ?? "list"}
             reader={evaluations}
@@ -162,18 +163,18 @@ export default function App() {
         <div className="conversation-workbench">
           <header className="conversation-heading">
             <div>
-              <p>Session</p>
-              <h1>{snapshot?.session.title ?? "Conversation"}</h1>
+              <p>会话</p>
+              <h1>{snapshot?.session.title ?? "对话"}</h1>
             </div>
             <span
               className={`connection-status connection-${state.connection}`}
             >
-              {state.connection}
+              {connectionLabel(state.connection)}
             </span>
           </header>
           {snapshot === null ? (
             <section className="conversation-empty">
-              <p>Open a workspace to begin.</p>
+              <p>先打开一个工作区开始。</p>
             </section>
           ) : (
             <ConversationTimeline
@@ -183,6 +184,7 @@ export default function App() {
               thinkingDrafts={state.thinkingDrafts}
               toolOutputDrafts={state.toolOutputDrafts}
               interruptedBanner={snapshot.interrupted_banner}
+              lastFinishedRun={snapshot.last_finished_run}
               onAcknowledgeRecovery={acknowledgeRecovery}
             />
           )}

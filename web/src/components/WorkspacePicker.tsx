@@ -12,7 +12,7 @@ export function WorkspacePicker({ onCreate }: WorkspacePickerProps) {
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!workspace.trim()) {
-      setError("Choose an absolute workspace directory.");
+      setError("请输入绝对路径的工作区目录。");
       return;
     }
     try {
@@ -21,7 +21,7 @@ export function WorkspacePicker({ onCreate }: WorkspacePickerProps) {
       setTitle("");
       setError(null);
     } catch {
-      setError("The workspace could not be opened.");
+      setError("无法打开该工作区。");
     }
   }
 
@@ -29,22 +29,22 @@ export function WorkspacePicker({ onCreate }: WorkspacePickerProps) {
     <form className="workspace-picker" onSubmit={submit}>
       <h1>My Coding Agent</h1>
       <label>
-        Workspace
+        工作区
         <input
           value={workspace}
           onChange={(event) => setWorkspace(event.target.value)}
-          placeholder="/absolute/path"
+          placeholder="/绝对路径/工作区目录"
         />
       </label>
       <label>
-        Session title <span aria-hidden="true">(optional)</span>
+        会话名称 <span aria-hidden="true">（可选）</span>
         <input
           value={title}
           onChange={(event) => setTitle(event.target.value)}
         />
       </label>
       {error ? <p role="alert">{error}</p> : null}
-      <button type="submit">Open workspace</button>
+      <button type="submit">打开工作区</button>
     </form>
   );
 }

@@ -31,14 +31,14 @@ test("reveals complete command context and its non-sandbox warning in collapsed 
   };
 
   render(<ToolCard tool={tool} />);
-  await user.click(screen.getByText("Details"));
+  await user.click(screen.getByText("详情"));
 
-  const card = screen.getByRole("article", { name: "command succeeded" });
+  const card = screen.getByRole("article", { name: "command 成功" });
   expect(card.textContent).toContain("git status --short");
   expect(card.textContent).toContain("/workspace");
   expect(card.textContent).toContain("Inspect changes");
   expect(card.textContent).toContain("120s");
-  expect(card.textContent).toContain("This command is not sandboxed");
+  expect(card.textContent).toContain("本命令不在沙箱中运行");
 });
 
 test("reveals the real run_command timeout and its unconditional non-sandbox warning", async () => {
@@ -65,12 +65,12 @@ test("reveals the real run_command timeout and its unconditional non-sandbox war
   };
 
   render(<ToolCard tool={tool} />);
-  await user.click(screen.getByText("Details"));
+  await user.click(screen.getByText("详情"));
 
-  const card = screen.getByRole("article", { name: "run_command succeeded" });
+  const card = screen.getByRole("article", { name: "run_command 成功" });
   expect(card.textContent).toContain("pytest -q");
   expect(card.textContent).toContain("30s");
-  expect(card.textContent).toContain("This command is not sandboxed");
+  expect(card.textContent).toContain("本命令不在沙箱中运行");
 });
 
 function writeTool(input: ToolExecutionDto["input"]): ToolExecutionDto {
@@ -104,9 +104,9 @@ test("reveals the frozen replacement arguments of a write_file replace", async (
   });
 
   render(<ToolCard tool={tool} />);
-  await user.click(screen.getByText("Details"));
+  await user.click(screen.getByText("详情"));
 
-  const card = screen.getByRole("article", { name: "write_file succeeded" });
+  const card = screen.getByRole("article", { name: "write_file 成功" });
   expect(card.textContent).toContain("replace");
   expect(card.textContent).toContain("/workspace/src/app.py");
   expect(card.textContent).toContain("raise NotImplementedError()");
@@ -123,9 +123,9 @@ test("reveals the frozen new content of a write_file write without calling it a 
   });
 
   render(<ToolCard tool={tool} />);
-  await user.click(screen.getByText("Details"));
+  await user.click(screen.getByText("详情"));
 
-  const card = screen.getByRole("article", { name: "write_file succeeded" });
+  const card = screen.getByRole("article", { name: "write_file 成功" });
   expect(card.textContent).toContain("write");
   expect(card.textContent).toContain("/workspace/notes.md");
   const contentBlock = card.querySelector("pre");
@@ -143,9 +143,9 @@ test("truncates oversized write content and says how much it is showing", async 
   });
 
   render(<ToolCard tool={tool} />);
-  await user.click(screen.getByText("Details"));
+  await user.click(screen.getByText("详情"));
 
-  const card = screen.getByRole("article", { name: "write_file succeeded" });
+  const card = screen.getByRole("article", { name: "write_file 成功" });
   expect(card.textContent).not.toContain(content);
-  expect(card.textContent).toContain("first 2000 of 5000 characters");
+  expect(card.textContent).toContain("已截断：仅显示前 2000 字符（共 5000 字符）");
 });

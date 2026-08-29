@@ -1,12 +1,15 @@
 import { Fragment } from "react";
 
+import { describeStopOutcome, failureBannerFor } from "../api/errors";
 import type {
   InterruptedBannerDto,
   MessageDto,
+  RunDto,
   ToolExecutionDto,
 } from "../api/types";
 import type { ThinkingDraft } from "../features/sessions/sessionReducer";
 import { MessageBubble } from "./MessageBubble";
+import { RunFailureBanner } from "./RunFailureBanner";
 import { ToolCard } from "./ToolCard";
 
 type ConversationTimelineProps = {
@@ -16,6 +19,8 @@ type ConversationTimelineProps = {
   thinkingDrafts: Record<string, ThinkingDraft>;
   toolOutputDrafts: Record<string, string>;
   interruptedBanner?: InterruptedBannerDto | null;
+  /** The last finished run, when the caller wants its failure summarized. */
+  lastFinishedRun?: RunDto | null;
   onAcknowledgeRecovery?(): void;
 };
 
@@ -26,6 +31,7 @@ export function ConversationTimeline({
   thinkingDrafts,
   toolOutputDrafts,
   interruptedBanner = null,
+  lastFinishedRun = null,
   onAcknowledgeRecovery,
 }: ConversationTimelineProps) {
   // The backend already returns the authoritative order (run start, assistant message,
@@ -48,10 +54,14 @@ export function ConversationTimeline({
     ),
   ];
 
+  // A finished run only earns a banner when it failed: a user stop, a soft
+  // limit and a normal completion are facts, not errors.
+  const runFailure = failureBannerFor(lastFinishedRun);
+
   return (
     <section
       className="conversation-timeline"
-      aria-label="Conversation timeline"
+      aria-label="对话时间线"
     >
       {interruptedBanner !== null ? (
         <InterruptedBanner
@@ -59,6 +69,7 @@ export function ConversationTimeline({
           onAcknowledgeRecovery={onAcknowledgeRecovery}
         />
       ) : null}
+      {runFailure !== null ? <RunFailureBanner failure={runFailure} /> : null}
       <div className="timeline-scroll">
         {messages.map((message) => (
           <Fragment key={message.id}>
@@ -126,16 +137,17 @@ function InterruptedBanner({
   onAcknowledgeRecovery?: () => void;
 }) {
   const restart = banner.stop_reason === "server_restart";
+  const outcome = describeStopOutcome(banner.stop_reason);
   return (
     <aside className="recovery-banner" role="alert">
       <p>
         {restart
-          ? "上一 run 因服务重启而中断。"
-          : `上一 run 已中断：${banner.stop_reason.replaceAll("_", " ")}。`}
+          ? "上一轮运行因服务重启而中断。"
+          : `上一轮运行已中断：${outcome?.title ?? banner.stop_reason}。`}
       </p>
       {banner.requires_recovery_ack ? (
         <button type="button" onClick={onAcknowledgeRecovery}>
-          我已检查 workspace/进程
+          我已检查工作区/进程
         </button>
       ) : (
         <p>可以继续对话。</p>

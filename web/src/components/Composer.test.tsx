@@ -45,8 +45,8 @@ test("replaces Send with Stop while a run is active", async () => {
     />,
   );
 
-  expect(screen.queryByRole("button", { name: "Send" })).toBeNull();
-  await user.click(screen.getByRole("button", { name: "Stop" }));
+  expect(screen.queryByRole("button", { name: "发送" })).toBeNull();
+  await user.click(screen.getByRole("button", { name: "停止" }));
   expect(onStop).toHaveBeenCalledWith("run-1");
 });
 
@@ -70,7 +70,7 @@ test.each<RunState>([
   );
 
   expect(
-    screen.getByRole<HTMLButtonElement>("button", { name: "Stop" }).disabled,
+    screen.getByRole<HTMLButtonElement>("button", { name: "停止" }).disabled,
   ).toBe(false);
 });
 
@@ -109,7 +109,7 @@ test.each<RunState>([
   );
 
   expect(
-    screen.getByRole<HTMLButtonElement>("button", { name: "Send" }).disabled,
+    screen.getByRole<HTMLButtonElement>("button", { name: "发送" }).disabled,
   ).toBe(false);
 });
 
@@ -119,12 +119,12 @@ test("keeps the next draft editable but cannot send it during a run", async () =
 
   render(<DraftHarness activeRun={run("tool_running")} onSend={onSend} />);
 
-  await user.type(screen.getByRole("textbox", { name: "Message" }), " message");
+  await user.type(screen.getByRole("textbox", { name: "消息" }), " message");
   expect(
-    screen.getByRole<HTMLTextAreaElement>("textbox", { name: "Message" }).value,
+    screen.getByRole<HTMLTextAreaElement>("textbox", { name: "消息" }).value,
   ).toBe("next message");
   expect(onSend).not.toHaveBeenCalled();
-  expect(screen.queryByRole("button", { name: "Send" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "发送" })).toBeNull();
 });
 
 test("disables Send for empty input and a recovery acknowledgement gate", () => {
@@ -138,7 +138,7 @@ test("disables Send for empty input and a recovery acknowledgement gate", () => 
     />,
   );
   expect(
-    screen.getByRole<HTMLButtonElement>("button", { name: "Send" }).disabled,
+    screen.getByRole<HTMLButtonElement>("button", { name: "发送" }).disabled,
   ).toBe(true);
 
   rerender(
@@ -152,7 +152,7 @@ test("disables Send for empty input and a recovery acknowledgement gate", () => 
     />,
   );
   expect(
-    screen.getByRole<HTMLButtonElement>("button", { name: "Send" }).disabled,
+    screen.getByRole<HTMLButtonElement>("button", { name: "发送" }).disabled,
   ).toBe(true);
 });
 
@@ -171,11 +171,11 @@ test("keeps the message input disabled and explained until recovery is acknowled
   );
 
   const textarea = screen.getByRole<HTMLTextAreaElement>("textbox", {
-    name: "Message",
+    name: "消息",
   });
   expect(textarea.disabled).toBe(true);
   expect(
-    screen.getByText("输入框已禁用：请先确认已检查 workspace/进程。"),
+    screen.getByText("输入框已禁用：请先确认已检查工作区/进程。"),
   ).not.toBeNull();
 
   await user.type(textarea, " more");
@@ -195,7 +195,7 @@ test("keeps a visible focus indicator on the message input for keyboard users", 
   );
 
   await user.tab();
-  const textarea = screen.getByRole("textbox", { name: "Message" });
+  const textarea = screen.getByRole("textbox", { name: "消息" });
   const composer = textarea.closest("form");
 
   expect(document.activeElement).toBe(textarea);

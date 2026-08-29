@@ -12,14 +12,14 @@ type ViewSwitcherProps = {
  */
 export function ViewSwitcher({ view, onViewChange }: ViewSwitcherProps) {
   return (
-    <nav className="view-switch" aria-label="Views">
+    <nav className="view-switch" aria-label="视图">
       <button
         type="button"
         className="view-tab"
         aria-current={view === "sessions" ? "page" : undefined}
         onClick={() => onViewChange("sessions")}
       >
-        Sessions
+        会话
       </button>
       <button
         type="button"
@@ -27,7 +27,7 @@ export function ViewSwitcher({ view, onViewChange }: ViewSwitcherProps) {
         aria-current={view === "evaluations" ? "page" : undefined}
         onClick={() => onViewChange("evaluations")}
       >
-        Evaluations
+        评测记录
       </button>
     </nav>
   );

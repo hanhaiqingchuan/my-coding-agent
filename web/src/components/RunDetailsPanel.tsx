@@ -1,3 +1,5 @@
+import { describeStopOutcome } from "../api/errors";
+import { runStateLabel } from "../api/labels";
 import type { JsonValue, RunTotalsDto, SessionSnapshotDto } from "../api/types";
 
 type RunDetailsPanelProps = { snapshot: SessionSnapshotDto | null };
@@ -14,59 +16,73 @@ export function RunDetailsPanel({ snapshot }: RunDetailsPanelProps) {
   if (run === null) {
     return (
       <section>
-        <h2>Run details</h2>
-        <p>No active run.</p>
+        <h2>运行详情</h2>
+        <p>当前没有运行中的任务。</p>
       </section>
     );
   }
   const isFinished = activeRun === null;
   const model = modelName(run.config_snapshot.model);
-  const stopReason = run.stop_reason?.replaceAll("_", " ") ?? null;
-  const errorKind = run.error_kind?.replaceAll("_", " ") ?? null;
+  const stopOutcome = describeStopOutcome(run.stop_reason, run.error_kind);
+  const errorOutcome =
+    run.error_kind !== null ? describeStopOutcome(run.error_kind) : null;
   return (
     <section>
-      <h2>Run details</h2>
+      <h2>运行详情</h2>
       <p className="run-details-scope">
-        {isFinished ? "Last finished run. No run is active." : "Active run."}
+        {isFinished
+          ? "上一个完成的任务。当前没有运行中的任务。"
+          : "运行中的任务。"}
       </p>
       <dl className="run-details-list">
         <div>
-          <dt>State</dt>
-          <dd className={`run-state run-state-${run.state}`}>{run.state}</dd>
+          <dt>状态</dt>
+          <dd className={`run-state run-state-${run.state}`}>
+            {runStateLabel(run.state)}
+          </dd>
         </div>
         <div>
-          <dt>Run ID</dt>
+          <dt>运行 ID</dt>
           <dd className="run-details-mono">{run.id}</dd>
         </div>
-        {model !== null ? <DetailRow label="Model" value={model} /> : null}
-        <DetailRow label="Rounds" value={String(run.totals.round_count)} />
-        <DetailRow label="Retries" value={String(run.totals.retry_count)} />
+        {model !== null ? <DetailRow label="模型" value={model} /> : null}
+        <DetailRow label="轮次" value={String(run.totals.round_count)} />
+        <DetailRow label="重试" value={String(run.totals.retry_count)} />
         <div>
-          <dt>Cumulative tokens</dt>
+          <dt>累计 Token</dt>
           <dd>
             <span>{tokenSummary(run.totals)}</span>
             <span className="run-details-note">
-              Known usage summed across rounds, not current context occupancy.
+              跨轮次累计的已知用量，非当前上下文占用。
             </span>
           </dd>
         </div>
-        {stopReason !== null ? (
-          <DetailRow label="Stop reason" value={stopReason} />
+        {stopOutcome !== null ? (
+          <DetailRow label="停止原因" value={stopOutcome.title} />
         ) : null}
-        {errorKind !== null ? (
-          <DetailRow label="Error kind" value={errorKind} />
+        {run.error_kind !== null && errorOutcome !== null ? (
+          <DetailRow label="错误类型" value={errorOutcome.title} />
         ) : null}
         <div>
-          <dt>Started</dt>
+          <dt>开始时间</dt>
           <dd>{new Date(run.started_at).toLocaleString()}</dd>
         </div>
         {run.finished_at !== null ? (
           <DetailRow
-            label="Finished"
+            label="结束时间"
             value={new Date(run.finished_at).toLocaleString()}
           />
         ) : null}
       </dl>
+      {stopOutcome !== null ? (
+        <div className="run-stop-detail">
+          <p>{stopOutcome.description}</p>
+          {stopOutcome.hint !== null ? (
+            <p className="run-stop-hint">{stopOutcome.hint}</p>
+          ) : null}
+          <p className="run-details-note">原始代码：{stopOutcome.code}</p>
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -82,10 +98,10 @@ function DetailRow({ label, value }: { label: string; value: string }) {
 
 function tokenSummary(totals: RunTotalsDto): string {
   return [
-    `input ${totals.input_tokens}`,
-    `output ${totals.output_tokens}`,
-    `cache create ${totals.cache_creation_input_tokens}`,
-    `cache read ${totals.cache_read_input_tokens}`,
+    `输入 ${totals.input_tokens}`,
+    `输出 ${totals.output_tokens}`,
+    `缓存写入 ${totals.cache_creation_input_tokens}`,
+    `缓存读取 ${totals.cache_read_input_tokens}`,
   ].join(" · ");
 }
 

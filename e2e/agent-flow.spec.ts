@@ -16,21 +16,21 @@ test("creates a session, approves write and command, then restores final history
   const sessionTitle = `Complete flow ${Date.now()}`;
 
   await page.goto("/");
-  await page.getByRole("textbox", { name: "Workspace" }).fill(state.workspace);
-  await page.getByLabel(/Session title/).fill(sessionTitle);
-  await page.getByRole("button", { name: "Open workspace" }).click();
+  await page.getByRole("textbox", { name: "工作区" }).fill(state.workspace);
+  await page.getByLabel(/会话名称/).fill(sessionTitle);
+  await page.getByRole("button", { name: "打开工作区" }).click();
   await expect(
     page.getByRole("heading", { name: sessionTitle }),
   ).toBeVisible();
 
-  await page.getByRole("textbox", { name: "Message" }).fill("agent-flow");
-  await page.getByRole("button", { name: "Send" }).click();
+  await page.getByRole("textbox", { name: "消息" }).fill("agent-flow");
+  await page.getByRole("button", { name: "发送" }).click();
 
   // Round one streams a thinking block before its text: the box renders expanded
   // while the reasoning arrives, then auto-collapses when the block closes. The
   // scripted block holds open until released, so the mid-stream check is exact.
   const thinkingToggle = page.getByRole("button", {
-    name: /^Thinking · \d+ chars$/,
+    name: /^思考中 · \d+ 字$/,
   });
   const thinkingText = page.locator(".thinking-text");
   await expect(thinkingToggle).toHaveAttribute("aria-expanded", "true");
@@ -48,28 +48,28 @@ test("creates a session, approves write and command, then restores final history
 
   await expect(page.getByText("Preparing the workspace change…")).toBeVisible();
 
-  const runDetails = page.getByRole("complementary", { name: "Run details" });
+  const runDetails = page.getByRole("complementary", { name: "运行详情" });
   const detailValue = (label: string) =>
     runDetails
       .locator("dl > div")
       .filter({ has: page.getByText(label, { exact: true }) })
       .getByRole("definition");
 
-  const writeApproval = page.getByRole("region", { name: "Pending approval" });
+  const writeApproval = page.getByRole("region", { name: "待审批" });
   await expect(
     writeApproval.getByRole("heading", { name: "write_file" }),
   ).toBeVisible();
-  await expect(detailValue("Model")).toHaveText("scripted-e2e");
-  await expect(detailValue("Rounds")).toHaveText("1");
-  await writeApproval.getByRole("button", { name: "Approve" }).click();
+  await expect(detailValue("模型")).toHaveText("scripted-e2e");
+  await expect(detailValue("轮次")).toHaveText("1");
+  await writeApproval.getByRole("button", { name: "批准" }).click();
 
   await expect(
     writeApproval.getByRole("heading", { name: "run_command" }),
   ).toBeVisible();
-  await expect(detailValue("Rounds")).toHaveText("2");
-  await expect(detailValue("Retries")).toHaveText("0");
-  await expect(detailValue("Cumulative tokens")).toContainText(
-    "input 16 · output 16 · cache create 0 · cache read 0",
+  await expect(detailValue("轮次")).toHaveText("2");
+  await expect(detailValue("重试")).toHaveText("0");
+  await expect(detailValue("累计 Token")).toContainText(
+    "输入 16 · 输出 16 · 缓存写入 0 · 缓存读取 0",
   );
   await expect(
     writeApproval.getByText(
@@ -78,18 +78,18 @@ test("creates a session, approves write and command, then restores final history
   ).toBeVisible();
   await expect(writeApproval.getByText("10s")).toBeVisible();
   await expect(
-    writeApproval.getByText(/This command is not sandboxed/),
+    writeApproval.getByText(/本命令不在沙箱中运行/),
   ).toBeVisible();
-  await writeApproval.getByRole("button", { name: "Approve" }).click();
+  await writeApproval.getByRole("button", { name: "批准" }).click();
 
   await expect(page.getByText("All scripted steps completed.")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Send" })).toBeVisible();
-  await expect(page.getByLabel("write_file succeeded")).toBeVisible();
-  await expect(page.getByLabel("run_command succeeded")).toBeVisible();
+  await expect(page.getByRole("button", { name: "发送" })).toBeVisible();
+  await expect(page.getByLabel("write_file 成功")).toBeVisible();
+  await expect(page.getByLabel("run_command 成功")).toBeVisible();
 
   await page.reload();
   await expect(page.getByText("All scripted steps completed.")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Send" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "发送" })).toBeVisible();
 
   // The committed round-one message keeps its reasoning server-side: after the
   // refresh it still renders collapsed by default and expands on demand.

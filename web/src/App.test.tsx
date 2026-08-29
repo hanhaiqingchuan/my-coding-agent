@@ -131,15 +131,15 @@ test("renders the fixed approval dock and sends only backend commands for approv
   render(<App />);
 
   await waitFor(() =>
-    expect(screen.getByRole("button", { name: "Approve" })).not.toBeNull(),
+    expect(screen.getByRole("button", { name: "批准" })).not.toBeNull(),
   );
   expect(
-    screen.getByRole("region", { name: "Pending approval" }),
+    screen.getByRole("region", { name: "待审批" }),
   ).not.toBeNull();
 
-  await user.click(screen.getByRole("button", { name: "Approve" }));
+  await user.click(screen.getByRole("button", { name: "批准" }));
   await user.click(
-    screen.getByRole("button", { name: "我已检查 workspace/进程" }),
+    screen.getByRole("button", { name: "我已检查工作区/进程" }),
   );
 
   expect(mocks.send).toHaveBeenCalledWith(
@@ -164,32 +164,32 @@ test("the left rail switches views by writing the location hash", async () => {
 
   // The mocked snapshot holds an active run, so the composer shows Stop.
   await waitFor(() =>
-    expect(screen.getByRole("button", { name: "Stop" })).toBeTruthy(),
+    expect(screen.getByRole("button", { name: "停止" })).toBeTruthy(),
   );
   expect(window.location.hash).toBe("");
 
-  await user.click(screen.getByRole("button", { name: "Evaluations" }));
+  await user.click(screen.getByRole("button", { name: "评测记录" }));
   await waitFor(() =>
     expect(
       screen
-        .getByRole("button", { name: "Evaluations" })
+        .getByRole("button", { name: "评测记录" })
         .getAttribute("aria-current"),
     ).toBe("page"),
   );
   expect(window.location.hash).toBe("#/evaluations");
   await waitFor(() =>
-    expect(screen.getByText(/No evaluation campaigns found/)).toBeTruthy(),
+    expect(screen.getByText(/尚无评测记录/)).toBeTruthy(),
   );
-  expect(screen.queryByRole("button", { name: "Stop" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "停止" })).toBeNull();
 
-  await user.click(screen.getByRole("button", { name: "Sessions" }));
+  await user.click(screen.getByRole("button", { name: "会话" }));
   await waitFor(() =>
-    expect(screen.getByRole("button", { name: "Stop" })).toBeTruthy(),
+    expect(screen.getByRole("button", { name: "停止" })).toBeTruthy(),
   );
   expect(window.location.hash).toBe("");
   expect(
     screen
-      .getByRole("button", { name: "Evaluations" })
+      .getByRole("button", { name: "评测记录" })
       .getAttribute("aria-current"),
   ).toBeNull();
 });
@@ -199,36 +199,36 @@ test("restores the evaluations view when the hash is set before mount", async ()
   render(<App />);
 
   await waitFor(() =>
-    expect(screen.getByText(/No evaluation campaigns found/)).toBeTruthy(),
+    expect(screen.getByText(/尚无评测记录/)).toBeTruthy(),
   );
   expect(
     screen
-      .getByRole("button", { name: "Evaluations" })
+      .getByRole("button", { name: "评测记录" })
       .getAttribute("aria-current"),
   ).toBe("page");
   expect(
     screen
-      .getByRole("button", { name: "Sessions" })
+      .getByRole("button", { name: "会话" })
       .getAttribute("aria-current"),
   ).toBeNull();
-  expect(screen.queryByRole("button", { name: "Stop" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "停止" })).toBeNull();
 });
 
 test("follows hashchange events so refresh, back and pasted links restore the view", async () => {
   render(<App />);
   await waitFor(() =>
-    expect(screen.getByRole("button", { name: "Stop" })).toBeTruthy(),
+    expect(screen.getByRole("button", { name: "停止" })).toBeTruthy(),
   );
 
   window.location.hash = "#/evaluations";
   await waitFor(() =>
-    expect(screen.getByText(/No evaluation campaigns found/)).toBeTruthy(),
+    expect(screen.getByText(/尚无评测记录/)).toBeTruthy(),
   );
-  expect(screen.queryByRole("button", { name: "Stop" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "停止" })).toBeNull();
 
   window.location.hash = "";
   await waitFor(() =>
-    expect(screen.getByRole("button", { name: "Stop" })).toBeTruthy(),
+    expect(screen.getByRole("button", { name: "停止" })).toBeTruthy(),
   );
 });
 

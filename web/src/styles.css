@@ -1009,6 +1009,55 @@ button:disabled:hover {
   border-color: var(--amber-line);
   background: #3b2d19;
 }
+/* --- Run failure banner -------------------------------------------------- */
+/* The timeline's compact summary of a failed run: the run-details panel keeps
+   the raw facts, this puts the cause and the next step beside the conversation. */
+.run-failure-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  min-width: 0;
+  margin: var(--space-5) var(--space-1) 0;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--danger-border);
+  border-left: 3px solid var(--danger-line);
+  border-radius: var(--radius-md);
+  background: var(--danger-bg);
+}
+.run-failure-copy {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.run-failure-copy strong {
+  color: var(--danger-fg-strong);
+  font-size: var(--text-sm);
+}
+.run-failure-copy p {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+}
+.run-failure-retries {
+  color: var(--text-secondary);
+}
+.run-failure-hint {
+  color: var(--danger-fg);
+}
+.run-failure-dismiss {
+  flex: none;
+  margin-left: auto;
+  padding: 2px 8px;
+  border-color: var(--danger-border);
+  color: var(--danger-fg);
+  background: transparent;
+  font-size: var(--text-sm);
+  line-height: var(--leading-tight);
+}
+.run-failure-dismiss:hover {
+  border-color: var(--danger-line);
+  color: var(--danger-fg-strong);
+}
 .sr-only {
   position: absolute;
   width: 1px;
@@ -1441,6 +1490,24 @@ p.run-details-scope {
   color: var(--text-muted);
   font-size: var(--text-2xs);
   line-height: 1.45;
+}
+/* The friendly stop-reason explanation travels with the facts that produced it. */
+.run-stop-detail {
+  display: grid;
+  gap: var(--space-1);
+  margin-top: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-left: 3px solid var(--neutral-line);
+  border-radius: var(--radius-md);
+}
+.run-stop-detail p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+.run-stop-detail .run-stop-hint {
+  color: var(--text-primary);
 }
 .run-details-mono {
   color: var(--code-fg);

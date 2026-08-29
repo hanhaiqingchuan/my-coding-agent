@@ -1,4 +1,5 @@
 import type { JsonValue, ToolExecutionDto } from "../api/types";
+import { toolStateLabel } from "../api/labels";
 
 type ToolCardProps = {
   tool: ToolExecutionDto;
@@ -18,12 +19,12 @@ const WRITE_ARGUMENTS: ReadonlyArray<{
   label: string;
   multiline: boolean;
 }> = [
-  { key: "operation", label: "Operation", multiline: false },
-  { key: "path", label: "Path", multiline: false },
-  { key: "replace_all", label: "Replace all", multiline: false },
-  { key: "content", label: "Content", multiline: true },
-  { key: "old_text", label: "Replaced text", multiline: true },
-  { key: "new_text", label: "Replacement text", multiline: true },
+  { key: "operation", label: "操作", multiline: false },
+  { key: "path", label: "路径", multiline: false },
+  { key: "replace_all", label: "全部替换", multiline: false },
+  { key: "content", label: "内容", multiline: true },
+  { key: "old_text", label: "被替换文本", multiline: true },
+  { key: "new_text", label: "替换后文本", multiline: true },
 ];
 
 type WriteRow = {
@@ -43,14 +44,16 @@ export function ToolCard({ tool, outputDraft }: ToolCardProps) {
   return (
     <article
       className={`tool-card tool-${tool.execution_state}`}
-      aria-label={`${tool.name} ${statusLabel(tool.execution_state)}`}
+      aria-label={`${tool.name} ${toolStateLabel(tool.execution_state)}`}
     >
       <header>
         <strong>{tool.name}</strong>
-        <span className="tool-status">{statusLabel(tool.execution_state)}</span>
+        <span className="tool-status">
+          {toolStateLabel(tool.execution_state)}
+        </span>
       </header>
       <details>
-        <summary>Details</summary>
+        <summary>详情</summary>
         {isCommand ? <CommandDetails input={tool.input} /> : null}
         {writeRows.length > 0 ? <WriteDetails rows={writeRows} /> : null}
         {!isCommand && writeRows.length === 0 ? (
@@ -87,30 +90,27 @@ export function CommandDetails({
   return (
     <dl className="tool-command-details">
       <div>
-        <dt>Command</dt>
+        <dt>命令</dt>
         <dd>{command ?? "—"}</dd>
       </div>
       <div>
-        <dt>Working directory</dt>
+        <dt>工作目录</dt>
         <dd>{cwd ?? "—"}</dd>
       </div>
       <div>
-        <dt>Reason</dt>
+        <dt>理由</dt>
         <dd>{reason ?? "—"}</dd>
       </div>
       <div>
-        <dt>Timeout</dt>
+        <dt>超时</dt>
         <dd>{timeoutLabel(timeoutSeconds)}</dd>
       </div>
       {/* run_command is never a security sandbox: an approved command runs with
           the current operating system user's privileges, so the warning belongs
           to every command card and no backend flag may switch it off. */}
       <div className="tool-risk">
-        <dt>Warning</dt>
-        <dd>
-          This command is not sandboxed and runs with your operating system
-          user&apos;s full privileges.
-        </dd>
+        <dt>警告</dt>
+        <dd>本命令不在沙箱中运行，将拥有你当前系统用户的全部权限。</dd>
       </div>
     </dl>
   );
@@ -161,7 +161,7 @@ function writeArgumentRows(input: Record<string, JsonValue>): WriteRow[] {
       value: truncate ? text.slice(0, MAX_TEXT_CHARACTERS) : text,
       multiline,
       truncationNote: truncate
-        ? `Showing the first ${MAX_TEXT_CHARACTERS} of ${text.length} characters.`
+        ? `已截断：仅显示前 ${MAX_TEXT_CHARACTERS} 字符（共 ${text.length} 字符）。`
         : null,
     });
   }
@@ -189,12 +189,6 @@ function timeoutLabel(timeoutSeconds: JsonValue | undefined): string {
   // metadata nor the model input carries one, the schema default stays invisible
   // rather than being guessed here.
   return typeof timeoutSeconds === "number" ? `${timeoutSeconds}s` : "—";
-}
-
-export function statusLabel(
-  state: ToolExecutionDto["execution_state"],
-): string {
-  return state.replaceAll("_", " ");
 }
 
 export function stringValue(value: JsonValue | undefined): string | null {

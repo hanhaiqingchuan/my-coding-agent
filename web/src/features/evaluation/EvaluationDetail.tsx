@@ -11,7 +11,7 @@ type EvaluationDetailProps = {
 };
 
 function percent(rate: number | null): string {
-  return rate === null ? "n/a" : `${(rate * 100).toFixed(1)}%`;
+  return rate === null ? "—" : `${(rate * 100).toFixed(1)}%`;
 }
 
 function means(values: Record<string, number | null>): string {
@@ -34,26 +34,26 @@ function judgeCell(row: RunRowDto): {
 } {
   if (row.judge_error) {
     return {
-      label: "Judge error",
-      content: "judge error",
+      label: "裁判错误",
+      content: "裁判错误",
       className: "eval-badge eval-fail",
     };
   }
   if (row.judge_scores === null) {
     return {
-      label: "Judge scores: not judged",
+      label: "裁判评分：未评判",
       content: "—",
       className: "eval-muted",
     };
   }
   const scores = SCORE_NAMES.map(
     (name) => `${SCORE_LABELS[name]} ${row.judge_scores?.[name] ?? "—"}`,
-  ).join(", ");
+  ).join("，");
   const content = SCORE_NAMES.map((name) =>
     String(row.judge_scores?.[name] ?? "—"),
   ).join(" · ");
   return {
-    label: `Judge scores: ${scores}`,
+    label: `裁判评分：${scores}`,
     content,
     className: "eval-judge-scores",
   };
@@ -67,7 +67,7 @@ export function EvaluationDetail({ detail, onOpenRun }: EvaluationDetailProps) {
     <div className="eval-campaign-detail">
       {summary.corrupt ? (
         <p className="eval-corrupt-line">
-          <span className="eval-badge eval-fail">corrupt</span>{" "}
+          <span className="eval-badge eval-fail">已损坏</span>{" "}
           {summary.note ?? ""}
         </p>
       ) : summary.note !== null ? (
@@ -76,39 +76,39 @@ export function EvaluationDetail({ detail, onOpenRun }: EvaluationDetailProps) {
       {aggregates !== null ? (
         <div className="eval-aggregates">
           <div>
-            <span>Strict success</span>
+            <span>严格成功</span>
             <strong>{percent(aggregates.task_completion_rate)}</strong>
             <p>
-              {aggregates.strict_success_runs} / {aggregates.valid_runs} valid
-              runs
+              {aggregates.valid_runs} 次有效运行中通过{" "}
+              {aggregates.strict_success_runs}
             </p>
           </div>
           <div>
-            <span>Cost</span>
+            <span>成本</span>
             <p>
-              Tokens {aggregates.total_input_tokens ?? "—"} in ·{" "}
-              {aggregates.total_output_tokens ?? "—"} out
+              Token 输入 {aggregates.total_input_tokens ?? "—"} · 输出{" "}
+              {aggregates.total_output_tokens ?? "—"}
             </p>
             <p>
-              {aggregates.total_main_requests} main requests ·{" "}
-              {aggregates.total_tool_calls} tool calls
+              主请求 {aggregates.total_main_requests} · 工具调用{" "}
+              {aggregates.total_tool_calls}
             </p>
           </div>
           <div>
-            <span>Judge</span>
+            <span>裁判</span>
             <strong>{means(aggregates.judge_means)}</strong>
             <p>
-              {aggregates.judged_runs} judged · {aggregates.judge_error_runs}{" "}
-              judge errors
+              已评判 {aggregates.judged_runs} · 裁判错误{" "}
+              {aggregates.judge_error_runs}
             </p>
           </div>
           {Object.keys(aggregates.failure_kinds).length > 0 ? (
             <div>
-              <span>Failures</span>
+              <span>失败分布</span>
               <strong>
                 {Object.entries(aggregates.failure_kinds)
                   .map(([kind, times]) => `${kind} ×${times}`)
-                  .join(", ")}
+                  .join("，")}
               </strong>
             </div>
           ) : null}
@@ -118,18 +118,18 @@ export function EvaluationDetail({ detail, onOpenRun }: EvaluationDetailProps) {
         <table className="eval-task-table">
           <thead>
             <tr>
-              <th scope="col">Task</th>
-              <th scope="col">Category</th>
-              <th scope="col">State</th>
-              <th scope="col">Stop reason</th>
-              <th scope="col">Rounds</th>
-              <th scope="col">Tools</th>
-              <th scope="col">In</th>
-              <th scope="col">Out</th>
-              <th scope="col">Duration</th>
-              <th scope="col">Strict</th>
-              <th scope="col">Artifact</th>
-              <th scope="col">Judge</th>
+              <th scope="col">任务</th>
+              <th scope="col">分类</th>
+              <th scope="col">状态</th>
+              <th scope="col">停止原因</th>
+              <th scope="col">轮次</th>
+              <th scope="col">工具</th>
+              <th scope="col">输入</th>
+              <th scope="col">输出</th>
+              <th scope="col">耗时</th>
+              <th scope="col">严格</th>
+              <th scope="col">产物</th>
+              <th scope="col">裁判</th>
             </tr>
           </thead>
           <tbody>
@@ -145,33 +145,33 @@ export function EvaluationDetail({ detail, onOpenRun }: EvaluationDetailProps) {
                         onClick={() => onOpenRun(task.task_id, row.repeat)}
                       >
                         <span>{task.task_id}</span>
-                        <small>· repeat {row.repeat}</small>
+                        <small>· 第 {row.repeat} 次</small>
                       </button>
                     </td>
                     <td>{task.category}</td>
-                    <td aria-label="State">{row.state ?? "—"}</td>
-                    <td aria-label="Stop reason">{row.stop_reason ?? "—"}</td>
-                    <td aria-label="Rounds">{row.rounds ?? "—"}</td>
-                    <td aria-label="Tool calls">{row.tool_calls ?? "—"}</td>
-                    <td aria-label="Input tokens">{row.input_tokens ?? "—"}</td>
-                    <td aria-label="Output tokens">
+                    <td aria-label="状态">{row.state ?? "—"}</td>
+                    <td aria-label="停止原因">{row.stop_reason ?? "—"}</td>
+                    <td aria-label="轮次">{row.rounds ?? "—"}</td>
+                    <td aria-label="工具调用">{row.tool_calls ?? "—"}</td>
+                    <td aria-label="输入 Token">{row.input_tokens ?? "—"}</td>
+                    <td aria-label="输出 Token">
                       {row.output_tokens ?? "—"}
                     </td>
-                    <td aria-label="Duration">{duration(row)}</td>
+                    <td aria-label="耗时">{duration(row)}</td>
                     <td>
                       <span
                         className={`eval-badge ${row.strict_success ? "eval-pass" : "eval-fail"}`}
-                        aria-label={`Strict success: ${row.strict_success ? "pass" : "fail"}`}
+                        aria-label={`严格成功：${row.strict_success ? "通过" : "未通过"}`}
                       >
-                        {row.strict_success ? "pass" : "fail"}
+                        {row.strict_success ? "通过" : "未通过"}
                       </span>
                     </td>
                     <td>
                       <span
                         className={`eval-badge ${row.artifact_correct ? "eval-pass" : "eval-fail"}`}
-                        aria-label={`Artifact correct: ${row.artifact_correct ? "ok" : "wrong"}`}
+                        aria-label={`产物正确：${row.artifact_correct ? "正确" : "错误"}`}
                       >
-                        {row.artifact_correct ? "ok" : "wrong"}
+                        {row.artifact_correct ? "正确" : "错误"}
                       </span>
                     </td>
                     <td>
@@ -189,7 +189,7 @@ export function EvaluationDetail({ detail, onOpenRun }: EvaluationDetailProps) {
           </tbody>
         </table>
       ) : summary.corrupt ? (
-        <p className="eval-note">No readable run records in this campaign.</p>
+        <p className="eval-note">该轮次没有可读取的运行记录。</p>
       ) : null}
     </div>
   );

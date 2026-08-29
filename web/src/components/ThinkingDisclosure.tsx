@@ -17,7 +17,7 @@ export function ThinkingDisclosure({
   text,
   live = false,
   closed = false,
-  label = "Thinking",
+  label = "思考中",
 }: ThinkingDisclosureProps) {
   const [open, setOpen] = useState(live && !closed);
   const [seenClosed, setSeenClosed] = useState(closed);
@@ -43,7 +43,7 @@ export function ThinkingDisclosure({
         onClick={() => setOpen((current) => !current)}
       >
         <span className="thinking-chevron" aria-hidden="true" />
-        {label} · {text.length} chars
+        {label} · {text.length} 字
       </button>
       {/* The body stays mounted so the collapse runs as a CSS transition on
           grid-template-rows; the global prefers-reduced-motion rule removes it. */}
