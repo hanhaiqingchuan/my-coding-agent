@@ -54,14 +54,17 @@ jobs:
           uv run --python 3.12 ruff check src tests scripts
           npm --prefix web run lint
 
+      # The production build must precede the backend tests: serve mounts
+      # web/dist, and tests/integration/test_headless_run.py boots the real
+      # app, so a fresh checkout without a build fails there.
+      - name: Production build
+        run: npm --prefix web run build
+
       - name: Backend tests
         run: uv run --python 3.12 pytest --ignore=tests/live
 
       - name: Frontend component tests
         run: npm --prefix web run test
-
-      - name: Production build
-        run: npm --prefix web run build
 
       - name: E2E tests
         run: npm --prefix web run test:e2e
