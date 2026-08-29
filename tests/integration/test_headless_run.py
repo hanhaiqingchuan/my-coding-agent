@@ -13,6 +13,7 @@ from coding_agent.core.models import (
     AssistantTurn,
     ModelStopReason,
     TextPart,
+    ThinkingPart,
     ToolCall,
     ToolResult,
     ToolUsePart,
@@ -20,6 +21,7 @@ from coding_agent.core.models import (
 )
 from coding_agent.main import RuntimeDependencies, load_command_policy
 from coding_agent.model import ModelMessage
+from coding_agent.model.protocol import ModelAPIError
 from coding_agent.runtime.approval import ApprovalGate
 from coding_agent.runtime.publisher import EventPublisher
 from coding_agent.storage.sqlite import SQLiteStore
@@ -34,6 +36,26 @@ def _final_turn(text: str = "done") -> AssistantTurn:
         ModelStopReason.END_TURN,
         Usage(12, 3),
     )
+
+
+def _run_argv(paths: dict[str, Path]) -> list[str]:
+    return [
+        "run",
+        "--config",
+        str(paths["config"]),
+        "--workspace",
+        str(paths["workspace"]),
+        "--data-dir",
+        str(paths["data_dir"]),
+        "--prompt-file",
+        str(paths["prompt"]),
+        "--yes",
+        "--ack-unsafe-auto-approve",
+        "--command-policy",
+        str(paths["policy"]),
+        "--report-out",
+        str(paths["report"]),
+    ]
 
 
 def _task_files(tmp_path: Path) -> dict[str, Path]:
@@ -132,6 +154,7 @@ def test_headless_run_uses_injected_runtime_and_writes_versioned_report(tmp_path
         "compaction",
         "durations",
         "model_identity",
+        "final_assistant_text",
     }
     assert len(report["tool_schema_hash"]) == 64
     assert report["model"]["main"]["requests"] == 1
@@ -154,6 +177,7 @@ def test_headless_run_uses_injected_runtime_and_writes_versioned_report(tmp_path
     }
     assert report["durations"]["agent_monotonic_ms"] == 0
     assert report["durations"]["retry_wait_monotonic_ms"] == 0
+    assert report["final_assistant_text"] == "done"
 
 
 def test_report_records_the_model_identity_that_served_the_requests(tmp_path: Path) -> None:
@@ -699,3 +723,65 @@ def test_serve_uses_the_injected_runtime_and_fixed_loopback_host(
     sessions = dependencies.store.list_sessions()
     assert len(sessions) == 1
     assert sessions[0].workspace_realpath == str(paths["workspace"].resolve())
+
+
+def test_report_exports_the_last_committed_assistant_text_of_the_run(tmp_path: Path) -> None:
+    """The judge's communication axis scores the real final message, not a fixture-only field."""
+    paths = _task_files(tmp_path)
+    model = ScriptedModel(
+        [
+            AssistantTurn(
+                "turn-text-then-tool",
+                (
+                    TextPart("I will inspect the workspace first."),
+                    ThinkingPart("plan the edit"),
+                    ToolUsePart(
+                        ToolCall("call-pwd", "run_command", {"command": "pwd", "cwd": "."})
+                    ),
+                ),
+                ModelStopReason.TOOL_USE,
+                Usage(10, 4),
+            ),
+            _final_turn("Created helper.py and verified it with the existing suite."),
+        ]
+    )
+    dependencies = _dependencies(paths["data_dir"], model)
+
+    exit_code = cli.main(_run_argv(paths), dependencies=dependencies)
+
+    report = json.loads(paths["report"].read_text(encoding="utf-8"))
+    assert exit_code == 0
+    assert report["final_assistant_text"] == (
+        "Created helper.py and verified it with the existing suite."
+    )
+
+
+def test_report_leaves_final_assistant_text_null_without_a_committed_assistant_message(
+    tmp_path: Path,
+) -> None:
+    """A run failing before its first assistant message must export null, not a guess."""
+    paths = _task_files(tmp_path)
+    model = ScriptedModel([ModelAPIError(401, "authentication_error", None, False)])
+    dependencies = _dependencies(paths["data_dir"], model)
+
+    exit_code = cli.main(_run_argv(paths), dependencies=dependencies)
+
+    report = json.loads(paths["report"].read_text(encoding="utf-8"))
+    assert exit_code == 1
+    assert report["state"] == "FAILED"
+    assert report["final_assistant_text"] is None
+
+
+def test_report_bounds_a_verbose_final_assistant_message(tmp_path: Path) -> None:
+    """A verbose final message must not bloat every run report without notice."""
+    paths = _task_files(tmp_path)
+    verbose = "x" * 20_000
+    dependencies = _dependencies(paths["data_dir"], ScriptedModel([_final_turn(verbose)]))
+
+    cli.main(_run_argv(paths), dependencies=dependencies)
+
+    report = json.loads(paths["report"].read_text(encoding="utf-8"))
+    exported = report["final_assistant_text"]
+    assert isinstance(exported, str)
+    assert len(exported) <= 8_200
+    assert "truncated" in exported

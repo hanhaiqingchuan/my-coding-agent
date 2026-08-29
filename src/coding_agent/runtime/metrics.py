@@ -4,6 +4,9 @@ The run report is a projection of facts SQLite already owns. Nothing here mutate
 state, and nothing here exports prompt text, tool arguments, command output, or
 absolute paths: only counts, hashes, token usage, durations and the model identity
 the run's own configuration snapshot records — never the credential or the endpoint.
+The one exported message text is the run's final assistant message, bounded to
+``FINAL_ASSISTANT_TEXT_LIMIT`` characters, because the evaluation judge's
+communication axis scores exactly that message.
 """
 
 from __future__ import annotations
@@ -15,11 +18,13 @@ from dataclasses import asdict
 from datetime import datetime
 
 from coding_agent.config import ModelSettings
-from coding_agent.core.models import Run
+from coding_agent.core.models import MessageStatus, Run, TextPart
 from coding_agent.model.protocol import ModelRequest
 from coding_agent.storage.sqlite import SQLiteStore
 
 RUN_REPORT_SCHEMA_VERSION = "run-report-v1"
+FINAL_ASSISTANT_TEXT_LIMIT = 8000
+_TRUNCATION_NOTE = "\n…[truncated]"
 _USAGE_COMPONENTS = (
     "input_tokens",
     "output_tokens",
@@ -111,7 +116,40 @@ def build_run_report(
             "model_request_elapsed_ms": _elapsed_ms(main),
             "compaction_request_elapsed_ms": _elapsed_ms(compaction),
         },
+        "final_assistant_text": _final_assistant_text(store, run),
     }
+
+
+def _final_assistant_text(store: SQLiteStore, run: Run) -> str | None:
+    """Export the run's last committed assistant text, or ``None`` when there is none.
+
+    The final message is the one fact the evaluation judge cannot score without: its
+    communication axis reads exactly this text, redacted on the judge's side. Only
+    text parts are concatenated — tool calls and thinking are not prose — and the text
+    is capped so a verbose final message cannot bloat every published report. The
+    transcript is the session's committed projection the report already reads facts
+    from, so the last assistant message this run committed is the last one overall.
+
+    The report is written once the run is terminal, and every terminal state either
+    commits the final assistant turn atomically with its run state or leaves no
+    committed assistant message at all, so the text can never describe a later run.
+    """
+    messages = store.load_committed_transcript(run.session_id)
+    text = next(
+        (
+            "".join(part.text for part in message.parts if isinstance(part, TextPart))
+            for message in reversed(messages)
+            if message.run_id == run.id
+            and message.role == "assistant"
+            and message.status is MessageStatus.COMMITTED
+        ),
+        None,
+    )
+    if text is None:
+        return None
+    if len(text) <= FINAL_ASSISTANT_TEXT_LIMIT:
+        return text
+    return text[:FINAL_ASSISTANT_TEXT_LIMIT] + _TRUNCATION_NOTE
 
 
 def _model_identity(config_snapshot: Mapping[str, object]) -> dict[str, object | None]:
@@ -277,6 +315,7 @@ def _elapsed_ms(requests: Sequence[Mapping[str, object]]) -> int:
 
 
 __all__ = [
+    "FINAL_ASSISTANT_TEXT_LIMIT",
     "RUN_REPORT_SCHEMA_VERSION",
     "args_hash",
     "build_run_report",

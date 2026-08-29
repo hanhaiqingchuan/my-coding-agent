@@ -90,7 +90,8 @@ Two versioned documents exist, because one process cannot know both halves.
 projection of facts SQLite already owns: run state, stop reason, error kind, the model
 identity taken from the run's own configuration snapshot, model requests and attempts
 with per-component provider usage, tool statistics with hashed arguments, compaction
-facts, and per-phase durations. The identity carries the model name, context window,
+facts, per-phase durations, and the run's final assistant text (bounded, judge-facing).
+The identity carries the model name, context window,
 max output tokens and stream flag — never the credential and never the API endpoint.
 
 `run-v1` is written by the evaluator. It embeds the agent report verbatim under
@@ -120,9 +121,11 @@ The judge reads only the run's own `run-v1` facts plus the run's final assistant
 message, reduced to a fixed excerpt first. The excerpt never contains prompt text,
 tool arguments, command output, transcripts, credentials or absolute paths: the final
 assistant message is redacted before it enters the prompt, and everything else comes
-from the already-redacted run document. The shipped agent report does not currently
-export a final assistant message, so in today's campaigns that field is absent and
-the judge scores communication from the recorded facts alone.
+from the already-redacted run document. The agent report exports that message as
+`final_assistant_text` — the last committed assistant text of the run, capped at
+8000 characters with a truncation note — and it is `null` only when the run finished
+without committing any assistant message, for example when it failed before its first
+round; the judge then scores communication from the recorded facts alone.
 
 The judge must answer one fixed JSON object with three 1–5 scores and a rationale:
 
