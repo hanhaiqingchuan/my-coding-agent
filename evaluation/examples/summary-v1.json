@@ -15,6 +15,14 @@
   "failure_kinds": {},
   "harness_oracle_error_runs": 0,
   "harness_setup_runs": 0,
+  "judge_coverage": 0.0,
+  "judge_error_runs": 0,
+  "judge_means": {
+    "communication": null,
+    "process_quality": null,
+    "task_completion": null
+  },
+  "judged_runs": 0,
   "model_identity": {
     "context_window": 64000,
     "max_output_tokens": 8192,

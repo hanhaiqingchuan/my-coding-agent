@@ -8,6 +8,7 @@ directory, and oracles always execute outside that workspace.
 
 from __future__ import annotations
 
+import asyncio
 import difflib
 import json
 import os
@@ -21,7 +22,17 @@ from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
 
-from coding_agent.config import AppSettings, ConfigurationError, load_settings
+from coding_agent.config import (
+    AppSettings,
+    ConfigurationError,
+    load_settings,
+    resolve_api_key,
+)
+from coding_agent.evaluation.judge import (
+    build_transcript_excerpt,
+    judge_run,
+    write_judgement,
+)
 from coding_agent.evaluation.manifest import (
     IGNORED_NAMES,
     EvaluationManifest,
@@ -48,6 +59,8 @@ from coding_agent.evaluation.report import (
     summarize,
     write_run_document,
 )
+from coding_agent.model.anthropic_messages import AnthropicMessagesModel
+from coding_agent.model.protocol import ModelGateway
 from coding_agent.runtime.metrics import canonical_hash
 
 CANARY_TEXT = "evaluation canary; a change here means the agent wrote outside its workspace\n"
@@ -55,6 +68,8 @@ _ORACLE_TIMEOUT_SECONDS = 120
 _LOCALE_ENV_NAMES = ("LANG", "LC_ALL", "LC_CTYPE")
 
 Monotonic = Callable[[], float]
+JudgeHook = Callable[[RunResult, Path, str], Mapping[str, object] | None]
+"""Scores one finished run and returns the judgement record it wrote, or None."""
 
 
 class CampaignError(RuntimeError):
@@ -299,6 +314,44 @@ def verify_task_setup(
     )
 
 
+def build_judge_hook(
+    config: Path,
+    *,
+    gateway: ModelGateway | None = None,
+    environ: Mapping[str, str] | None = None,
+) -> JudgeHook:
+    """Build the campaign's judge hook from the same configuration the agent uses.
+
+    The judge reuses the shipped Anthropic Messages adapter with the campaign's own
+    ``ModelSettings``, so a judged campaign needs no second model configuration. The
+    returned hook never raises: a judge that cannot answer records a ``judge_error``
+    instead of aborting the campaign.
+    """
+    try:
+        settings = load_settings(config, {}, {})
+        api_key = resolve_api_key(settings, environ if environ is not None else os.environ)
+    except ConfigurationError as error:
+        raise CampaignError(f"judge: {error}") from error
+    model = gateway if gateway is not None else AnthropicMessagesModel(settings.model, api_key)
+
+    def hook(result: RunResult, run_dir: Path, campaign_id: str) -> Mapping[str, object] | None:
+        document = run_document(result, campaign_id=campaign_id)
+        excerpt = build_transcript_excerpt(document)
+        judgement = asyncio.run(judge_run(document, excerpt, settings.model, gateway=model))
+        write_judgement(
+            run_dir / "judgement.json",
+            judgement,
+            campaign_id=campaign_id,
+            task_id=result.task_id,
+            repeat=result.repeat,
+        )
+        return judgement.to_document(
+            campaign_id=campaign_id, task_id=result.task_id, repeat=result.repeat
+        )
+
+    return hook
+
+
 def run_campaign(
     manifest: EvaluationManifest,
     config: Path,
@@ -311,13 +364,15 @@ def run_campaign(
     monotonic: Monotonic = time.monotonic,
     agent_commit: str | None = None,
     campaign_id: str | None = None,
+    judge: JudgeHook | None = None,
 ) -> CampaignResult:
     """Run every task and repeat serially through the public headless CLI.
 
     A campaign writes only the records it owns: one immutable ``run-v1`` document per repeat
-    plus ``runs.jsonl``. The derived aggregates belong to ``summarize``, which refuses to
-    overwrite an existing artifact, so pre-writing them here would make the documented
-    aggregation command impossible to run.
+    plus ``runs.jsonl`` — and, when a judge hook is given, one ``judgement-v1`` record per
+    repeat. The derived aggregates belong to ``summarize``, which refuses to overwrite an
+    existing artifact, so pre-writing them here would make the documented aggregation
+    command impossible to run.
     """
     if repeats < 1:
         raise CampaignError("repeats: must be at least 1")
@@ -348,6 +403,7 @@ def run_campaign(
     config_hash = canonical_hash(asdict(settings))
 
     runs: list[RunResult] = []
+    judgements: list[Mapping[str, object]] = []
     verifications: list[SetupVerification] = []
     for task in manifest.tasks:
         verification = verify_task_setup(
@@ -357,12 +413,13 @@ def run_campaign(
         )
         verifications.append(verification)
         for repeat in range(1, repeats + 1):
+            run_dir = output_dir / "runs" / task.task_id / f"repeat-{repeat}"
             runs.append(
                 _run_once(
                     task=task,
                     repeat=repeat,
                     verification=verification,
-                    run_dir=output_dir / "runs" / task.task_id / f"repeat-{repeat}",
+                    run_dir=run_dir,
                     config=config,
                     config_hash=config_hash,
                     commit=commit,
@@ -372,9 +429,18 @@ def run_campaign(
                     monotonic=monotonic,
                 )
             )
+            if judge is not None:
+                record = judge(runs[-1], run_dir, identifier)
+                if record is not None:
+                    judgements.append(record)
 
     _write_jsonl(output_dir / "runs.jsonl", runs, identifier)
-    summary = summarize(runs, campaign_id=identifier, agent_commit=commit)
+    summary = summarize(
+        runs,
+        campaign_id=identifier,
+        agent_commit=commit,
+        judgements=judgements,
+    )
     return CampaignResult(
         campaign_id=identifier,
         dry_run=False,
@@ -832,8 +898,10 @@ __all__ = [
     "CampaignError",
     "CampaignPlan",
     "CampaignResult",
+    "JudgeHook",
     "OracleRun",
     "SetupVerification",
+    "build_judge_hook",
     "launch_agent",
     "resolve_agent_executable",
     "run_campaign",

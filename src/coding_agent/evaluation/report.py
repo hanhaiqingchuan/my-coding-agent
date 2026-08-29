@@ -14,6 +14,12 @@ from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from coding_agent.evaluation.judge import (
+    JUDGE_ERROR,
+    JUDGEMENT_SCHEMA_VERSION,
+    SCORE_NAMES,
+)
+
 RUN_SCHEMA_VERSION = "run-v1"
 SUMMARY_SCHEMA_VERSION = "summary-v1"
 PROVIDER = "anthropic_messages"
@@ -385,7 +391,13 @@ class Summary:
     compaction_runs: int
     agent_monotonic_ms: Mapping[str, float | None]
     failure_kinds: Mapping[str, int]
-    tasks: tuple[TaskSummary, ...]
+    judged_runs: int = 0
+    judge_error_runs: int = 0
+    judge_means: Mapping[str, float | None] = field(
+        default_factory=lambda: {name: None for name in SCORE_NAMES}
+    )
+    judge_coverage: float | None = None
+    tasks: tuple[TaskSummary, ...] = ()
 
     def to_document(self) -> dict[str, object]:
         return {
@@ -416,6 +428,10 @@ class Summary:
             "compaction_runs": self.compaction_runs,
             "agent_monotonic_ms": dict(self.agent_monotonic_ms),
             "failure_kinds": dict(self.failure_kinds),
+            "judged_runs": self.judged_runs,
+            "judge_error_runs": self.judge_error_runs,
+            "judge_means": dict(self.judge_means),
+            "judge_coverage": self.judge_coverage,
             "tasks": [task.to_document() for task in self.tasks],
         }
 
@@ -425,8 +441,14 @@ def summarize(
     *,
     campaign_id: str | None = None,
     agent_commit: str | None = None,
+    judgements: Sequence[Mapping[str, object]] | None = None,
 ) -> Summary:
-    """Aggregate runs while keeping harness outcomes out of the capability denominator."""
+    """Aggregate runs while keeping harness outcomes out of the capability denominator.
+
+    ``judgements`` carries the campaign's ``judgement-v1`` documents, if any. Fuzzy
+    scores are aggregated beside the deterministic metrics only: they never enter
+    ``strict_success``, the five-condition denominator of spec section 18.5.
+    """
     valid = [item for item in results if item.outcome == OUTCOME_OK]
     strict = [item for item in valid if item.strict_success]
     artifact = [item for item in valid if item.artifact_correct]
@@ -436,6 +458,7 @@ def summarize(
         if item.durations.agent_monotonic_ms is not None
     ]
     tasks = _task_summaries(results)
+    judge = _judge_facts(results, judgements)
     return Summary(
         campaign_id=campaign_id,
         agent_commit=agent_commit or next((item.agent_commit for item in results), None),
@@ -466,6 +489,10 @@ def summarize(
         compaction_runs=sum(1 for item in valid if item.compaction.count > 0),
         agent_monotonic_ms=_distribution(durations),
         failure_kinds=_failure_kinds(results),
+        judged_runs=judge.judged_runs,
+        judge_error_runs=judge.judge_error_runs,
+        judge_means=judge.judge_means,
+        judge_coverage=judge.judge_coverage,
         tasks=tasks,
     )
 
@@ -480,9 +507,60 @@ def summarize_campaign(input_dir: Path, output_dir: Path) -> Summary:
         results,
         campaign_id=campaign_id if isinstance(campaign_id, str) else None,
         agent_commit=commit if isinstance(commit, str) else None,
+        judgements=_read_judgement_documents(input_dir),
     )
     _write_outputs(output_dir, summary, results)
     return summary
+
+
+@dataclass(frozen=True, slots=True)
+class _JudgeFacts:
+    """Judge aggregates derived from judgement documents, never from run facts."""
+
+    judged_runs: int
+    judge_error_runs: int
+    judge_means: Mapping[str, float | None]
+    judge_coverage: float | None
+
+
+def _judge_facts(
+    results: Sequence[RunResult],
+    judgements: Sequence[Mapping[str, object]] | None,
+) -> _JudgeFacts:
+    documents = list(judgements or [])
+    scored = [item for item in documents if item.get("error") != JUDGE_ERROR]
+    started = len(results)
+    means: dict[str, float | None] = {}
+    for name in SCORE_NAMES:
+        values: list[float] = []
+        for item in scored:
+            value = _mapping(item.get("scores")).get(name)
+            if isinstance(value, int) and not isinstance(value, bool):
+                values.append(float(value))
+        means[name] = _mean(values)
+    return _JudgeFacts(
+        judged_runs=len(documents),
+        judge_error_runs=sum(1 for item in documents if item.get("error") == JUDGE_ERROR),
+        judge_means=means,
+        judge_coverage=(len(documents) / started) if started else None,
+    )
+
+
+def _read_judgement_documents(input_dir: Path) -> list[Mapping[str, object]]:
+    """Read the campaign's judgement records written next to each run document."""
+    documents: list[Mapping[str, object]] = []
+    for path in sorted(input_dir.glob("runs/*/*/judgement.json")):
+        try:
+            document = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, json.JSONDecodeError) as error:
+            raise ReportError(f"{path.name}: unreadable judgement record") from error
+        if (
+            not isinstance(document, dict)
+            or document.get("schema_version") != JUDGEMENT_SCHEMA_VERSION
+        ):
+            raise ReportError(f"{path.name}: expected schema_version {JUDGEMENT_SCHEMA_VERSION}")
+        documents.append(document)
+    return documents
 
 
 def _read_documents(input_dir: Path) -> list[Mapping[str, object]]:
@@ -712,10 +790,25 @@ def _markdown(summary: Summary) -> str:
         f"- robust tasks: {summary.robust_task_count}",
         f"- total input tokens: {_number(summary.total_input_tokens)}",
         f"- total output tokens: {_number(summary.total_output_tokens)}",
-        "",
-        "| task | category | valid | strict | results |",
-        "| --- | --- | --- | --- | --- |",
     ]
+    if summary.judged_runs:
+        lines.extend(
+            [
+                f"- judged runs: {summary.judged_runs} (judge errors: {summary.judge_error_runs})",
+                f"- judge coverage: {_percent(summary.judge_coverage)}",
+                "- judge means: "
+                + ", ".join(
+                    f"{name} {_score(summary.judge_means.get(name))}" for name in SCORE_NAMES
+                ),
+            ]
+        )
+    lines.extend(
+        [
+            "",
+            "| task | category | valid | strict | results |",
+            "| --- | --- | --- | --- | --- |",
+        ]
+    )
     for task in summary.tasks:
         results = " ".join("pass" if value else "fail" for value in task.results)
         lines.append(
@@ -733,6 +826,10 @@ def _model_name(identity: Mapping[str, object] | None) -> str:
 
 def _percent(value: float | None) -> str:
     return "n/a" if value is None else f"{value * 100:.1f}%"
+
+
+def _score(value: float | None) -> str:
+    return "n/a" if value is None else f"{value:.2f}"
 
 
 def _number(value: int | None) -> str:

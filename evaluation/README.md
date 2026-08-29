@@ -1,8 +1,9 @@
 # Evaluation harness
 
 This directory holds the public part of the quantitative evaluation described in
-section 18 of `doc/项目设计方案.md`: the versioned JSON schemas, four self-authored
-redistributable tasks, and redacted example results. The harness code lives in
+section 18 of `doc/项目设计方案.md`: the versioned JSON schemas, twelve self-authored
+redistributable tasks (the four P0 tasks plus the expansion to the full section 18.4
+matrix), and redacted example results. The harness code lives in
 `src/coding_agent/evaluation/`.
 
 The harness measures the shipped product. It launches `coding-agent run` as a
@@ -26,8 +27,16 @@ uv run --python 3.12 coding-agent-eval run \
   --manifest evaluation/tasks/public/manifest.toml \
   --config config.toml --repeats 1 --serial --out /path/outside/this/repo
 
+# Run the campaign and score every finished run with the LLM judge.
+uv run --python 3.12 coding-agent-eval run \
+  --manifest evaluation/tasks/public/manifest.toml \
+  --config config.toml --repeats 1 --serial --out /path/outside/this/repo --judge
+
 # Aggregate a campaign's run records into summary.json, summary.csv and report.md.
 uv run --python 3.12 coding-agent-eval summarize --input /path/outside/this/repo
+
+# Print the campaign history index for a results root.
+uv run --python 3.12 coding-agent-eval history --results /path/to/private/results
 ```
 
 `--dry-run` prints the task count, the upper bound on main model requests, the
@@ -52,10 +61,11 @@ evaluation/
 ├── schemas/
 │   ├── manifest-v1.schema.json    # documentation schema for the TOML manifest
 │   ├── run-v1.schema.json         # one immutable evaluation run
-│   └── summary-v1.schema.json     # one redacted campaign aggregate
+│   ├── summary-v1.schema.json     # one redacted campaign aggregate
+│   └── judgement-v1.schema.json   # one LLM-judged fuzzy-metric record
 ├── tasks/public/
 │   ├── manifest.toml
-│   └── <task-id>/
+│   └── <task-id>/                 # twelve tasks: four categories, three each
 │       ├── prompt.md              # copied outside the workspace, passed as --prompt-file
 │       ├── baseline/              # read-only; every repeat is a fresh copy
 │       ├── gold/                  # gold patch as a file overlay
@@ -97,6 +107,54 @@ those documents exactly as written: it never recomputes `strict_success`, `artif
 or the `failure_stage` and `failure_kind` pair, and it never derives an oracle outcome from a
 score flag. A record that carries no failure kind contributes none. Scoring happens once, when
 the run finishes.
+
+## The judge and judgement-v1
+
+`coding-agent-eval run --judge` scores every finished run with an LLM judge after its
+`run.json` is written. The judge is the shipped `AnthropicMessagesModel` adapter — the
+same `ModelSettings` as the campaign's own configuration, one streaming request, no
+tools — so the evaluation adds no second model client and no third-party evaluation
+framework.
+
+The judge reads only the run's own `run-v1` facts plus the run's final assistant
+message, reduced to a fixed excerpt first. The excerpt never contains prompt text,
+tool arguments, command output, transcripts, credentials or absolute paths: the final
+assistant message is redacted before it enters the prompt, and everything else comes
+from the already-redacted run document. The shipped agent report does not currently
+export a final assistant message, so in today's campaigns that field is absent and
+the judge scores communication from the recorded facts alone.
+
+The judge must answer one fixed JSON object with three 1–5 scores and a rationale:
+
+| score | meaning |
+| --- | --- |
+| `task_completion` | did the run achieve the task's goal, relative to the prompt and the deterministic oracle facts |
+| `process_quality` | were the tool choices and their order sensible — read before write, recovery after failures, no redundant calls |
+| `communication` | does the final assistant message report the work honestly and briefly, and state how it was verified |
+
+One malformed answer is retried once. A second malformed answer — or a failing model
+request — becomes a recorded `judge_error` with an `error_detail`; a judge error never
+aborts the campaign. Each record is a versioned `judgement-v1` document written to
+`runs/<task-id>/repeat-<n>/judgement.json`, never overwriting an existing record, and
+carries the judge model identity and the judge prompt version so scores from different
+prompt versions are not silently compared.
+
+Fuzzy scores never enter `strict_success`: the capability denominator stays exactly
+the five deterministic conditions of section 18.5. The summary reports them beside the
+deterministic metrics as `judged_runs`, `judge_error_runs`, `judge_means` and
+`judge_coverage` (judged runs over started runs). `summarize` aggregates judgements
+from the same per-run files, so the two commands cannot disagree.
+
+## Campaign history
+
+`coding-agent-eval history --results <dir>` prints a read-only index of every campaign
+directory under a results root — campaign id, window, task count, started/valid/strict
+success runs, the model identity, and the judge aggregates when judgements exist. A
+campaign directory is one holding a `runs.jsonl` or at least one `runs/*/*/run.json`
+record. The scan never writes, moves or deletes anything under the root; a directory
+whose records cannot be read is reported as a corrupt entry with a note instead of
+being skipped silently. Campaigns are listed oldest first, by their first recorded
+start time.
 
 ## Task manifest
 
@@ -165,6 +223,7 @@ canary.txt              guards against writes outside the workspace
 oracle/                 oracle working directory
 agent-report.json       the agent's run-report-v1 document
 run.json                the evaluator's run-v1 document
+judgement.json          the judge's judgement-v1 document, only with --judge
 ```
 
 An existing campaign directory or run directory is never overwritten. The generated

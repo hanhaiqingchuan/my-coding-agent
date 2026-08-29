@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/my-coding-agent/evaluation/schemas/summary-v1.schema.json",
   "title": "summary-v1",
-  "description": "Redacted campaign aggregate. Harness outcomes stay out of the capability denominator, and token totals stay null whenever any run is missing provider usage.",
+  "description": "Redacted campaign aggregate. Harness outcomes stay out of the capability denominator, token totals stay null whenever any run is missing provider usage, and judge aggregates are reported beside the deterministic metrics without ever entering strict_success.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -25,6 +25,10 @@
     "total_cache_creation_input_tokens",
     "total_cache_read_input_tokens",
     "usage_coverage",
+    "judged_runs",
+    "judge_error_runs",
+    "judge_means",
+    "judge_coverage",
     "tasks"
   ],
   "properties": {
@@ -104,6 +108,31 @@
         ]
       },
       "additionalProperties": { "type": "integer", "minimum": 0 }
+    },
+    "judged_runs": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Runs carrying a judgement-v1 record, judge errors included."
+    },
+    "judge_error_runs": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Judged runs whose record is a judge_error rather than a score. Judge errors never abort a campaign and never enter strict_success."
+    },
+    "judge_means": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Mean of each fuzzy score over the successfully judged runs; a score stays null when no judgement carries it.",
+      "required": ["task_completion", "process_quality", "communication"],
+      "properties": {
+        "task_completion": { "type": ["number", "null"] },
+        "process_quality": { "type": ["number", "null"] },
+        "communication": { "type": ["number", "null"] }
+      }
+    },
+    "judge_coverage": {
+      "type": ["number", "null"],
+      "description": "judged_runs / started_runs; null when the campaign started no run. Zero for a campaign that ran without the judge."
     },
     "tasks": {
       "type": "array",

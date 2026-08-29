@@ -647,12 +647,12 @@ def test_public_task_set_scores_end_to_end_with_a_stub_agent(
 
     summary = result.summary
     assert summary is not None
-    assert [item.ok for item in result.setup] == [True, True, True, True]
-    assert summary.started_runs == 4
-    assert summary.valid_runs == 4
-    assert summary.strict_success_runs == 4
+    assert [item.ok for item in result.setup] == [True] * len(manifest.tasks)
+    assert summary.started_runs == len(manifest.tasks)
+    assert summary.valid_runs == len(manifest.tasks)
+    assert summary.strict_success_runs == len(manifest.tasks)
     assert summary.task_completion_rate == 1.0
-    assert [run.forbidden_changes for run in result.runs] == [[], [], [], []]
+    assert [run.forbidden_changes for run in result.runs] == [[]] * len(manifest.tasks)
     assert all(run.detected_workspace_escape is False for run in result.runs)
     assert (output_dir / "runs.jsonl").is_file()
     assert all(

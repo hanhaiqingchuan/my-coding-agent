@@ -276,12 +276,25 @@ def test_recorded_hashes_must_be_sha256_digests(manifest_root: Path, field: str)
         validate_manifest(path)
 
 
-def test_public_manifest_declares_one_task_per_category() -> None:
-    """The delivered P0 task set must cover all four spec categories exactly once."""
+def test_public_manifest_declares_three_tasks_per_category() -> None:
+    """The delivered task set must cover all four spec categories exactly three times."""
     manifest = validate_manifest(PUBLIC_MANIFEST / "manifest.toml")
 
     categories = sorted(task.category for task in manifest.tasks)
-    assert categories == ["large_file_edit", "local_edit", "locate_and_modify", "new_file"]
+    assert categories == [
+        "large_file_edit",
+        "large_file_edit",
+        "large_file_edit",
+        "local_edit",
+        "local_edit",
+        "local_edit",
+        "locate_and_modify",
+        "locate_and_modify",
+        "locate_and_modify",
+        "new_file",
+        "new_file",
+        "new_file",
+    ]
     assert all(task.error_overlay is not None for task in manifest.tasks)
     assert all(task.commands for task in manifest.tasks)
     pinned = [
@@ -293,5 +306,5 @@ def test_public_manifest_declares_one_task_per_category() -> None:
             task.regression_oracle_hash,
         )
     ]
-    assert len(pinned) == 12
+    assert len(pinned) == 36
     assert all(len(digest) == 64 for digest in pinned)

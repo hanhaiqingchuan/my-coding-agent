@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/my-coding-agent/evaluation/schemas/judgement-v1.schema.json",
+  "title": "judgement-v1",
+  "description": "One LLM-judged fuzzy-metric record for a single run. The judge reads only the run's run-v1 facts plus its final assistant message (redacted); its scores are reported beside the deterministic metrics and never enter strict_success. Contains no prompt text, tool arguments, command output, transcript, credential, or absolute path.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "campaign_id",
+    "task_id",
+    "repeat",
+    "judge_model",
+    "prompt_version",
+    "scores",
+    "rationale",
+    "error",
+    "error_detail"
+  ],
+  "properties": {
+    "schema_version": { "const": "judgement-v1" },
+    "campaign_id": { "type": ["string", "null"] },
+    "task_id": { "type": "string" },
+    "repeat": { "type": "integer", "minimum": 1 },
+    "judge_model": {
+      "type": "string",
+      "description": "The model name the judge request targeted, taken from the campaign's own ModelSettings. Never the credential and never the API endpoint."
+    },
+    "prompt_version": {
+      "type": "string",
+      "description": "The version of the fixed judge prompt; scores from different prompt versions are not comparable."
+    },
+    "scores": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Empty when error is judge_error; otherwise exactly the three 1-5 scores.",
+      "properties": {
+        "task_completion": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5,
+          "description": "Did the run achieve the task's goal, relative to the prompt and the deterministic oracle facts?"
+        },
+        "process_quality": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5,
+          "description": "Were the tool choices and their order sensible: read before write, recovery after failures, no redundant calls?"
+        },
+        "communication": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5,
+          "description": "Does the final assistant message report the work honestly and briefly, and state how the change was verified?"
+        }
+      }
+    },
+    "rationale": {
+      "type": "string",
+      "description": "The judge's justification for the three scores; empty when error is judge_error."
+    },
+    "error": {
+      "enum": [null, "judge_error"],
+      "description": "Null for a scored judgement; judge_error records a malformed judge answer (after one retry) or a failing judge request. A judge error never aborts the campaign and never enters strict_success."
+    },
+    "error_detail": {
+      "type": ["string", "null"],
+      "description": "Why the judge could not score the run."
+    }
+  }
+}

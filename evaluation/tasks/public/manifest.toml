@@ -1,7 +1,8 @@
 schema_version = "evaluation-manifest-v1"
 manifest_id = "public-p0"
 
-# Four self-authored, redistributable P0 tasks, one per category of design section 18.4.
+# Twelve self-authored, redistributable tasks: the four P0 tasks plus the expansion to
+# the full set of design section 18.4, three tasks per category.
 # Every path is relative to this file, stays inside this directory, and lives outside the
 # read-only baseline so that gold overlays and oracles never reach the agent workspace.
 #
@@ -31,6 +32,44 @@ commands = [
 ]
 
 [[tasks]]
+task_id = "new-file-wordcount"
+category = "new_file"
+prompt = "new-file-wordcount/prompt.md"
+baseline = "new-file-wordcount/baseline"
+baseline_tree_hash = "18c3bfd3c71fe287e29f0542a6bc001d51ac50c813c219e165bf54da50fceec2"
+gold_overlay = "new-file-wordcount/gold"
+error_overlay = "new-file-wordcount/error"
+target_oracle = "new-file-wordcount/oracle/target.py"
+target_oracle_hash = "249cd76b1bf2f5bb6cdf3865e6970292a1f46aeffc4ac07793e60f5f196cbce9"
+regression_oracle = "new-file-wordcount/oracle/regression.py"
+regression_oracle_hash = "3611f288585b3ee4d5d60ea01f3f26a9b08e81ac0a8048c22133fb79a36ff0fc"
+allowed_paths = ["src/wordkit"]
+forbidden_paths = ["tests", "README.md"]
+timeout_seconds = 900
+commands = [
+    { command = "PYTHONPATH=src python3 -B -m unittest discover -s tests -t tests", cwd = "." },
+]
+
+[[tasks]]
+task_id = "new-file-roman"
+category = "new_file"
+prompt = "new-file-roman/prompt.md"
+baseline = "new-file-roman/baseline"
+baseline_tree_hash = "d24bbeba166248c3d9dd5266ffa8dac310c1e63b0d668cda13fc6bab23964af5"
+gold_overlay = "new-file-roman/gold"
+error_overlay = "new-file-roman/error"
+target_oracle = "new-file-roman/oracle/target.py"
+target_oracle_hash = "02973914553a0dd8a35f45a5fad336e60c31f51bf92832f52d401f5be08435ca"
+regression_oracle = "new-file-roman/oracle/regression.py"
+regression_oracle_hash = "47f002e4e24387109a92d8879d6d0676a189c67855906bf63941641c5f4cdb41"
+allowed_paths = ["src/numkit"]
+forbidden_paths = ["tests", "README.md"]
+timeout_seconds = 900
+commands = [
+    { command = "PYTHONPATH=src python3 -B -m unittest discover -s tests -t tests", cwd = "." },
+]
+
+[[tasks]]
 task_id = "local-edit-clamp"
 category = "local_edit"
 prompt = "local-edit-clamp/prompt.md"
@@ -43,6 +82,44 @@ target_oracle_hash = "a680fb91b9db60dd58a8e62a1006d4b840bb7c6b604bf7548e3363411d
 regression_oracle = "local-edit-clamp/oracle/regression.py"
 regression_oracle_hash = "b66d532969efdbd333c1d5c056e326af6dad400ea3358a31d30d41ad2de0dad6"
 allowed_paths = ["src/mathkit/ranges.py"]
+forbidden_paths = ["tests", "README.md"]
+timeout_seconds = 900
+commands = [
+    { command = "PYTHONPATH=src python3 -B -m unittest discover -s tests -t tests", cwd = "." },
+]
+
+[[tasks]]
+task_id = "local-edit-mean"
+category = "local_edit"
+prompt = "local-edit-mean/prompt.md"
+baseline = "local-edit-mean/baseline"
+baseline_tree_hash = "9c93fd453d1573f4c2b5c249d145e90c4bcb51a594fc8513e391701a4a56c328"
+gold_overlay = "local-edit-mean/gold"
+error_overlay = "local-edit-mean/error"
+target_oracle = "local-edit-mean/oracle/target.py"
+target_oracle_hash = "63990dd5acbb3e321c50d5823d22a9528dfb9f335dccae2ef5e83ffbc16a4939"
+regression_oracle = "local-edit-mean/oracle/regression.py"
+regression_oracle_hash = "9790c74d644e6211f75d8313d957255d9d2da67b18fdc7f79f5206f41843573a"
+allowed_paths = ["src/statkit/stats.py"]
+forbidden_paths = ["tests", "README.md"]
+timeout_seconds = 900
+commands = [
+    { command = "PYTHONPATH=src python3 -B -m unittest discover -s tests -t tests", cwd = "." },
+]
+
+[[tasks]]
+task_id = "local-edit-suffix"
+category = "local_edit"
+prompt = "local-edit-suffix/prompt.md"
+baseline = "local-edit-suffix/baseline"
+baseline_tree_hash = "97b6e9278037a8153099e953387fc488be69b77485851f32159a001a7c3a6949"
+gold_overlay = "local-edit-suffix/gold"
+error_overlay = "local-edit-suffix/error"
+target_oracle = "local-edit-suffix/oracle/target.py"
+target_oracle_hash = "b41aa626c1b6431eb4bccdeb688f2a13b24fc9ba0c777054ae4c2221511aacd5"
+regression_oracle = "local-edit-suffix/oracle/regression.py"
+regression_oracle_hash = "46560ccd8e7b0f33240c4d06fc1ef431e2590cdaa8e1ac4d52facc19cef00e66"
+allowed_paths = ["src/strkit/naming.py"]
 forbidden_paths = ["tests", "README.md"]
 timeout_seconds = 900
 commands = [
@@ -69,6 +146,44 @@ commands = [
 ]
 
 [[tasks]]
+task_id = "locate-step-normalize"
+category = "locate_and_modify"
+prompt = "locate-step-normalize/prompt.md"
+baseline = "locate-step-normalize/baseline"
+baseline_tree_hash = "c51abb99356648f10effa64b136c058889963ac22af85e61d88f45a7e4001e79"
+gold_overlay = "locate-step-normalize/gold"
+error_overlay = "locate-step-normalize/error"
+target_oracle = "locate-step-normalize/oracle/target.py"
+target_oracle_hash = "c57b338fdb84314e3ba29e83e75598e0f874b8d22d0fe05aed08a960ff1e94d5"
+regression_oracle = "locate-step-normalize/oracle/regression.py"
+regression_oracle_hash = "dd635bd47fc2f453bf01421362670e48d0bbf36eeb7163cfa7a585e2e9a1007f"
+allowed_paths = ["src/pipeline"]
+forbidden_paths = ["tests", "README.md"]
+timeout_seconds = 900
+commands = [
+    { command = "PYTHONPATH=src python3 -B -m unittest discover -s tests -t tests", cwd = "." },
+]
+
+[[tasks]]
+task_id = "locate-rename-timeout"
+category = "locate_and_modify"
+prompt = "locate-rename-timeout/prompt.md"
+baseline = "locate-rename-timeout/baseline"
+baseline_tree_hash = "f13bf700c31916378dbe52c4e4518cc7184599a3d26d51c1eea62b309be566ef"
+gold_overlay = "locate-rename-timeout/gold"
+error_overlay = "locate-rename-timeout/error"
+target_oracle = "locate-rename-timeout/oracle/target.py"
+target_oracle_hash = "c0053fdd24885274d5bfccd2910fcccc2a09c415ca03157e3fb8ad96c8fff9f7"
+regression_oracle = "locate-rename-timeout/oracle/regression.py"
+regression_oracle_hash = "0cdd89f32047aced27fa61f1da3ab293c58b835c7b68763a59ce93bdc32af5bc"
+allowed_paths = ["src/fetch"]
+forbidden_paths = ["tests", "README.md"]
+timeout_seconds = 900
+commands = [
+    { command = "PYTHONPATH=src python3 -B -m unittest discover -s tests -t tests", cwd = "." },
+]
+
+[[tasks]]
 task_id = "large-file-handlers"
 category = "large_file_edit"
 prompt = "large-file-handlers/prompt.md"
@@ -81,6 +196,44 @@ target_oracle_hash = "20b09e5c016392cdc9ce4a43af47e4bb382225d5d01894b4e808d7c7db
 regression_oracle = "large-file-handlers/oracle/regression.py"
 regression_oracle_hash = "173bfe60524ea128ba3cc1865dac3e7ca8a05de29a1bafbb21ce3212f524a999"
 allowed_paths = ["src/dispatch/handlers.py"]
+forbidden_paths = ["tests", "README.md"]
+timeout_seconds = 900
+commands = [
+    { command = "PYTHONPATH=src python3 -B -m unittest discover -s tests -t tests", cwd = "." },
+]
+
+[[tasks]]
+task_id = "large-file-routes"
+category = "large_file_edit"
+prompt = "large-file-routes/prompt.md"
+baseline = "large-file-routes/baseline"
+baseline_tree_hash = "0f2dc3a6b18f1ed8404cea711fcf58b11509f7e19fcccc70054acbb119ae4b2b"
+gold_overlay = "large-file-routes/gold"
+error_overlay = "large-file-routes/error"
+target_oracle = "large-file-routes/oracle/target.py"
+target_oracle_hash = "6148248785e087e0f4e9ecb52fcdf4c67b8d00c23a0776353572c207c5214121"
+regression_oracle = "large-file-routes/oracle/regression.py"
+regression_oracle_hash = "7e3fb3d3ac23377006efa48ed23fd80d2804058e21f5a82037f48b6209b61fa1"
+allowed_paths = ["src/router/table.py"]
+forbidden_paths = ["tests", "README.md"]
+timeout_seconds = 900
+commands = [
+    { command = "PYTHONPATH=src python3 -B -m unittest discover -s tests -t tests", cwd = "." },
+]
+
+[[tasks]]
+task_id = "large-file-validators"
+category = "large_file_edit"
+prompt = "large-file-validators/prompt.md"
+baseline = "large-file-validators/baseline"
+baseline_tree_hash = "422ec701c1d191102dfa703d1cbe3cbdb64d7a1c1e62f635c5c6fe07c805d4d3"
+gold_overlay = "large-file-validators/gold"
+error_overlay = "large-file-validators/error"
+target_oracle = "large-file-validators/oracle/target.py"
+target_oracle_hash = "383440b983f5d6c4605c2099db3c4a6a23126bbac93cdaea7d16d9e2e298c970"
+regression_oracle = "large-file-validators/oracle/regression.py"
+regression_oracle_hash = "de2952aca7a39cfec43bd485becadd8bead35979e800d0804917cb35895f8e01"
+allowed_paths = ["src/checks/limits.py"]
 forbidden_paths = ["tests", "README.md"]
 timeout_seconds = 900
 commands = [
