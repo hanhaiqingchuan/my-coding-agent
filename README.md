@@ -32,6 +32,14 @@ npm --prefix web exec -- playwright install chromium
 
 Python 依赖只经 `uv` 安装；不要使用 `pip install`、系统 Python 或另建虚拟环境。
 
+### Linux / Windows WSL
+
+命令与 macOS 完全相同：安装 [uv](https://docs.astral.sh/uv/) 与 Node.js（apt、nvm 均可）后直接 `make install`。Python 一律来自 uv 托管并安装进 `.venv` 的 3.12——Makefile 与测试不依赖操作系统自带的 Python（测试子进程直接使用 `.venv` 内的解释器）。WSL/无头 Linux 唯一可能多出的一步是补齐 Chromium 的系统库：
+
+```bash
+npm --prefix web exec -- playwright install-deps chromium   # 需要 sudo
+```
+
 ## 3. 配置
 
 仓库提交 `config.example.toml` 作为模板。复制一份为 `config.toml` 后按需修改：

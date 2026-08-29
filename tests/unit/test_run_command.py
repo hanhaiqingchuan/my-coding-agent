@@ -4,6 +4,7 @@ import asyncio
 import json
 import os
 import shlex
+import sys
 import time
 from pathlib import Path
 
@@ -18,7 +19,10 @@ from coding_agent.tools.run_command import AllowedCommand, CommandPolicy, RunCom
 
 
 def python_command(source: str) -> str:
-    return f"uv run --python 3.12 python -c {shlex.quote(source)}"
+    # run_command isolates the child HOME, so `uv run --python 3.12` cannot find
+    # uv's managed interpreters (they live under the real HOME) and would download
+    # one per child. The venv interpreter is hermetic and identical on macOS/WSL.
+    return f"{shlex.quote(sys.executable)} -c {shlex.quote(source)}"
 
 
 def prepared_command(
