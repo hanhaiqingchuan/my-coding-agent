@@ -5,6 +5,7 @@ import type {
   MessageDto,
   ToolExecutionDto,
 } from "../api/types";
+import type { ThinkingDraft } from "../features/sessions/sessionReducer";
 import { MessageBubble } from "./MessageBubble";
 import { ToolCard } from "./ToolCard";
 
@@ -12,6 +13,7 @@ type ConversationTimelineProps = {
   messages: MessageDto[];
   tools: ToolExecutionDto[];
   assistantDrafts: Record<string, string>;
+  thinkingDrafts: Record<string, ThinkingDraft>;
   toolOutputDrafts: Record<string, string>;
   interruptedBanner?: InterruptedBannerDto | null;
   onAcknowledgeRecovery?(): void;
@@ -21,6 +23,7 @@ export function ConversationTimeline({
   messages,
   tools,
   assistantDrafts,
+  thinkingDrafts,
   toolOutputDrafts,
   interruptedBanner = null,
   onAcknowledgeRecovery,
@@ -36,6 +39,14 @@ export function ConversationTimeline({
       outputDraft={toolOutputDrafts[tool.tool_call_id]}
     />
   );
+  // Thinking and text of one round share a draft epoch, so they share one bubble:
+  // the thinking box rides above the streaming text and never replaces it.
+  const draftEpochs = [
+    ...Object.keys(thinkingDrafts),
+    ...Object.keys(assistantDrafts).filter(
+      (epoch) => !(epoch in thinkingDrafts),
+    ),
+  ];
 
   return (
     <section
@@ -55,7 +66,7 @@ export function ConversationTimeline({
             {(grouped.get(message.id) ?? []).map(toolCard)}
           </Fragment>
         ))}
-        {Object.entries(assistantDrafts).map(([epoch, text]) => (
+        {draftEpochs.map((epoch) => (
           <MessageBubble
             key={epoch}
             message={{
@@ -68,7 +79,8 @@ export function ConversationTimeline({
               status: "pending_tools",
               tool_call_id: null,
             }}
-            text={text}
+            text={assistantDrafts[epoch]}
+            thinking={thinkingDrafts[epoch]}
             transient
           />
         ))}

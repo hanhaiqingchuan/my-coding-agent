@@ -16,6 +16,9 @@ const DRAFT_COMMIT_EVENTS = new Set([
 export type ConnectionState =
   "connecting" | "connected" | "reconnecting" | "offline";
 
+/** One round's streamed reasoning: `closed` is the backend's auto-collapse signal. */
+export type ThinkingDraft = { text: string; closed: boolean };
+
 export type SessionViewState = {
   snapshot: SessionSnapshotDto | null;
   draftText: string;
@@ -23,6 +26,7 @@ export type SessionViewState = {
   lastSeq: number;
   csrfToken: string | null;
   assistantDrafts: Record<string, string>;
+  thinkingDrafts: Record<string, ThinkingDraft>;
   toolOutputDrafts: Record<string, string>;
 };
 
@@ -42,6 +46,7 @@ export function createInitialSessionViewState(): SessionViewState {
     lastSeq: 0,
     csrfToken: null,
     assistantDrafts: {},
+    thinkingDrafts: {},
     toolOutputDrafts: {},
   };
 }
@@ -56,6 +61,7 @@ export function reduceServerMessage(
       snapshot: message.snapshot,
       lastSeq: message.snapshot.snapshot_seq,
       assistantDrafts: {},
+      thinkingDrafts: {},
       toolOutputDrafts: {},
     };
   }
@@ -73,6 +79,7 @@ export function reduceServerMessage(
         ...state,
         lastSeq: message.event.seq,
         assistantDrafts: {},
+        thinkingDrafts: {},
         toolOutputDrafts: {},
       };
     }
@@ -85,6 +92,35 @@ export function reduceServerMessage(
       assistantDrafts: {
         ...state.assistantDrafts,
         [message.draft_epoch]: `${state.assistantDrafts[message.draft_epoch] ?? ""}${message.text}`,
+      },
+    };
+  }
+
+  if (message.type === "assistant.thinking.delta") {
+    // A delta always re-opens the draft: a second thinking block in the same
+    // round streams into the same epoch after the previous block closed.
+    return {
+      ...state,
+      thinkingDrafts: {
+        ...state.thinkingDrafts,
+        [message.draft_epoch]: {
+          text: `${state.thinkingDrafts[message.draft_epoch]?.text ?? ""}${message.text}`,
+          closed: false,
+        },
+      },
+    };
+  }
+
+  if (message.type === "assistant.thinking.closed") {
+    const current = state.thinkingDrafts[message.draft_epoch];
+    // Transient events are dropped on reconnect, so a close can arrive without
+    // any text; there is nothing to collapse then.
+    if (current === undefined || current.closed) return state;
+    return {
+      ...state,
+      thinkingDrafts: {
+        ...state.thinkingDrafts,
+        [message.draft_epoch]: { text: current.text, closed: true },
       },
     };
   }
@@ -121,6 +157,7 @@ export function sessionViewReducer(
         snapshot: action.snapshot,
         lastSeq: action.snapshot.snapshot_seq,
         assistantDrafts: runStillProducing ? state.assistantDrafts : {},
+        thinkingDrafts: runStillProducing ? state.thinkingDrafts : {},
         toolOutputDrafts: runStillProducing ? state.toolOutputDrafts : {},
       };
     }

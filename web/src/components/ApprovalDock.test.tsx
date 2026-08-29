@@ -147,6 +147,7 @@ test("docks the current approval above the composer and resolves by call id and 
         messages={[]}
         tools={[]}
         assistantDrafts={{}}
+        thinkingDrafts={{}}
         toolOutputDrafts={{}}
       />
       <ApprovalDock pendingApproval={pendingCommand} onResolve={onResolve} />
@@ -183,6 +184,7 @@ test("removes a handled approval dock while its tool card remains in the timelin
         messages={[]}
         tools={[]}
         assistantDrafts={{}}
+        thinkingDrafts={{}}
         toolOutputDrafts={{}}
       />
       <ApprovalDock pendingApproval={pendingCommand} onResolve={vi.fn()} />
@@ -198,6 +200,7 @@ test("removes a handled approval dock while its tool card remains in the timelin
         messages={[]}
         tools={[resolvedTool]}
         assistantDrafts={{}}
+        thinkingDrafts={{}}
         toolOutputDrafts={{}}
       />
       <ApprovalDock pendingApproval={null} onResolve={vi.fn()} />

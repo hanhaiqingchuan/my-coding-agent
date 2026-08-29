@@ -10,16 +10,42 @@ test("creates a session, approves write and command, then restores final history
   expect(stateResponse.ok()).toBe(true);
   const state = (await stateResponse.json()) as { workspace: string };
 
+  // A unique title keeps the heading assertion below tied to THIS session: the
+  // app auto-selects a previous session on load, and the create call only lands
+  // after its CSRF bootstrap roundtrip.
+  const sessionTitle = `Complete flow ${Date.now()}`;
+
   await page.goto("/");
   await page.getByRole("textbox", { name: "Workspace" }).fill(state.workspace);
-  await page.getByLabel(/Session title/).fill("Complete flow");
+  await page.getByLabel(/Session title/).fill(sessionTitle);
   await page.getByRole("button", { name: "Open workspace" }).click();
   await expect(
-    page.getByRole("heading", { name: "Complete flow" }),
+    page.getByRole("heading", { name: sessionTitle }),
   ).toBeVisible();
 
   await page.getByRole("textbox", { name: "Message" }).fill("agent-flow");
   await page.getByRole("button", { name: "Send" }).click();
+
+  // Round one streams a thinking block before its text: the box renders expanded
+  // while the reasoning arrives, then auto-collapses when the block closes. The
+  // scripted block holds open until released, so the mid-stream check is exact.
+  const thinkingToggle = page.getByRole("button", {
+    name: /^Thinking · \d+ chars$/,
+  });
+  const thinkingText = page.locator(".thinking-text");
+  await expect(thinkingToggle).toHaveAttribute("aria-expanded", "true");
+  await expect(thinkingText).toContainText("prepare a workspace change");
+  await page.screenshot({
+    path: "test-results/thinking-live-expanded.png",
+  });
+
+  await request.post(`${BACKEND_URL}/__test__/thinking/release`);
+  await expect(thinkingToggle).toHaveAttribute("aria-expanded", "false");
+  await expect(thinkingText).toBeHidden();
+  await page.screenshot({
+    path: "test-results/thinking-live-collapsed.png",
+  });
+
   await expect(page.getByText("Preparing the workspace change…")).toBeVisible();
 
   const runDetails = page.getByRole("complementary", { name: "Run details" });
@@ -64,6 +90,20 @@ test("creates a session, approves write and command, then restores final history
   await page.reload();
   await expect(page.getByText("All scripted steps completed.")).toBeVisible();
   await expect(page.getByRole("button", { name: "Send" })).toBeVisible();
+
+  // The committed round-one message keeps its reasoning server-side: after the
+  // refresh it still renders collapsed by default and expands on demand.
+  await expect(thinkingToggle).toHaveAttribute("aria-expanded", "false");
+  await expect(thinkingText).toBeHidden();
+  await page.screenshot({
+    path: "test-results/thinking-committed-collapsed.png",
+  });
+  await thinkingToggle.click();
+  await expect(thinkingText).toBeVisible();
+  await expect(thinkingText).toContainText("prepare a workspace change");
+  await page.screenshot({
+    path: "test-results/thinking-committed-expanded.png",
+  });
 
   const finalState = (await (
     await request.get(`${BACKEND_URL}/__test__/state`)

@@ -191,6 +191,9 @@ button:disabled:hover {
   *::before,
   *::after {
     transition-duration: 0ms !important;
+    /* A delayed flip (the thinking collapse hides its text once the height has
+       settled) would otherwise linger as motionless dead time. */
+    transition-delay: 0ms !important;
   }
 }
 
@@ -469,6 +472,89 @@ button:disabled:hover {
 }
 .message-bubble[data-transient="true"] header {
   color: var(--info-fg);
+}
+
+/* --- Thinking disclosures ---------------------------------------------- */
+/* Provider reasoning is display-only: quieter than assistant text (muted,
+   monospace, one size down) and collapsed in history. The pill mirrors the
+   tool-card summary so both disclosures read as the same control. */
+.thinking-box {
+  min-width: 0;
+  margin: 0 0 var(--space-3);
+}
+.thinking-box:last-child {
+  margin-bottom: 0;
+}
+.thinking-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: fit-content;
+  padding: 3px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-pill);
+  color: var(--text-secondary);
+  background: var(--bg-sunken);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.thinking-toggle:hover {
+  color: var(--text-primary);
+  background: var(--bg-button);
+}
+.thinking-chevron {
+  width: 5px;
+  height: 5px;
+  border-right: 1.5px solid currentcolor;
+  border-bottom: 1.5px solid currentcolor;
+  transform: rotate(-45deg);
+  transition: transform 120ms ease;
+}
+.thinking-box[data-open="true"] .thinking-chevron {
+  transform: rotate(45deg);
+}
+/* The body stays mounted so closing runs as one CSS transition from 1fr to 0fr;
+   visibility joins the transition so the collapsed text also leaves the
+   accessibility tree once the height has settled. */
+.thinking-body {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition:
+    grid-template-rows 180ms ease,
+    visibility 0s 0s;
+}
+.thinking-box[data-open="false"] .thinking-body {
+  grid-template-rows: 0fr;
+  visibility: hidden;
+  transition:
+    grid-template-rows 180ms ease,
+    visibility 0s 180ms;
+}
+.thinking-text {
+  overflow: hidden auto;
+  min-height: 0;
+  max-height: 280px;
+  margin: var(--space-2) 0 0;
+  padding: var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  background: var(--bg-sunken);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+/* A live block is still arriving, so it carries the streaming accent the
+   transient bubble and running tools already use. */
+.thinking-live .thinking-toggle {
+  border-color: var(--info-border);
+  color: var(--info-fg);
+}
+.thinking-live .thinking-text {
+  border-left: 3px solid var(--info-line);
 }
 
 /* --- Tool cards --------------------------------------------------------- */

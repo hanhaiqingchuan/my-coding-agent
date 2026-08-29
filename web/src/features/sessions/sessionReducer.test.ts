@@ -143,6 +143,180 @@ test("a transient assistant delta leaves the durable cursor unchanged", () => {
   expect(next.assistantDrafts["attempt-1"]).toBe("Working…");
 });
 
+test("transient thinking deltas accumulate into an open draft", () => {
+  const initial = { ...createInitialSessionViewState(), lastSeq: 7 };
+
+  const once = reduceServerMessage(initial, {
+    type: "assistant.thinking.delta",
+    session_id: "session-1",
+    run_id: "run-1",
+    draft_epoch: "attempt-1",
+    index: 0,
+    text: "Plan the ",
+  });
+  const twice = reduceServerMessage(once, {
+    type: "assistant.thinking.delta",
+    session_id: "session-1",
+    run_id: "run-1",
+    draft_epoch: "attempt-1",
+    index: 0,
+    text: "workspace change.",
+  });
+
+  expect(twice.lastSeq).toBe(7);
+  expect(twice.thinkingDrafts["attempt-1"]).toEqual({
+    text: "Plan the workspace change.",
+    closed: false,
+  });
+});
+
+test("a thinking closed event collapses the draft without dropping its text", () => {
+  const streaming = {
+    ...createInitialSessionViewState(),
+    thinkingDrafts: {
+      "attempt-1": { text: "Plan the change.", closed: false },
+    },
+  };
+
+  const next = reduceServerMessage(streaming, {
+    type: "assistant.thinking.closed",
+    session_id: "session-1",
+    run_id: "run-1",
+    draft_epoch: "attempt-1",
+    index: 0,
+  });
+
+  expect(next.thinkingDrafts["attempt-1"]).toEqual({
+    text: "Plan the change.",
+    closed: true,
+  });
+});
+
+test("a thinking closed event for an unknown epoch is ignored", () => {
+  const initial = createInitialSessionViewState();
+
+  const next = reduceServerMessage(initial, {
+    type: "assistant.thinking.closed",
+    session_id: "session-1",
+    run_id: "run-1",
+    draft_epoch: "attempt-1",
+    index: 0,
+  });
+
+  expect(next).toBe(initial);
+});
+
+test("a second thinking block's delta re-opens the draft and keeps appending", () => {
+  const collapsed = {
+    ...createInitialSessionViewState(),
+    thinkingDrafts: {
+      "attempt-1": { text: "First block finished.", closed: true },
+    },
+  };
+
+  const next = reduceServerMessage(collapsed, {
+    type: "assistant.thinking.delta",
+    session_id: "session-1",
+    run_id: "run-1",
+    draft_epoch: "attempt-1",
+    index: 2,
+    text: "Second block starts.",
+  });
+
+  expect(next.thinkingDrafts["attempt-1"]).toEqual({
+    text: "First block finished.Second block starts.",
+    closed: false,
+  });
+});
+
+test("draft-committing durable events clear thinking drafts with the text drafts", () => {
+  for (const type of [
+    "assistant.turn_committed",
+    "assistant.interrupted",
+    "tool.group_settled",
+  ]) {
+    const streaming = {
+      ...createInitialSessionViewState(),
+      lastSeq: 7,
+      assistantDrafts: { "attempt-1": "Answer" },
+      thinkingDrafts: { "attempt-1": { text: "Reasoning", closed: true } },
+    };
+
+    const next = reduceServerMessage(streaming, {
+      type: "durable",
+      event: { ...eventWithSeq(8), type },
+    });
+
+    expect(next.assistantDrafts, type).toEqual({});
+    expect(next.thinkingDrafts, type).toEqual({});
+  }
+});
+
+test("a terminal durable event clears thinking drafts with the text drafts", () => {
+  const streaming = {
+    ...createInitialSessionViewState(),
+    lastSeq: 7,
+    thinkingDrafts: { "attempt-1": { text: "Reasoning", closed: false } },
+  };
+
+  const next = reduceServerMessage(streaming, {
+    type: "durable",
+    event: {
+      ...eventWithSeq(8),
+      type: "run.state_changed",
+      payload: {
+        state: "completed",
+        stop_reason: "completed",
+        error_kind: null,
+      },
+    },
+  });
+
+  expect(next.thinkingDrafts).toEqual({});
+});
+
+test("a snapshot message clears thinking drafts with the text drafts", () => {
+  const streaming = {
+    ...createInitialSessionViewState(),
+    lastSeq: 7,
+    assistantDrafts: { "attempt-1": "Answer" },
+    thinkingDrafts: { "attempt-1": { text: "Reasoning", closed: false } },
+  };
+
+  const next = reduceServerMessage(streaming, {
+    type: "snapshot",
+    client_command_id: "subscribe-1",
+    session_id: "session-1",
+    snapshot: snapshot(4, "model_streaming"),
+  });
+
+  expect(next.assistantDrafts).toEqual({});
+  expect(next.thinkingDrafts).toEqual({});
+});
+
+test("a durable refresh preserves a live thinking draft until its run settles", () => {
+  const streaming = {
+    ...createInitialSessionViewState(),
+    snapshot: snapshot(2),
+    lastSeq: 2,
+    thinkingDrafts: { "attempt-1": { text: "Reasoning", closed: false } },
+  };
+
+  const refreshed = sessionViewReducer(streaming, {
+    type: "snapshot.refreshed",
+    snapshot: snapshot(3, "model_streaming"),
+  });
+  const settled = sessionViewReducer(refreshed, {
+    type: "snapshot.refreshed",
+    snapshot: snapshot(4, "completed"),
+  });
+
+  expect(refreshed.thinkingDrafts).toEqual({
+    "attempt-1": { text: "Reasoning", closed: false },
+  });
+  expect(settled.thinkingDrafts).toEqual({});
+});
+
 test("a durable refresh preserves a live draft until its message is committed", () => {
   const streaming = {
     ...createInitialSessionViewState(),

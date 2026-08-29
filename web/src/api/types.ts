@@ -108,6 +108,8 @@ export type RunDto = {
 };
 
 export type TextPartDto = { type: "text"; text: string };
+/** Provider reasoning, display-only: collapsed in history, never fed back to the model. */
+export type ThinkingPartDto = { type: "thinking"; text: string };
 export type ToolUsePartDto = {
   type: "tool_use";
   id: string;
@@ -124,7 +126,8 @@ export type ToolResultPartDto = {
   data: Record<string, JsonValue>;
   truncated: boolean;
 };
-export type MessagePartDto = TextPartDto | ToolUsePartDto | ToolResultPartDto;
+export type MessagePartDto =
+  TextPartDto | ThinkingPartDto | ToolUsePartDto | ToolResultPartDto;
 
 export type MessageDto = {
   id: string;
@@ -363,6 +366,23 @@ export type ServerMessage =
       draft_epoch: string;
       index: number;
       text: string;
+    }
+  | {
+      /** Transient reasoning increment; dropped on reconnect, never durable. */
+      type: "assistant.thinking.delta";
+      session_id: string;
+      run_id: string;
+      draft_epoch: string;
+      index: number;
+      text: string;
+    }
+  | {
+      /** One thinking block finished; the display-only auto-collapse signal. */
+      type: "assistant.thinking.closed";
+      session_id: string;
+      run_id: string;
+      draft_epoch: string;
+      index: number;
     }
   | {
       type: "tool.output.delta";

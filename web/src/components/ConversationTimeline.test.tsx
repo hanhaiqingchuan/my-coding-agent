@@ -97,6 +97,7 @@ test("renders tool cards in the server order even when call_order restarts each 
         commandTool("call-d", "message-3", 0, "round-3-first"),
       ]}
       assistantDrafts={{}}
+      thinkingDrafts={{}}
       toolOutputDrafts={{}}
     />,
   );
@@ -122,6 +123,7 @@ test("interleaves every tool card with the assistant message that requested it",
         commandTool("call-c", "message-2", 0, "round-2-first"),
       ]}
       assistantDrafts={{}}
+      thinkingDrafts={{}}
       toolOutputDrafts={{}}
     />,
   );
@@ -144,6 +146,7 @@ test("keeps the streaming draft ahead of the tools its uncommitted message reque
         commandTool("call-b", "message-2", 0, "round-2-first"),
       ]}
       assistantDrafts={{ "attempt-2": "round-2-draft" }}
+      thinkingDrafts={{}}
       toolOutputDrafts={{}}
     />,
   );
@@ -162,6 +165,7 @@ test("renders committed messages separately from transient assistant drafts", ()
       messages={[assistantMessage]}
       tools={[]}
       assistantDrafts={{ "attempt-1": "Streaming answer" }}
+      thinkingDrafts={{}}
       toolOutputDrafts={{}}
     />,
   );
@@ -173,6 +177,117 @@ test("renders committed messages separately from transient assistant drafts", ()
       .closest("article")
       ?.getAttribute("data-transient"),
   ).toBe("true");
+});
+
+const thinkingMessage: MessageDto = {
+  ...assistantMessage,
+  id: "message-2",
+  parts: [
+    { type: "thinking", text: "Reasoning about the workspace change." },
+    { type: "text", text: "Committed answer" },
+  ],
+};
+
+test("renders a committed thinking part collapsed by default and expands on demand", async () => {
+  const user = userEvent.setup();
+  render(
+    <ConversationTimeline
+      messages={[thinkingMessage]}
+      tools={[]}
+      assistantDrafts={{}}
+      thinkingDrafts={{}}
+      toolOutputDrafts={{}}
+    />,
+  );
+
+  const disclosure = screen.getByRole("button", { name: /^Thinking · / });
+  expect(disclosure.getAttribute("aria-expanded")).toBe("false");
+  // The summary row reports the size of the reasoning it guards.
+  expect(disclosure.textContent).toBe("Thinking · 37 chars");
+
+  await user.click(disclosure);
+  expect(disclosure.getAttribute("aria-expanded")).toBe("true");
+  expect(
+    screen.getByText("Reasoning about the workspace change."),
+  ).not.toBeNull();
+
+  // Part order is authoritative: the thinking disclosure precedes the answer text.
+  const article = screen.getByText("Committed answer").closest("article");
+  expect((article?.textContent ?? "").indexOf("Thinking")).toBeLessThan(
+    (article?.textContent ?? "").indexOf("Committed answer"),
+  );
+});
+
+test("renders a live thinking draft expanded while streaming and collapsed once closed", async () => {
+  const user = userEvent.setup();
+  const { rerender } = render(
+    <ConversationTimeline
+      messages={[]}
+      tools={[]}
+      assistantDrafts={{}}
+      thinkingDrafts={{
+        "attempt-1": { text: "Live reasoning.", closed: false },
+      }}
+      toolOutputDrafts={{}}
+    />,
+  );
+
+  const disclosure = screen.getByRole("button", { name: /^Thinking · / });
+  expect(disclosure.getAttribute("aria-expanded")).toBe("true");
+  expect(screen.getByText("Live reasoning.")).not.toBeNull();
+  expect(
+    screen
+      .getByText("Live reasoning.")
+      .closest("article")
+      ?.getAttribute("data-transient"),
+  ).toBe("true");
+
+  // The closed event only flips the reducer flag; the same disclosure collapses.
+  rerender(
+    <ConversationTimeline
+      messages={[]}
+      tools={[]}
+      assistantDrafts={{}}
+      thinkingDrafts={{
+        "attempt-1": { text: "Live reasoning.", closed: true },
+      }}
+      toolOutputDrafts={{}}
+    />,
+  );
+
+  expect(disclosure.getAttribute("aria-expanded")).toBe("false");
+  expect(disclosure.closest(".thinking-box")?.getAttribute("data-open")).toBe(
+    "false",
+  );
+
+  // A collapsed live box can still be reopened by hand.
+  await user.click(disclosure);
+  expect(disclosure.getAttribute("aria-expanded")).toBe("true");
+  expect(screen.getByText("Live reasoning.")).not.toBeNull();
+});
+
+test("keeps the streaming text draft below the live thinking box of the same epoch", () => {
+  render(
+    <ConversationTimeline
+      messages={[]}
+      tools={[]}
+      assistantDrafts={{ "attempt-1": "Streaming answer" }}
+      thinkingDrafts={{
+        "attempt-1": { text: "Live reasoning.", closed: false },
+      }}
+      toolOutputDrafts={{}}
+    />,
+  );
+
+  const article = screen
+    .getByText("Streaming answer")
+    .closest("article[data-transient='true']");
+  expect(article?.textContent).toContain("Live reasoning.");
+  expect((article?.textContent ?? "").indexOf("Thinking")).toBeLessThan(
+    (article?.textContent ?? "").indexOf("Streaming answer"),
+  );
+  // One bubble per epoch: the thinking box never replaces the text draft.
+  expect(screen.getAllByRole("article")).toHaveLength(1);
 });
 
 test.each<ToolExecutionState>([
@@ -191,6 +306,7 @@ test.each<ToolExecutionState>([
       messages={[]}
       tools={[tool(state)]}
       assistantDrafts={{}}
+      thinkingDrafts={{}}
       toolOutputDrafts={{}}
     />,
   );
@@ -207,6 +323,7 @@ test("requires recovery acknowledgement before continuing after a server restart
       messages={[]}
       tools={[]}
       assistantDrafts={{}}
+      thinkingDrafts={{}}
       toolOutputDrafts={{}}
       interruptedBanner={{
         run_id: "run-1",
@@ -232,6 +349,7 @@ test("shows a non-blocking historical interruption banner when acknowledgement i
       messages={[]}
       tools={[]}
       assistantDrafts={{}}
+      thinkingDrafts={{}}
       toolOutputDrafts={{}}
       interruptedBanner={{
         run_id: "run-1",

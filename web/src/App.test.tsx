@@ -87,6 +87,7 @@ vi.mock("./features/sessions/useSession", () => ({
       snapshot,
       draftText: "next task",
       assistantDrafts: {},
+      thinkingDrafts: {},
       toolOutputDrafts: {},
       connection: "connected",
     },

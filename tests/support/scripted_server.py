@@ -6,6 +6,7 @@ import asyncio
 import inspect
 import os
 import tempfile
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from pathlib import Path
 from uuid import uuid4
@@ -21,13 +22,22 @@ from coding_agent.core.models import (
     AssistantTurn,
     ModelStopReason,
     TextPart,
+    ThinkingPart,
     ToolCall,
     ToolResult,
     ToolUsePart,
     Usage,
 )
 from coding_agent.main import RuntimeDependencies, build_run_coordinator
-from coding_agent.model.protocol import DeltaSink, ModelRequest, TextDelta
+from coding_agent.model.protocol import (
+    DeltaSink,
+    ModelRequest,
+    TextDelta,
+    ThinkingBlockClosed,
+    ThinkingBlockClosedSink,
+    ThinkingDelta,
+    ThinkingDeltaSink,
+)
 from coding_agent.runtime.approval import ApprovalGate
 from coding_agent.runtime.publisher import EventPublisher
 from coding_agent.storage.sqlite import SQLiteStore
@@ -55,14 +65,36 @@ class FixturePaths:
 class BrowserScriptedModel:
     """Select a deterministic response from the persisted conversation itself."""
 
+    def __init__(self) -> None:
+        # The browser test holds the scripted thinking block open until it has
+        # observed the expanded state, so the auto-collapse never races the poll.
+        self._thinking_released = False
+        self._thinking_waiters: list[asyncio.Future[None]] = []
+
+    def release_thinking(self) -> None:
+        """Let the held-open thinking block finish and emit its close event."""
+        self._thinking_released = True
+        for waiter in self._thinking_waiters:
+            if not waiter.done():
+                waiter.set_result(None)
+        self._thinking_waiters = []
+
+    async def hold_thinking_open(self) -> None:
+        """Block the close event until the test releases it (consumed once)."""
+        if not self._thinking_released:
+            waiter = asyncio.get_running_loop().create_future()
+            self._thinking_waiters.append(waiter)
+            await waiter
+        self._thinking_released = False
+
     async def complete(
         self,
         request: ModelRequest,
         on_text_delta: DeltaSink,
         cancellation: CancellationToken,
         *,
-        on_thinking_delta: object = None,
-        on_thinking_block_closed: object = None,
+        on_thinking_delta: ThinkingDeltaSink | None = None,
+        on_thinking_block_closed: ThinkingBlockClosedSink | None = None,
     ) -> AssistantTurn:
         prompt = _initial_prompt(request)
         results = _tool_results(request)
@@ -177,11 +209,26 @@ class BrowserScriptedModel:
             )
 
         if prompt == "agent-flow" and len(results) == 0:
+            # Round one opens with a thinking block so the browser exercises the
+            # real thinking callbacks end to end (loop -> publisher -> WS).
+            thinking = (
+                "The scripted run should first prepare a workspace change, "
+                "then verify the written file exists with a follow-up command."
+            )
+            await _emit_thinking(
+                thinking,
+                on_thinking_delta,
+                on_thinking_block_closed,
+                cancellation,
+                delay=0.2,
+                hold=self.hold_thinking_open,
+            )
             text = "Preparing the workspace change…"
             await _emit((text,), on_text_delta, cancellation, delay=0.25)
             return AssistantTurn(
                 id=f"write-turn-{uuid4()}",
                 parts=(
+                    ThinkingPart(thinking),
                     TextPart(text),
                     ToolUsePart(
                         ToolCall(
@@ -247,6 +294,36 @@ async def _emit(
         if inspect.isawaitable(emitted):
             await emitted
         await asyncio.sleep(delay)
+    cancellation.raise_if_cancelled()
+
+
+async def _emit_thinking(
+    text: str,
+    thinking_sink: ThinkingDeltaSink | None,
+    closed_sink: ThinkingBlockClosedSink | None,
+    cancellation: CancellationToken,
+    *,
+    delay: float,
+    hold: "Callable[[], Awaitable[None]] | None" = None,
+) -> None:
+    """Stream one thinking block the way the provider adapter does: fixed-size
+    chunks, then a single close event for the block. `hold` parks the close
+    event so a browser test can observe the block mid-stream deterministically."""
+    size = 18
+    chunks = tuple(text[index : index + size] for index in range(0, len(text), size))
+    for chunk in chunks:
+        cancellation.raise_if_cancelled()
+        if thinking_sink is not None:
+            emitted = thinking_sink(ThinkingDelta(index=0, text=chunk))
+            if inspect.isawaitable(emitted):
+                await emitted
+        await asyncio.sleep(delay)
+    if hold is not None:
+        await hold()
+    if closed_sink is not None:
+        emitted = closed_sink(ThinkingBlockClosed(index=0))
+        if inspect.isawaitable(emitted):
+            await emitted
     cancellation.raise_if_cancelled()
 
 
@@ -363,6 +440,11 @@ def _build_app(paths: FixturePaths, generation: int, restart: asyncio.Event) -> 
     async def restart_server() -> dict[str, str]:
         restart.set()
         return {"status": "restarting"}
+
+    @app.post("/__test__/thinking/release")
+    async def release_thinking() -> dict[str, str]:
+        model.release_thinking()
+        return {"status": "released"}
 
     return app
 

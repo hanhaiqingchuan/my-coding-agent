@@ -124,6 +124,7 @@ export default function App() {
               messages={snapshot.messages}
               tools={snapshot.tools}
               assistantDrafts={state.assistantDrafts}
+              thinkingDrafts={state.thinkingDrafts}
               toolOutputDrafts={state.toolOutputDrafts}
               interruptedBanner={snapshot.interrupted_banner}
               onAcknowledgeRecovery={acknowledgeRecovery}
