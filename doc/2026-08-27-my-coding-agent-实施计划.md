@@ -1424,6 +1424,126 @@ Expected: 本地全绿；README §10 出现指向 `hanhaiqingchuan/my-coding-age
 
 ---
 
+### Task 20: 评测扩展——扩容任务集、确定性与模糊指标、结果持久化
+
+> 定位：在 Task 17 既有评测器（manifest/runner/report、`run-v1`/`summary-v1`）之上**增量扩展**，不替换任何既有接口。模糊指标自研、复用同一个 Anthropic Messages API 作裁判；**不引入 ragas 等第三方评测框架**（本项目禁用 agent 框架，且 ragas 的 agent 指标要求 OpenAI 兼容端点与参考轨迹，仅借鉴其指标设计思路：工具调用准确率、目标达成率、带理由的评分）。
+
+**Files:**
+
+- Create: `src/coding_agent/evaluation/tasks_extra.py`（12 任务集生成与校验）
+- Create: `src/coding_agent/evaluation/judge.py`（LLM 裁判：评分请求构造、响应解析、裁判记录）
+- Create: `src/coding_agent/evaluation/history.py`（历史索引：campaign 目录扫描、索引构建与查询）
+- Create: `evaluation/tasks/public/` 下 8 个新任务目录（4 类各 +2，凑齐 12）
+- Create: `evaluation/schemas/judgement-v1.schema.json`
+- Modify: `src/coding_agent/evaluation/runner.py`（可选 judge 挂钩）
+- Modify: `src/coding_agent/evaluation/report.py`（确定性指标汇总 + judge 聚合）
+- Modify: `src/coding_agent/evaluation/cli.py`（`run --judge`、`history` 子命令）
+- Modify: `evaluation/README.md`
+- Create: `tests/evaluation/test_tasks_extra.py`、`test_judge.py`、`test_history.py`
+
+**Interfaces:**
+
+```text
+build_task_set(public_dir: Path) -> list[EvaluationManifest]   # 12 任务：4 类 × 3
+judge_run(run_document: dict, transcript_excerpt: Mapping, settings) -> Judgement
+Judgement(scores: Mapping[str, int], rationale: str, judge_model: str, prompt_version: str, schema_version="judgement-v1")
+# 模糊指标（1-5 分制 + 理由，单一裁判请求、结构化 JSON 输出）：
+#   task_completion   任务目标是否达成（相对 prompt 与 oracle 事实）
+#   process_quality  工具选择与顺序是否合理（读后写、失败后自纠、无冗余调用）
+#   communication    最终回复是否如实、简洁、说明验证状态
+scan_campaigns(results_root: Path) -> list[CampaignSummary]   # 历史索引：目录扫描 + 缓存
+# 确定性指标全部来自既有 run-v1，不重复采集：tools.by_name、totals.round_count、
+# durations.*、totals.input/output_tokens、retries、compaction
+```
+
+- [ ] **Step 1: 扩容公开任务集并验证三态**
+
+按设计方案 §18.4 的四类（新建单文件功能 / 既有函数局部修改 / 搜索定位后改两文件 / 600 行以上文件小改动）在 4 个既有任务基础上每类新增 2 个，共 12 个；沿用既有目录结构（prompt.md、baseline/gold/error、oracle、manifest 摘要钉死）。离线测试：全部任务通过 `coding-agent-eval validate`（baseline 失败、gold 通过、error 变体失败）。
+
+- [ ] **Step 2: 写 judge 失败测试（TDD）**
+
+`judge.py` 的裁判请求：复用 `AnthropicMessagesModel` 适配器（同一 `ModelSettings`，可指向同或不同模型），单次请求、`stream=true`、无 tools、要求输出固定 JSON。测试覆盖：合法 JSON 解析、非法 JSON/缺字段/越界分数的重试一次后失败落 `judge_error`（不中断 campaign）、裁判记录含 judge_model 与 prompt_version、裁判 prompt 与 transcript 摘录不含凭据、离线用 fake model 驱动全部路径。
+
+- [ ] **Step 3: 写 history 索引失败测试**
+
+`history.py` 扫描 results_root 下的 campaign 目录（每个含 runs.jsonl 或 runs/*/run.json 即算），构建递增索引（campaign_id、时间、任务数、strict_success 率、judge 均分、模型标识），只读、可缓存、损坏目录跳过并记录。测试：空目录、正常 campaign、损坏 JSON、多 campaign 排序。
+
+- [ ] **Step 4: 实现 runner 挂钩与报告聚合**
+
+`coding-agent-eval run --judge` 在每个 run 结束后调用 judge（transcript 摘录 = run-v1 已有字段 + 最终 assistant 文本，不新增原始 transcript 采集），judge 结果写入 `runs/<task>/<repeat>/judgement.json` 并进 summary 聚合（均分、覆盖率、judge_error 数）。`history` 子命令打印历史索引。既有无 judge 路径行为不变。
+
+- [ ] **Step 5: 验证（离线全量）**
+
+```bash
+uv run --python 3.12 pytest tests/evaluation -v
+uv run --python 3.12 pytest -q
+uv run --python 3.12 coding-agent-eval validate --manifest evaluation/tasks/public/manifest.toml
+uv run --python 3.12 coding-agent-eval history --results <tmp>   # 空目录与样例目录
+make check
+```
+
+Expected: 全部退出码 0；judge 与 history 的离线测试用 fake model / 临时目录；CI 不受影响（仍只跑 validate）。
+
+- [ ] **Step 6: 提交检查点（本地 commit 已预授权，push 需当次确认）**
+
+建议提交信息：`feat: extend evaluation with judged metrics and history`。
+
+**明确不做**：不引入 ragas/deepeval 等第三方评测库；不做多裁判投票与裁判模型矩阵（P1 消融）；模糊指标不进入 `strict_success` 判定（能力分母只由确定性五条件构成，见设计方案 §18.5）；裁判不读模型上下文之外的数据。
+
+---
+
+### Task 21: 评测结果网页——统一查看历史 campaign 与指标
+
+> 定位：**只读结果展示页**，复用既有 FastAPI 静态托管模式；不新建独立服务进程、不新增 agent 能力。运行（真实 campaign）仍走 CLI，网页负责"看"。
+
+**Files:**
+
+- Create: `src/coding_agent/evaluation/web.py`（结果 API：campaign 列表/详情/单 run + judgement）
+- Create: `web/src/features/evaluation/`（EvaluationsPanel、EvaluationDetail、JudgementCard）
+- Modify: `src/coding_agent/main.py`（serve 挂载 `/api/evaluations/*` 与页面路由）
+- Modify: `web/src/App.tsx`（左栏加入 Evaluations 入口）
+- Create: `web/src/features/evaluation/*.test.tsx`
+- Modify: `README.md`（评测章节补网页用法）
+
+**Interfaces:**
+
+```text
+GET /api/evaluations                     -> CampaignSummary[]（来自 history.py 索引）
+GET /api/evaluations/{campaign_id}       -> CampaignDetail（tasks、每任务 runs、聚合指标）
+GET /api/evaluations/{campaign_id}/runs/{task_id}/{repeat} -> run-v1 文档 + judgement
+# 页面：/evaluations 路由（React），深链可分享；数据只读，无写操作
+```
+
+- [ ] **Step 1: 写结果 API 失败测试**
+
+只读端点、JSON 契约、不存在 campaign 404、损坏 judgement 的容错降级、同一 Host/Origin/CSRF 防护面（GET 只读，沿用 Task 13 裁定：读端点不要求 CSRF token，但 Host/Origin 仍校验）。
+
+- [ ] **Step 2: 写前端组件失败测试**
+
+EvaluationsPanel 列表（campaign、时间、任务数、成功率、judge 均分）、详情页（每任务行：确定性指标列——轮次/工具调用/token/耗时 + strict_success + judge 三项分数与理由折叠展示）、空态与加载态、history 数据损坏时的优雅降级。
+
+- [ ] **Step 3: 实现后端只读 API 与前端页面**
+
+`evaluation/web.py` 只读消费 history.py 与 run-v1 文档，无状态、无写路径；前端复用既有设计语言（深色工作台、折叠详情、状态色），新增左栏入口与 `/evaluations` 路由。不新增依赖。
+
+- [ ] **Step 4: 端到端验证**
+
+```bash
+npm --prefix web run test && npm --prefix web run build
+make test-e2e          # 既有 5 条不受影响；若加评测页 E2E，用离线 fixture campaign
+uv run --python 3.12 pytest -q
+```
+
+Expected: 全绿；用一个本地生成的离线样例 campaign（fake model 产物）手动验证页面渲染：列表→详情→单 run→judgement 折叠，截图留证。
+
+- [ ] **Step 5: 提交检查点（本地 commit 已预授权，push 需当次确认）**
+
+建议提交信息：`feat: add evaluation results dashboard`。
+
+**明确不做**：不从网页发起评测运行（运行仍走 CLI，避免网页长连接与审批歧义）；不做评测结果编辑/删除；不做跨机器数据同步；页面不含任何凭据或绝对路径。
+
+---
+
 ## Execution Order and Checkpoints
 
 P0 关键路径按 Task 1 → 12 顺序执行；Task 7 先冻结 `ModelRequest/ModelMessage/AssistantTurn/Usage/typed exceptions`，Task 9 才消费这些契约，不并行猜测接口。Task 12 的正式 headless 纵向链路通过后，立即并行起草 Task 18 的 README.txt、demo workspace、视频脚本和发布 checklist，再继续 Task 13–15 与 Task 16 的主链/Stop E2E。随后完成 Task 17 的 4 个公开任务各 1 次 smoke 和 Task 18 发布 gate。P0 可提交后才进入 P1。
