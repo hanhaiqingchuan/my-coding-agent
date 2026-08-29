@@ -1363,27 +1363,36 @@ Expected: 所有检查通过；`doc/` 仅跟踪两份已审计的公开设计文
 
 ```yaml
 # 触发：push 到 main + 全部 pull_request；单 job `check`，runs-on ubuntu-latest，timeout-minutes 20
+# permissions: contents: read（最小权限，本流水线不使用 GITHUB_TOKEN）
 # 步骤顺序（失败即短路，镜像本地 make check 但拆到步骤级便于定位）：
 #   actions/checkout@v5
-#   astral-sh/setup-uv@v9      (enable-cache: true, python-version: "3.12")
-#   actions/setup-node@v4      (node-version: 20, cache: npm, cache-dependency-path: web/package-lock.json)
+#   astral-sh/setup-uv@v9.0.0  (enable-cache: true, python-version: "3.12"——必须精确版本，见下方"已踩过的坑"1)
+#   actions/setup-node@v4      (node-version: 22, cache: npm, cache-dependency-path: web/package-lock.json——必须 ≥22，见坑 3)
 #   uv sync --frozen --python 3.12 --all-groups
 #   npm --prefix web ci
 #   npm --prefix web exec -- playwright install chromium --with-deps
 #   ruff check src tests scripts && npm --prefix web run lint
+#   npm --prefix web run build        （必须在后端测试之前，见坑 2）
 #   uv run --python 3.12 pytest --ignore=tests/live
 #   npm --prefix web run test
-#   npm --prefix web run build
 #   npm --prefix web run test:e2e
 #   scripts/audit_public.py --repo .（不带 --history） && scripts/check_readme_txt.py README.txt
 #   coding-agent-eval validate --manifest evaluation/tasks/public/manifest.toml
 ```
 
-- [ ] **Step 1: 写 CI 脚本**
+**已踩过的坑（首跑三连失败的根因，修复已内联为 ci.yml 注释，勿回退）：**
+
+1. **`astral-sh/setup-uv` 不发布浮动 major tag**：仓库只有 `v9.0.0` 这类精确 tag，没有裸 `v9`（与 `actions/checkout@v5`、`actions/setup-node@v4` 的惯例不同）。写 `@v9` 会在 GitHub 解析阶段直接失败（本地 YAML 校验发现不了）。**必须钉精确版本**；升级时手动改。
+2. **后端测试隐式依赖 `web/dist`**：`tests/integration/test_headless_run.py` 会真实启动 `serve`，而 `serve` 挂载 `web/dist` 静态目录。若 build 排在后端测试之后，全新 checkout 必挂 `RuntimeError: Directory .../web/dist does not exist`。本地验证必须先移走 `web/dist` 模拟全新 checkout——残留的本地 dist 会掩盖此缺陷（第二次失败即由此而来）。
+3. **Node 下限是 22.14，不是 20**：依赖链 `jsdom 30 → undici 8.10`，其 `CacheStorage` 调用 `webidl.util.markAsUncloneable`，该 API Node ≥ 22.14 才存在。Node 20 上 jsdom 环境完全无法启动（vitest worker 全崩、零测试执行），且**本地 node 24 无法复现**——只能靠在目标 Node 版本（nvm exec 22）下实测发现。未来升级 jsdom/undici 时须重新确认 Node 下限。
+
+另两条经验：步骤顺序镜像 `make check` 但**不能**直接 `make check`（需要步骤级失败定位 + `--with-deps` 差异）；本地验证"全绿"的可信度取决于是否消除了本地残留（dist、node_modules、API key 环境变量），最严格验证 = 移走 dist + `env -u` 两个 key + 目标 Node 版本。
+
+- [x] **Step 1: 写 CI 脚本**
 
 按上述接口创建 `.github/workflows/ci.yml`。硬约束：**CI 不进行任何需要 API key 的测试**——`tests/live/` 由 `--ignore` 显式排除（`tests/conftest.py` 的 `RUN_LIVE_TESTS` gate 是第二道防线，且 CI 环境本无任何 secret）；评测只跑 `validate`（manifest 三态校验），不跑真实模型；E2E 使用 ScriptedModel 驱动本地 scripted_server，无网络。不需要操作者提供任何资源：无 secret、无部署、默认 `GITHUB_TOKEN` 即可。
 
-- [ ] **Step 2: 本地静态校验**
+- [x] **Step 2: 本地静态校验**
 
 ```bash
 .venv/bin/python -c "import yaml; yaml.safe_load(open('.github/workflows/ci.yml'))"
@@ -1392,11 +1401,13 @@ Expected: 所有检查通过；`doc/` 仅跟踪两份已审计的公开设计文
 
 Expected: YAML 可解析；工作树审计 0 findings（`.github/` 属正常工程目录，不在禁止路径清单内）。
 
-- [ ] **Step 3: 首跑观察与迭代**
+- [x] **Step 3: 首跑观察与迭代**
 
 提交并 push 后在 GitHub 仓库 Actions 页签观察首跑。已知首跑风险与对策：E2E `webServer` 的 30 秒启动超时在 CI 冷启动环境可能偏紧（必要时单独调 `web/playwright.config.ts` 的 `timeout`，调整需先过本地 E2E 回归）；uv 缓存以 `uv.lock` 为键，仓库已提交锁文件，命中率高；私有仓库免费额度 2000 分钟/月，单次约 8–12 分钟，远低于额度（转 Public 后无限）。首跑失败的环境差异修复属于正常迭代，预计 1–2 轮。
 
-- [ ] **Step 4: 徽章与验证收口**
+> **实际执行记录（2026-08-29）**：首跑实际经历三轮环境差异失败后于第四次成功（run `33247066889`，1m43s——runner 缓存生效，远快于预估的 8–12 分钟；E2E webServer 30s 超时最终未成为问题）。三个根因与修复详见上方"已踩过的坑"；对应的四个提交为 `27533bd`（workflow 本体）→ `8af4f91`（钉 setup-uv 精确版本）→ `39a52dc`（build 提前）→ `acd6a36`（node 22）。修复均以 ci.yml 内联注释 + 本节文字双重固化，防止回退。
+
+- [x] **Step 4: 徽章与验证收口**
 
 ```bash
 make check
@@ -1405,7 +1416,7 @@ uv run --python 3.12 scripts/audit_public.py --repo .
 
 Expected: 本地全绿；README §10 出现指向 `hanhaiqingchuan/my-coding-agent` 的 CI 状态徽章且 URL 从未登录环境可访问（转 Public 前徽章对匿名访问不可见，属预期，转 Public 后自动生效）。
 
-- [ ] **Step 5: 提交检查点（本地 commit 已预授权，push 需当次确认）**
+- [x] **Step 5: 提交检查点（本地 commit 已预授权，push 需当次确认）**
 
 建议提交信息：`ci: add github actions workflow`。
 
