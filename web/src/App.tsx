@@ -14,10 +14,35 @@ import { EvaluationsPanel } from "./features/evaluation/EvaluationsPanel";
 import { EvaluationClient } from "./features/evaluation/evaluationApi";
 import { useSession } from "./features/sessions/useSession";
 
+type AppRoute = { view: AppView; campaign: string | null };
+
+/**
+ * The app's whole router: `#/evaluations` (optionally `#/evaluations/<campaign>`
+ * to open one campaign) selects the evaluations view; any other hash — the
+ * empty default included — is the sessions workbench. Hash-only, so deep links
+ * survive refresh, back/forward and pasting without a router dependency.
+ */
+function routeFromHash(hash: string): AppRoute {
+  const match = /^#\/evaluations(?:\/([^/]+))?\/?$/.exec(hash);
+  return match === null
+    ? { view: "sessions", campaign: null }
+    : { view: "evaluations", campaign: match[1] ?? null };
+}
+
+function useHashRoute(): AppRoute {
+  const [route, setRoute] = useState(() => routeFromHash(window.location.hash));
+  useEffect(() => {
+    const onHashChange = () => setRoute(routeFromHash(window.location.hash));
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, []);
+  return route;
+}
+
 export default function App() {
   const api = useMemo(() => new ApiClient(), []);
   const evaluations = useMemo(() => new EvaluationClient(), []);
-  const [view, setView] = useState<AppView>("sessions");
+  const route = useHashRoute();
   const [sessions, setSessions] = useState<SessionDto[]>([]);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(
     null,
@@ -39,6 +64,14 @@ export default function App() {
 
   function commandId(): string {
     return crypto.randomUUID();
+  }
+
+  /** The rail's tabs navigate by rewriting the hash; hashchange re-renders. */
+  function switchView(next: AppView) {
+    const target = next === "evaluations" ? "#/evaluations" : "";
+    if (window.location.hash !== target) {
+      window.location.hash = target;
+    }
   }
 
   function startRun(content: string) {
@@ -95,14 +128,18 @@ export default function App() {
   const snapshot = state.snapshot;
   const recoveryBlocked = snapshot?.session.requires_recovery_ack ?? false;
 
-  if (view === "evaluations") {
+  if (route.view === "evaluations") {
     return (
       <div className="app-shell evaluations-shell">
         <nav className="session-sidebar" aria-label="Sessions and workspace">
-          <ViewSwitcher view={view} onViewChange={setView} />
+          <ViewSwitcher view={route.view} onViewChange={switchView} />
         </nav>
         <main className="conversation-panel" aria-label="Evaluations">
-          <EvaluationsPanel reader={evaluations} />
+          <EvaluationsPanel
+            key={route.campaign ?? "list"}
+            reader={evaluations}
+            initialCampaign={route.campaign}
+          />
         </main>
       </div>
     );
@@ -112,7 +149,7 @@ export default function App() {
     <AppShell
       sidebar={
         <>
-          <ViewSwitcher view={view} onViewChange={setView} />
+          <ViewSwitcher view={route.view} onViewChange={switchView} />
           <WorkspacePicker onCreate={createSession} />
           <SessionSidebar
             sessions={sessions}

@@ -6,8 +6,9 @@ type ViewSwitcherProps = {
 };
 
 /**
- * The left rail's top-level navigation. The app keeps one page-level state
- * instead of a router: both views are local, and no new dependency is needed.
+ * The left rail's top-level navigation. The app derives the current view from
+ * the location hash (`#/evaluations`); a tab click asks the app to rewrite the
+ * hash, and the hashchange listener re-renders — no router dependency.
  */
 export function ViewSwitcher({ view, onViewChange }: ViewSwitcherProps) {
   return (

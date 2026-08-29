@@ -20,6 +20,8 @@ type Load<T> =
 
 type EvaluationsPanelProps = {
   reader: EvaluationReader;
+  /** A campaign deep-linked through `#/evaluations/<campaign>`, if any. */
+  initialCampaign?: string | null;
 };
 
 function percent(rate: number | null): string {
@@ -50,10 +52,18 @@ function judgeMeans(summary: CampaignSummaryDto): string {
 /**
  * The read-only evaluation results workbench: campaigns list, one campaign's
  * task rows, one run with its judgement. Every screen is a pure view of disk
- * state; running campaigns stays on the CLI.
+ * state; running campaigns stays on the CLI. A deep-linked campaign seeds the
+ * initial screen; App remounts the panel (via key) when that link changes.
  */
-export function EvaluationsPanel({ reader }: EvaluationsPanelProps) {
-  const [screen, setScreen] = useState<Screen>({ kind: "list" });
+export function EvaluationsPanel({
+  reader,
+  initialCampaign = null,
+}: EvaluationsPanelProps) {
+  const [screen, setScreen] = useState<Screen>(
+    initialCampaign === null
+      ? { kind: "list" }
+      : { kind: "campaign", campaign: initialCampaign },
+  );
   const [campaigns, setCampaigns] = useState<Load<CampaignSummaryDto[]>>({
     status: "loading",
   });

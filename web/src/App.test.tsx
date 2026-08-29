@@ -3,8 +3,14 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, expect, test, vi } from "vitest";
 
 import type { SessionSnapshotDto } from "./api/types";
+import type { CampaignDetailDto } from "./features/evaluation/types";
+import fixture from "./features/evaluation/fixtures/evaluation.fixture.json";
 
-const mocks = vi.hoisted(() => ({ send: vi.fn(), dispatch: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  send: vi.fn(),
+  dispatch: vi.fn(),
+  campaignDetail: vi.fn(),
+}));
 
 vi.mock("./api/client", () => ({
   ApiClient: class {
@@ -25,7 +31,7 @@ vi.mock("./api/client", () => ({
 vi.mock("./features/evaluation/evaluationApi", () => ({
   EvaluationClient: class {
     listCampaigns = async () => [];
-    campaignDetail = vi.fn();
+    campaignDetail = mocks.campaignDetail;
     runDetail = vi.fn();
   },
 }));
@@ -106,10 +112,18 @@ vi.mock("./features/sessions/useSession", () => ({
 
 import App from "./App";
 
+// The fixture was recorded from a real offline campaign, so the deep-link test
+// asserts the campaign screen against the exact payload shape the API serves.
+const CAMPAIGN_DETAIL = fixture.campaignDetail as unknown as CampaignDetailDto;
+
 afterEach(() => {
   cleanup();
+  // The hash outlives one test inside jsdom's shared window; reset it so every
+  // test starts from the default (sessions) route.
+  window.location.hash = "";
   mocks.send.mockClear();
   mocks.dispatch.mockClear();
+  mocks.campaignDetail.mockClear();
 });
 
 test("renders the fixed approval dock and sends only backend commands for approval and recovery", async () => {
@@ -144,7 +158,7 @@ test("renders the fixed approval dock and sends only backend commands for approv
   );
 });
 
-test("the left rail switches between the sessions workbench and evaluations", async () => {
+test("the left rail switches views by writing the location hash", async () => {
   const user = userEvent.setup();
   render(<App />);
 
@@ -152,10 +166,17 @@ test("the left rail switches between the sessions workbench and evaluations", as
   await waitFor(() =>
     expect(screen.getByRole("button", { name: "Stop" })).toBeTruthy(),
   );
+  expect(window.location.hash).toBe("");
 
   await user.click(screen.getByRole("button", { name: "Evaluations" }));
-  const evaluationsTab = screen.getByRole("button", { name: "Evaluations" });
-  expect(evaluationsTab.getAttribute("aria-current")).toBe("page");
+  await waitFor(() =>
+    expect(
+      screen
+        .getByRole("button", { name: "Evaluations" })
+        .getAttribute("aria-current"),
+    ).toBe("page"),
+  );
+  expect(window.location.hash).toBe("#/evaluations");
   await waitFor(() =>
     expect(screen.getByText(/No evaluation campaigns found/)).toBeTruthy(),
   );
@@ -165,9 +186,62 @@ test("the left rail switches between the sessions workbench and evaluations", as
   await waitFor(() =>
     expect(screen.getByRole("button", { name: "Stop" })).toBeTruthy(),
   );
+  expect(window.location.hash).toBe("");
   expect(
     screen
       .getByRole("button", { name: "Evaluations" })
       .getAttribute("aria-current"),
   ).toBeNull();
+});
+
+test("restores the evaluations view when the hash is set before mount", async () => {
+  window.location.hash = "#/evaluations";
+  render(<App />);
+
+  await waitFor(() =>
+    expect(screen.getByText(/No evaluation campaigns found/)).toBeTruthy(),
+  );
+  expect(
+    screen
+      .getByRole("button", { name: "Evaluations" })
+      .getAttribute("aria-current"),
+  ).toBe("page");
+  expect(
+    screen
+      .getByRole("button", { name: "Sessions" })
+      .getAttribute("aria-current"),
+  ).toBeNull();
+  expect(screen.queryByRole("button", { name: "Stop" })).toBeNull();
+});
+
+test("follows hashchange events so refresh, back and pasted links restore the view", async () => {
+  render(<App />);
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "Stop" })).toBeTruthy(),
+  );
+
+  window.location.hash = "#/evaluations";
+  await waitFor(() =>
+    expect(screen.getByText(/No evaluation campaigns found/)).toBeTruthy(),
+  );
+  expect(screen.queryByRole("button", { name: "Stop" })).toBeNull();
+
+  window.location.hash = "";
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "Stop" })).toBeTruthy(),
+  );
+});
+
+test("deep-links to one campaign through #/evaluations/<campaign>", async () => {
+  mocks.campaignDetail.mockResolvedValueOnce(CAMPAIGN_DETAIL);
+  window.location.hash = "#/evaluations/judged-campaign";
+  render(<App />);
+
+  await waitFor(() =>
+    expect(
+      screen.getByRole("heading", { name: "judged-campaign" }),
+    ).toBeTruthy(),
+  );
+  await waitFor(() => expect(screen.getByText("demo-task")).toBeTruthy());
+  expect(mocks.campaignDetail).toHaveBeenCalledWith("judged-campaign");
 });
