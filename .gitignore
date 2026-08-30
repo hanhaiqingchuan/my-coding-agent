@@ -46,6 +46,7 @@ node_modules/
 /web/test-results/
 /playwright-report/
 /test-results/
+*.tmp.mjs
 
 # Editor and operating-system files.
 .DS_Store
