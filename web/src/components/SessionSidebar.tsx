@@ -1,4 +1,8 @@
+import { motion } from "motion/react";
+
+import { staggerChild, staggerParent } from "../motion";
 import type { SessionDto } from "../api/types";
+import { IconX } from "./icons";
 
 type SessionSidebarProps = {
   sessions: SessionDto[];
@@ -16,9 +20,18 @@ export function SessionSidebar({
   return (
     <section aria-labelledby="sessions-heading">
       <h2 id="sessions-heading">会话</h2>
-      <ul className="session-list">
+      <motion.ul
+        className="session-list"
+        variants={staggerParent}
+        initial="initial"
+        animate="animate"
+      >
         {sessions.map((session) => (
-          <li key={session.id} className="session-item">
+          <motion.li
+            key={session.id}
+            className="session-item"
+            variants={staggerChild}
+          >
             <button
               type="button"
               className="session-row"
@@ -37,11 +50,11 @@ export function SessionSidebar({
               title="删除会话"
               onClick={() => onDelete(session.id)}
             >
-              ×
+              <IconX />
             </button>
-          </li>
+          </motion.li>
         ))}
-      </ul>
+      </motion.ul>
     </section>
   );
 }

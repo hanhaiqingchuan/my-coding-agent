@@ -1,3 +1,6 @@
+import { motion } from "motion/react";
+
+import { riseIn } from "../motion";
 import type { CompactionStatus } from "../features/sessions/sessionReducer";
 
 type CompactionChipProps = { status: CompactionStatus | null };
@@ -16,23 +19,41 @@ export function CompactionChip({ status }: CompactionChipProps) {
   if (status === null) return null;
   if (status.phase === "running") {
     return (
-      <p className="compaction-chip compaction-running" role="status">
+      <motion.p
+        className="compaction-chip compaction-running"
+        role="status"
+        variants={riseIn}
+        initial="initial"
+        animate="animate"
+      >
         正在压缩上下文…
-      </p>
+      </motion.p>
     );
   }
   if (status.phase === "finished" && status.errorCode !== undefined) {
     return (
-      <p className="compaction-chip compaction-finished" role="status">
+      <motion.p
+        className="compaction-chip compaction-finished"
+        role="status"
+        variants={riseIn}
+        initial="initial"
+        animate="animate"
+      >
         压缩失败（{status.errorCode}）：已保留原上下文（约{" "}
         {tokenCount(status.beforeTokens)} tokens），可稍后重试 /compact
-      </p>
+      </motion.p>
     );
   }
   return (
-    <p className="compaction-chip compaction-finished" role="status">
+    <motion.p
+      className="compaction-chip compaction-finished"
+      role="status"
+      variants={riseIn}
+      initial="initial"
+      animate="animate"
+    >
       上下文已压缩：{tokenCount(status.beforeTokens)} →{" "}
       {tokenCount(status.afterTokens)} tokens
-    </p>
+    </motion.p>
   );
 }

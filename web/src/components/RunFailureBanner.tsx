@@ -1,6 +1,9 @@
 import { useState } from "react";
+import { motion } from "motion/react";
 
+import { riseIn } from "../motion";
 import type { RunFailure } from "../api/errors";
+import { IconX } from "./icons";
 
 /**
  * The timeline's compact, dismissible summary of the last finished run's
@@ -13,10 +16,13 @@ export function RunFailureBanner({ failure }: { failure: RunFailure }) {
   const [dismissedRunId, setDismissedRunId] = useState<string | null>(null);
   if (failure.runId === dismissedRunId) return null;
   return (
-    <aside
+    <motion.aside
       className="run-failure-banner"
       role="status"
       data-testid="run-failure-banner"
+      variants={riseIn}
+      initial="initial"
+      animate="animate"
     >
       <div className="run-failure-copy">
         <strong>{failure.title}</strong>
@@ -36,8 +42,8 @@ export function RunFailureBanner({ failure }: { failure: RunFailure }) {
         aria-label="关闭提示"
         onClick={() => setDismissedRunId(failure.runId)}
       >
-        ×
+        <IconX />
       </button>
-    </aside>
+    </motion.aside>
   );
 }

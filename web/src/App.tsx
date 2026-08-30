@@ -185,6 +185,17 @@ export default function App() {
 
   const snapshot = state.snapshot;
   const recoveryBlocked = snapshot?.session.requires_recovery_ack ?? false;
+  // The timeline owns the recovery banner, the failure banner, and the live
+  // drafts, so the empty state only stands in for it when all are absent.
+  const timelineEmpty =
+    snapshot !== null &&
+    snapshot.messages.length === 0 &&
+    snapshot.tools.length === 0 &&
+    snapshot.interrupted_banner == null &&
+    snapshot.last_finished_run == null &&
+    snapshot.active_run == null &&
+    Object.keys(state.assistantDrafts).length === 0 &&
+    Object.keys(state.thinkingDrafts).length === 0;
 
   if (route.view === "evaluations") {
     return (
@@ -233,6 +244,14 @@ export default function App() {
           {snapshot === null ? (
             <section className="conversation-empty">
               <p>先打开一个工作区开始。</p>
+            </section>
+          ) : timelineEmpty ? (
+            <section className="conversation-empty">
+              <p className="conversation-empty-title">给智能体下达第一个任务</p>
+              <p>
+                描述要读写的文件和要达成的目标；写文件、执行命令都会先经过你批准。
+                输入 / 查看可用命令。
+              </p>
             </section>
           ) : (
             <ConversationTimeline

@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from "react";
+import { motion } from "motion/react";
 
+import { menuPop } from "../motion";
 import type { RunDto } from "../api/types";
+import { IconSend, IconStop } from "./icons";
 
 const TERMINAL_RUN_STATES = new Set([
   "completed",
@@ -119,11 +122,14 @@ export function Composer({
         }}
       />
       {menuOpen ? (
-        <ul
+        <motion.ul
           className="slash-menu"
           role="listbox"
           aria-label="斜杠命令"
           ref={menuRef}
+          variants={menuPop}
+          initial="initial"
+          animate="animate"
         >
           {matches.map((command, index) => (
             <li key={command.name}>
@@ -141,7 +147,7 @@ export function Composer({
               </button>
             </li>
           ))}
-        </ul>
+        </motion.ul>
       ) : null}
       {isRecoveryBlocked ? (
         <p className="composer-note" id="composer-recovery-note">
@@ -171,10 +177,12 @@ export function Composer({
               if (activeRun !== null && !isCancelling) onStop(activeRun.id);
             }}
           >
+            <IconStop />
             {isCancelling ? "正在停止" : "停止"}
           </button>
         ) : (
           <button className="composer-send" type="submit" disabled={!canSend}>
+            <IconSend />
             发送
           </button>
         )}

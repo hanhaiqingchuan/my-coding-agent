@@ -39,6 +39,17 @@ function campaignName(summary: CampaignSummaryDto): string {
   return summary.campaign_id ?? summary.directory;
 }
 
+/** Visual busy feedback beside the loading line; decorative only. */
+function SkeletonRows({ rows = 3 }: { rows?: number }) {
+  return (
+    <div className="eval-skeleton" aria-hidden="true">
+      {Array.from({ length: rows }, (_, index) => (
+        <span key={index} style={{ animationDelay: `${index * 90}ms` }} />
+      ))}
+    </div>
+  );
+}
+
 function judgeMeans(summary: CampaignSummaryDto): string {
   if (summary.judged_runs === 0) {
     return "未评判";
@@ -140,7 +151,10 @@ export function EvaluationsPanel({
         </header>
         <section className="eval-list" aria-label="评测轮次">
           {campaigns.status === "loading" ? (
-            <p className="eval-muted">正在加载评测轮次…</p>
+            <>
+              <p className="eval-muted">正在加载评测轮次…</p>
+              <SkeletonRows />
+            </>
           ) : campaigns.status === "error" ? (
             <p className="eval-warning" role="alert">
               无法加载评测轮次。
@@ -220,7 +234,10 @@ export function EvaluationsPanel({
           </button>
         </header>
         {detail.status === "loading" ? (
-          <p className="eval-muted">正在加载轮次…</p>
+          <>
+            <p className="eval-muted">正在加载轮次…</p>
+            <SkeletonRows rows={5} />
+          </>
         ) : detail.status === "error" ? (
           <p className="eval-warning" role="alert">
             无法加载该轮次。
@@ -260,7 +277,10 @@ export function EvaluationsPanel({
         </button>
       </header>
       {run.status === "loading" ? (
-        <p className="eval-muted">正在加载运行…</p>
+        <>
+          <p className="eval-muted">正在加载运行…</p>
+          <SkeletonRows rows={4} />
+        </>
       ) : run.status === "error" ? (
         <p className="eval-warning" role="alert">
           无法加载该运行。

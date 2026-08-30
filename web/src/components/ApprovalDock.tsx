@@ -1,3 +1,6 @@
+import { motion } from "motion/react";
+
+import { gateRise } from "../motion";
 import type { ApprovalDecision, PendingApprovalDto } from "../api/types";
 import { CommandDetails, stringValue } from "./ToolCard";
 
@@ -17,7 +20,14 @@ export function ApprovalDock({
   const isWrite = pendingApproval.name.includes("write");
 
   return (
-    <section className="approval-dock" aria-label="待审批">
+    <motion.section
+      key={pendingApproval.tool_call_id}
+      className="approval-dock"
+      aria-label="待审批"
+      variants={gateRise}
+      initial="initial"
+      animate="animate"
+    >
       <header>
         <p>需要审批</p>
         <h2>{pendingApproval.name}</h2>
@@ -50,6 +60,6 @@ export function ApprovalDock({
           批准
         </button>
       </div>
-    </section>
+    </motion.section>
   );
 }

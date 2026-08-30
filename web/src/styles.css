@@ -6,6 +6,59 @@
    contrast is the signature. Colour pairs are chosen for WCAG AA (>= 4.5:1)
    on the surface they sit on; wells keep their own on-dark tokens.
    --------------------------------------------------------------------------- */
+
+/* Self-hosted voices (OFL): Plex Sans carries UI latin, JetBrains Mono is the
+   instrument voice; CJK falls through to the system stack. */
+@font-face {
+  font-family: "IBM Plex Sans";
+  src: url("./assets/fonts/ibm-plex-sans-latin-400-normal.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "IBM Plex Sans";
+  src: url("./assets/fonts/ibm-plex-sans-latin-500-normal.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "IBM Plex Sans";
+  src: url("./assets/fonts/ibm-plex-sans-latin-600-normal.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "IBM Plex Sans";
+  src: url("./assets/fonts/ibm-plex-sans-latin-700-normal.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("./assets/fonts/jetbrains-mono-latin-400-normal.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("./assets/fonts/jetbrains-mono-latin-500-normal.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("./assets/fonts/jetbrains-mono-latin-700-normal.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   /* Warm cream chrome */
   --paper: #f1ecdf;
@@ -80,10 +133,11 @@
 
   /* Typography: sans for the desk, mono as the instrument voice */
   --font-sans:
-    Inter, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei",
-    "Noto Sans CJK SC", system-ui, sans-serif;
+    "IBM Plex Sans", Inter, "PingFang SC", "Hiragino Sans GB",
+    "Microsoft YaHei", "Noto Sans CJK SC", system-ui, sans-serif;
   --font-mono:
-    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo,
+    Consolas, monospace;
   --text-2xs: 0.6875rem;
   --text-xs: 0.75rem;
   --text-sm: 0.8125rem;
@@ -108,12 +162,22 @@
   --radius-md: 10px;
   --radius-lg: 14px;
   --radius-pill: 999px;
-  /* Light chrome wants elevation you feel more than see */
+  /* Light chrome wants elevation you feel more than see; cards also catch a
+     white top light, wells catch it from inside plus a darker floor. */
   --shadow-card:
-    0 1px 2px rgb(38 34 26 / 7%), 0 1px 3px rgb(38 34 26 / 5%);
+    inset 0 1px 0 rgb(255 255 255 / 65%),
+    0 1px 2px rgb(38 34 26 / 7%),
+    0 1px 3px rgb(38 34 26 / 5%);
   --shadow-dock:
-    0 -12px 32px rgb(38 34 26 / 14%), 0 -2px 8px rgb(38 34 26 / 9%);
-  --shadow-menu: 0 8px 24px rgb(38 34 26 / 18%);
+    inset 0 1px 0 rgb(255 255 255 / 55%),
+    0 -12px 32px rgb(38 34 26 / 14%),
+    0 -2px 8px rgb(38 34 26 / 9%);
+  --shadow-menu:
+    inset 0 1px 0 rgb(255 255 255 / 65%),
+    0 8px 24px rgb(38 34 26 / 18%);
+  --shadow-well:
+    inset 0 1px 0 rgb(255 255 255 / 5%),
+    inset 0 2px 6px rgb(0 0 0 / 45%);
 
   color: var(--ink);
   background: var(--paper);
@@ -128,7 +192,41 @@ body {
   min-width: 320px;
   min-height: 100vh;
   margin: 0;
-  background: var(--paper);
+  /* A faint desk lamp from above keeps the cream from reading flat. */
+  background:
+    radial-gradient(1400px 700px at 50% -12%, #fbf5e4 0%, rgb(251 245 228 / 0%) 60%),
+    var(--paper);
+}
+::selection {
+  background: rgb(46 79 215 / 22%);
+}
+/* Themed slim scrollbars on every internal scroll region. */
+.rail-scroll,
+.timeline-scroll,
+.conversation-panel,
+.tool-card pre,
+.approval-dock pre,
+.thinking-text {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+.tool-card pre,
+.approval-dock pre,
+.thinking-text {
+  scrollbar-color: var(--well-edge) transparent;
+}
+::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: var(--line-strong);
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
 }
 button,
 input {
@@ -169,7 +267,8 @@ button {
     background-color 120ms ease,
     border-color 120ms ease,
     color 120ms ease,
-    box-shadow 120ms ease;
+    box-shadow 120ms ease,
+    transform 90ms ease;
 }
 button:hover {
   border-color: var(--ink-faint);
@@ -183,11 +282,16 @@ a:focus-visible,
 [tabindex]:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgb(46 79 215 / 16%);
 }
 /* Inside a dark well the accent outline is too dim; use the on-dark accent. */
 .md-code-block button:focus-visible,
 .thinking-box button:focus-visible {
   outline-color: var(--well-accent);
+  box-shadow: 0 0 0 4px rgb(168 180 240 / 22%);
+}
+button:not(:disabled):active {
+  transform: scale(0.97);
 }
 button:disabled,
 button:disabled:hover {
@@ -417,6 +521,9 @@ button:disabled:hover {
   border-radius: 0;
   background: transparent;
   text-align: left;
+  transition:
+    background-color 140ms ease,
+    box-shadow 140ms ease;
 }
 .session-row:hover {
   border-color: transparent;
@@ -546,6 +653,9 @@ button:disabled:hover {
   color: var(--amber-fg);
   background: var(--amber-bg);
 }
+.connection-reconnecting::before {
+  animation: gate-lamp 1.2s ease-in-out infinite;
+}
 .connection-offline {
   border-color: var(--danger-border);
   color: var(--danger-fg);
@@ -568,8 +678,23 @@ button:disabled:hover {
 .conversation-empty {
   display: grid;
   place-items: center;
+  align-content: center;
+  gap: var(--space-2);
+  min-height: 100%;
   color: var(--ink-faint);
   font-size: var(--text-sm);
+  text-align: center;
+}
+.conversation-empty p {
+  margin: 0;
+  max-width: 46ch;
+}
+.conversation-empty-title {
+  color: var(--ink-soft);
+  font-family: var(--font-mono);
+  font-size: var(--text-base);
+  font-weight: 700;
+  letter-spacing: 0.04em;
 }
 
 /* --- Messages: a transcript, not chat bubbles ---------------------------- */
@@ -699,7 +824,7 @@ button:disabled:hover {
   border: 1px solid var(--well-edge);
   border-radius: var(--radius-md);
   background: var(--well);
-  box-shadow: inset 0 1px 2px rgb(0 0 0 / 30%);
+  box-shadow: var(--shadow-well);
   overflow: hidden;
 }
 .markdown .md-code-head {
@@ -812,6 +937,7 @@ button:disabled:hover {
   border-radius: var(--radius-sm);
   color: var(--well-fg);
   background: var(--well);
+  box-shadow: var(--shadow-well);
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   line-height: 1.5;
@@ -843,6 +969,9 @@ button:disabled:hover {
   border-radius: var(--radius-md);
   background: var(--card);
   box-shadow: var(--shadow-card);
+  transition:
+    border-color 200ms ease,
+    background-color 200ms ease;
 }
 .tool-card > header {
   display: flex;
@@ -853,12 +982,19 @@ button:disabled:hover {
   padding: var(--space-3) var(--space-4);
 }
 .tool-card > header strong {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
   min-width: 0;
   overflow-wrap: anywhere;
   color: var(--ink);
   font-family: var(--font-mono);
   font-size: var(--text-sm);
   font-weight: 700;
+}
+.tool-card > header strong svg {
+  flex: none;
+  color: var(--ink-faint);
 }
 /* State pill: a lamp dot plus the label. */
 .tool-status {
@@ -1015,6 +1151,7 @@ button:disabled:hover {
   border-radius: var(--radius-sm);
   color: var(--well-fg);
   background: var(--well);
+  box-shadow: var(--shadow-well);
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   line-height: 1.5;
@@ -1116,13 +1253,6 @@ button:disabled:hover {
   border-radius: var(--radius-lg);
   background: var(--amber-bg);
   box-shadow: var(--shadow-dock);
-  animation: gate-rise 220ms ease-out;
-}
-@keyframes gate-rise {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
 }
 .approval-dock header {
   padding-bottom: var(--space-3);
@@ -1395,6 +1525,7 @@ button:disabled:hover {
   height: 100%;
   border-radius: var(--radius-pill);
   background: var(--success-line);
+  transition: width 240ms ease;
 }
 .context-gauge-warn {
   background: var(--amber-line);
@@ -1539,6 +1670,10 @@ button:disabled:hover {
   background: transparent;
   font-size: var(--text-sm);
   font-weight: 600;
+  transition:
+    background-color 160ms ease,
+    color 160ms ease,
+    box-shadow 160ms ease;
 }
 .view-tab:hover {
   border-color: transparent;
@@ -1774,6 +1909,40 @@ button:disabled:hover {
   color: var(--ink);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
+}
+
+/* Loading feedback: shimmer bars that mirror the ledger rows they replace. */
+.eval-skeleton {
+  display: grid;
+  gap: var(--space-3);
+}
+.eval-skeleton span {
+  display: block;
+  height: 46px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: linear-gradient(
+    100deg,
+    var(--sunken) 30%,
+    var(--card) 50%,
+    var(--sunken) 70%
+  );
+  background-size: 200% 100%;
+  animation: eval-shimmer 1.5s linear infinite;
+}
+@keyframes eval-shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+.eval-list ul {
+  animation: eval-fade 240ms ease;
+}
+@keyframes eval-fade {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
 }
 
 /* Run detail: the facts reuse the run-details list; the judgement card sits

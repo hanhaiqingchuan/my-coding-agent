@@ -1,5 +1,7 @@
 import { Fragment, useEffect, useRef } from "react";
+import { motion } from "motion/react";
 
+import { riseIn } from "../motion";
 import { describeStopOutcome, failureBannerFor } from "../api/errors";
 import type {
   InterruptedBannerDto,
@@ -158,7 +160,13 @@ function InterruptedBanner({
   const restart = banner.stop_reason === "server_restart";
   const outcome = describeStopOutcome(banner.stop_reason);
   return (
-    <aside className="recovery-banner" role="alert">
+    <motion.aside
+      className="recovery-banner"
+      role="alert"
+      variants={riseIn}
+      initial="initial"
+      animate="animate"
+    >
       <p>
         {restart
           ? "上一轮运行因服务重启而中断。"
@@ -171,6 +179,6 @@ function InterruptedBanner({
       ) : (
         <p>可以继续对话。</p>
       )}
-    </aside>
+    </motion.aside>
   );
 }

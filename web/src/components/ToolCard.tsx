@@ -1,5 +1,9 @@
+import { motion } from "motion/react";
+
+import { riseIn } from "../motion";
 import type { JsonValue, ToolExecutionDto } from "../api/types";
 import { toolStateLabel } from "../api/labels";
+import { ToolGlyph } from "./icons";
 
 type ToolCardProps = {
   tool: ToolExecutionDto;
@@ -42,12 +46,18 @@ export function ToolCard({ tool, outputDraft }: ToolCardProps) {
     : [];
 
   return (
-    <article
+    <motion.article
       className={`tool-card tool-${tool.execution_state}`}
       aria-label={`${tool.name} ${toolStateLabel(tool.execution_state)}`}
+      variants={riseIn}
+      initial="initial"
+      animate="animate"
     >
       <header>
-        <strong>{tool.name}</strong>
+        <strong>
+          <ToolGlyph name={tool.name} />
+          {tool.name}
+        </strong>
         <span className="tool-status">
           {toolStateLabel(tool.execution_state)}
         </span>
@@ -72,7 +82,7 @@ export function ToolCard({ tool, outputDraft }: ToolCardProps) {
           <pre className="tool-output-draft">{outputDraft}</pre>
         ) : null}
       </details>
-    </article>
+    </motion.article>
   );
 }
 

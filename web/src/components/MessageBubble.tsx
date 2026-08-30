@@ -1,3 +1,6 @@
+import { motion } from "motion/react";
+
+import { riseIn } from "../motion";
 import type { MessageDto, MessagePartDto } from "../api/types";
 import { roleLabel } from "../api/labels";
 import type { ThinkingDraft } from "../features/sessions/sessionReducer";
@@ -51,7 +54,13 @@ export function MessageBubble({
     const hasText = text !== undefined && text.length > 0;
     if (!hasThinking && !hasText) return null;
     return (
-      <article className="message-bubble message-assistant" data-transient>
+      <motion.article
+        className="message-bubble message-assistant"
+        data-transient
+        variants={riseIn}
+        initial="initial"
+        animate="animate"
+      >
         <header>助手 · 生成中</header>
         {hasThinking ? (
           <ThinkingDisclosure
@@ -61,7 +70,7 @@ export function MessageBubble({
           />
         ) : null}
         {hasText ? <p>{text}</p> : null}
-      </article>
+      </motion.article>
     );
   }
 
@@ -79,7 +88,12 @@ export function MessageBubble({
     );
 
   return (
-    <article className={`message-bubble message-${message.role}`}>
+    <motion.article
+      className={`message-bubble message-${message.role}`}
+      variants={riseIn}
+      initial="initial"
+      animate="animate"
+    >
       <header>{roleLabel(message.role)}</header>
       {segments.map((segment, index) =>
         segment.kind === "thinking" ? (
@@ -88,6 +102,6 @@ export function MessageBubble({
           renderText(segment.text, index)
         ),
       )}
-    </article>
+    </motion.article>
   );
 }
