@@ -34,6 +34,9 @@ htmlcov/
 /logs/
 *.log
 
+# Evaluation campaign records are published, including each run's state.db.
+!evaluation-results/**/*.db
+
 # Frontend.
 node_modules/
 /web/node_modules/
@@ -50,4 +53,3 @@ node_modules/
 .vscode/
 
 # Evaluation campaign outputs (raw run documents stay outside the public repo).
-/evaluation-results/**/data/
