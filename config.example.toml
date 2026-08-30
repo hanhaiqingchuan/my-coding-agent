@@ -1,38 +1,89 @@
+# My Coding Agent 配置模板
+#
+# 用法：复制为 config.toml（已被 .gitignore 忽略，不会进入仓库），
+#       默认读取启动目录下的 config.toml，也可用 --config 指定其它路径。
+# 凭据只通过环境变量提供：本文件只保存环境变量的「名字」，绝不写密钥本身。
+# 启动校验失败时会以 CONFIG_ERROR 退出（退出码 2）并指出具体字段。
+# 各字段完整语义见 doc/项目设计方案.md §15。
+
+# ─── 服务 ───────────────────────────────────────────────────────────────────
 [server]
+# 监听端口。服务固定只监听 127.0.0.1（本地回环），不提供远程 host 开关。
 port = 8000
+# 启动后是否自动打开浏览器。设为 false 时需手动访问 http://127.0.0.1:<port>。
 open_browser = true
 
+# ─── 模型（Anthropic-compatible Messages API）──────────────────────────────
 [model]
+# API 根地址，不要手工追加 /v1/messages。
+# 官方：https://api.anthropic.com
+# 阿里云百炼 Token Plan：https://token-plan.cn-beijing.maas.aliyuncs.com/apps/anthropic
+# 其它兼容网关填其根地址即可，须实现标准 Messages API + client tool use。
 base_url = "https://api.anthropic.com"
+# 模型 id，须与所选服务实际暴露的名称一致（如 claude-sonnet-4-5 / qwen3.8-flash）。
 model = "claude-model-name"
+# 存放 API 密钥的环境变量「名」。启动时从该变量读取密钥；变量为空则 CONFIG_ERROR 退出。
+# 密钥本身永远不写进本文件、日志或任何持久化产物。
 api_key_env = "ANTHROPIC_API_KEY"
+# 模型上下文窗口（token）。必须与真实模型一致——上下文预算、压缩阈值都由它推导。
+# 须满足：context_window > max_output_tokens + safety_margin_tokens。
 context_window = 64000
+# 单次回复的最大输出 token（对应 Messages API 必填的 max_tokens）。
 max_output_tokens = 8192
+# 必须为 true：P0 只实现流式（SSE）路径，false 会被启动校验拒绝。
 stream = true
 
+# ─── Agent 行为 ─────────────────────────────────────────────────────────────
 [agent]
+# 一次 run 的最大模型调用轮数。最后一轮不提供工具并强制总结，超出以 MAX_ROUNDS 收束。
 max_rounds = 30
+# 模型给出「完整但非法」的工具参数时，允许连续自纠的次数（错误结果回灌后重试）。
 tool_argument_retries = 2
+# 防循环阈值：同一工具+相同参数指纹连续第 N 次提出时不再执行并回灌
+# repetition_detected；再犯则整个 run 以 DOOM_LOOP 终止。
 doom_loop_threshold = 3
 
+# ─── 上下文管理与压缩 ───────────────────────────────────────────────────────
 [context]
+# 估算 token 达到可用输入预算的该比例时触发同步压缩（0.80 = 80%）。
 compact_trigger_ratio = 0.80
+# 压缩后的软目标比例（0.60 = 60%）。不可压缩内容超出该值时允许
+# compaction_above_target=true 并返回最小合法视图；只有超过可用预算才 CONTEXT_OVERFLOW。
 compact_target_ratio = 0.60
+# 上下文安全余量（token）。可用输入预算 = context_window - max_output_tokens - 本值。
 safety_margin_tokens = 2048
+# 压缩摘要单次请求的输出 token 上限。
 summary_max_tokens = 2048
+# 每次模型视图至少保留的「最近完整用户轮次」数（须 ≥ 2）。
 recent_turns_min = 2
+# 最近完整轮次尽量占可用输入预算的比例上限。
 recent_budget_ratio = 0.40
 
+# ─── 网络重试 ───────────────────────────────────────────────────────────────
 [retry]
+# 模型请求最大尝试次数（含首次）。可重试类：408/409/429/5xx（含 529）、连接失败、超时；
+# 401/403 与协议错误不重试。等待期间可见可停止（Stop 立即打断退避）。
 max_attempts = 5
-initial_delay_seconds = 2
-max_delay_seconds = 30
+# 指数退避起始延迟（秒）。服务端 Retry-After 头优先，非法/超限值回退到本地退避。
+initial_delay_seconds = 2.0
+# 单次退避延迟上限（秒）。服务端指定的等待超过 60 秒时按非法值处理回退本地退避。
+max_delay_seconds = 30.0
+# 退避抖动比例（0.25 = 最多加 25% 随机抖动，避免同步重试风暴）。
 jitter_ratio = 0.25
 
+# ─── 本地工具 ───────────────────────────────────────────────────────────────
 [tools]
+# read_file 单次读取的行数上限（与字节数双闸，先到先截断）。
 read_max_lines = 800
+# read_file 单次读取的字节数上限（40 KiB）。
 read_max_bytes = 40960
+# run_command 默认超时（秒）。超时先 TERM 进程组，宽限期内未退出再 KILL。
 command_timeout_seconds = 120
+# run_command 的 UI/数据库/模型统一输出上限（40 KiB），超出继续等待但丢弃额外字节。
 command_output_bytes = 40960
+# 超时/停止后从 TERM 到 KILL 的宽限秒数。
 kill_grace_seconds = 3
+# 除 PATH/locale/临时目录外额外透传给子进程的环境变量名白名单。
+# 模型密钥变量（[model].api_key_env 指向的）永远禁止透传，写了也会被剔除。
+# 例：pass_env = ["HTTP_PROXY", "NPM_CONFIG_REGISTRY"]
 pass_env = []
