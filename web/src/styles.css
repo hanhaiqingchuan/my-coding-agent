@@ -2329,6 +2329,29 @@ p.run-details-scope {
 .run-context-skills li {
   overflow-wrap: anywhere;
 }
+/* Whole-session footprint: separated card under the per-run facts. */
+.session-totals {
+  margin-top: var(--space-5);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--paper);
+}
+.session-totals h3 {
+  margin: 0 0 var(--space-2);
+  color: var(--ink-faint);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.session-totals p {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
 /* Model-layer states: streaming, compacting, retry wait, stopped and
    unrecoverable failure each read differently — a lamp plus a pill. */
 .run-state {

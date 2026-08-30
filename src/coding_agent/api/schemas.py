@@ -358,6 +358,17 @@ class ContextLoadDto(StrictDto):
         return cls(agents_md_path=load.agents_md_path, skills=list(load.skills_read))
 
 
+class SessionTotalsDto(StrictDto):
+    """The session's cumulative usage across all of its runs."""
+
+    run_count: int
+    round_count: int
+    input_tokens: int
+    output_tokens: int
+    cache_creation_input_tokens: int
+    cache_read_input_tokens: int
+
+
 class SessionSnapshotDto(StrictDto):
     session: SessionDto
     active_run: RunDto | None
@@ -368,6 +379,8 @@ class SessionSnapshotDto(StrictDto):
     interrupted_banner: InterruptedBannerDto | None
     context_load: ContextLoadDto | None
     """The focus run's context-load projection; ``None`` when the session has no run."""
+    session_totals: SessionTotalsDto | None
+    """Cumulative usage across the session's runs; ``None`` before the first run."""
     snapshot_seq: int
 
     @classmethod
@@ -401,6 +414,18 @@ class SessionSnapshotDto(StrictDto):
             context_load=(
                 ContextLoadDto.from_domain(snapshot.context_load)
                 if snapshot.context_load is not None
+                else None
+            ),
+            session_totals=(
+                SessionTotalsDto(
+                    run_count=snapshot.session_totals.run_count,
+                    round_count=snapshot.session_totals.round_count,
+                    input_tokens=snapshot.session_totals.input_tokens,
+                    output_tokens=snapshot.session_totals.output_tokens,
+                    cache_creation_input_tokens=snapshot.session_totals.cache_creation_input_tokens,
+                    cache_read_input_tokens=snapshot.session_totals.cache_read_input_tokens,
+                )
+                if snapshot.session_totals is not None
                 else None
             ),
             snapshot_seq=snapshot.snapshot_seq,

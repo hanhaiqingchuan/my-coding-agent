@@ -37,6 +37,7 @@ from coding_agent.core.models import (
     RunTotals,
     Session,
     SessionSnapshot,
+    SessionTotals,
     StopReason,
     TextPart,
     ThinkingPart,
@@ -361,6 +362,36 @@ class SQLiteStore:
                     "SELECT coalesce(max(seq), 0) FROM events WHERE session_id = ?",
                     (session_id,),
                 ).fetchone()[0]
+                totals_row = connection.execute(
+                    """
+                    SELECT COUNT(*) AS run_count,
+                           coalesce(sum(round_count), 0) AS round_count,
+                           coalesce(sum(input_tokens), 0) AS input_tokens,
+                           coalesce(sum(output_tokens), 0) AS output_tokens,
+                           coalesce(sum(cache_creation_input_tokens), 0)
+                               AS cache_creation_input_tokens,
+                           coalesce(sum(cache_read_input_tokens), 0)
+                               AS cache_read_input_tokens
+                    FROM runs WHERE session_id = ?
+                    """,
+                    (session_id,),
+                ).fetchone()
+                session_totals = (
+                    SessionTotals(
+                        run_count=int(totals_row["run_count"]),
+                        round_count=int(totals_row["round_count"]),
+                        input_tokens=int(totals_row["input_tokens"]),
+                        output_tokens=int(totals_row["output_tokens"]),
+                        cache_creation_input_tokens=int(
+                            totals_row["cache_creation_input_tokens"]
+                        ),
+                        cache_read_input_tokens=int(
+                            totals_row["cache_read_input_tokens"]
+                        ),
+                    )
+                    if totals_row["run_count"]
+                    else None
+                )
                 focus_run = active_run if active_run is not None else last_finished_run
                 context_load = (
                     _context_load_from_rows(connection, session_id, focus_run, tool_rows)
@@ -381,6 +412,7 @@ class SQLiteStore:
             interrupted_banner,
             last_finished_run,
             context_load,
+            session_totals,
         )
 
     def stage_tool_group(self, run_id: str, turn: AssistantTurn) -> PendingToolGroup:

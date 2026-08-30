@@ -501,6 +501,22 @@ class InterruptedRunNotice:
 
 
 @dataclass(frozen=True, slots=True)
+class SessionTotals:
+    """Cumulative usage across every run of the session, live-updating included.
+
+    The per-run rail resets when a new run starts; these sums let the panel show
+    the conversation's whole-session footprint alongside the focus run's.
+    """
+
+    run_count: int
+    round_count: int
+    input_tokens: int
+    output_tokens: int
+    cache_creation_input_tokens: int
+    cache_read_input_tokens: int
+
+
+@dataclass(frozen=True, slots=True)
 class SessionSnapshot:
     session: Session
     active_run: Run | None
@@ -522,6 +538,8 @@ class SessionSnapshot:
     Spec 13.5's context panel needs the AGENTS.md path and the skills the model actually
     read; both derive from durable evidence the run already produced, never discovery.
     """
+    session_totals: SessionTotals | None = None
+    """Cumulative usage across the session's runs; absent only before the first run."""
 
     def __post_init__(self) -> None:
         if self.snapshot_seq < 0:

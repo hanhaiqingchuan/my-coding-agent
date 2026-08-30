@@ -122,6 +122,7 @@
       "pending_approval",
       "interrupted_banner",
       "context_load",
+      "session_totals",
       "snapshot_seq"
     ],
     "DurableEvent": [

@@ -7,6 +7,7 @@ import type {
   JsonValue,
   RunTotalsDto,
   SessionSnapshotDto,
+  SessionTotalsDto,
 } from "../api/types";
 
 type RunDetailsPanelProps = { snapshot: SessionSnapshotDto | null };
@@ -83,6 +84,9 @@ export function RunDetailsPanel({ snapshot }: RunDetailsPanelProps) {
         ) : null}
       </dl>
       {contextLoad !== null ? <ContextLoadList load={contextLoad} /> : null}
+      {snapshot?.session_totals != null ? (
+        <SessionTotalsCard totals={snapshot.session_totals} />
+      ) : null}
       {stopOutcome !== null ? (
         <div className="run-stop-detail">
           <p>{stopOutcome.description}</p>
@@ -170,4 +174,26 @@ function modelName(value: JsonValue | undefined): string | null {
   }
   const name = value.model;
   return typeof name === "string" && name.length > 0 ? name : null;
+}
+
+/**
+ * Whole-session cumulative footprint. The per-run rows above reset whenever a
+ * new run starts; this card is what keeps the conversation's total cost visible
+ * across turns, so a fresh run never reads as the counters being wiped.
+ */
+function SessionTotalsCard({ totals }: { totals: SessionTotalsDto }) {
+  return (
+    <section className="session-totals" aria-label="会话累计">
+      <h3>会话累计</h3>
+      <p>
+        {totals.run_count} 次运行 · {totals.round_count} 轮 · 输入{" "}
+        {totals.input_tokens.toLocaleString()} · 输出{" "}
+        {totals.output_tokens.toLocaleString()}
+      </p>
+      <p className="run-details-note">
+        缓存写入 {totals.cache_creation_input_tokens.toLocaleString()} · 缓存读取{" "}
+        {totals.cache_read_input_tokens.toLocaleString()}，跨全部运行累计。
+      </p>
+    </section>
+  );
 }

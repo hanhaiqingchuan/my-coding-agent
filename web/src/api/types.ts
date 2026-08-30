@@ -192,6 +192,15 @@ export type ContextLoadDto = {
   skills: string[];
 };
 
+export type SessionTotalsDto = {
+  run_count: number;
+  round_count: number;
+  input_tokens: number;
+  output_tokens: number;
+  cache_creation_input_tokens: number;
+  cache_read_input_tokens: number;
+};
+
 export type SessionSnapshotDto = {
   session: SessionDto;
   active_run: RunDto | null;
@@ -201,6 +210,8 @@ export type SessionSnapshotDto = {
   pending_approval: PendingApprovalDto | null;
   interrupted_banner: InterruptedBannerDto | null;
   context_load: ContextLoadDto | null;
+  /** Cumulative usage across the session's runs; absent before the first run. */
+  session_totals?: SessionTotalsDto | null;
   snapshot_seq: number;
 };
 
@@ -278,6 +289,7 @@ export const REQUIRED_DTO_FIELDS = {
     "pending_approval",
     "interrupted_banner",
     "context_load",
+    "session_totals",
     "snapshot_seq",
   ],
   DurableEvent: [
