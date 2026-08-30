@@ -38,6 +38,12 @@ export type CampaignSummaryDto = {
   judge_model: string | null;
   corrupt: boolean;
   note: string | null;
+  avg_rounds: number | null;
+  avg_tool_calls: number | null;
+  avg_tool_failures: number | null;
+  avg_input_tokens: number | null;
+  avg_output_tokens: number | null;
+  avg_duration_ms: number | null;
 };
 
 /** One run's deterministic metrics: rounds, tool calls, tokens, durations, outcome. */

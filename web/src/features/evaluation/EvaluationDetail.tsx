@@ -14,6 +14,20 @@ function percent(rate: number | null): string {
   return rate === null ? "—" : `${(rate * 100).toFixed(1)}%`;
 }
 
+function decimal(value: number | null): string {
+  return value === null ? "—" : value.toFixed(1);
+}
+
+function seconds(ms: number | null): string {
+  return ms === null ? "—" : `${(ms / 1000).toFixed(1)}s`;
+}
+
+function tokens(value: number | null): string {
+  return value === null
+    ? "—"
+    : Math.round(value).toLocaleString("en-US");
+}
+
 function means(values: Record<string, number | null>): string {
   const rendered = SCORE_NAMES.map((name) => {
     const value = values[name];
@@ -93,6 +107,25 @@ export function EvaluationDetail({ detail, onOpenRun }: EvaluationDetailProps) {
               主请求 {aggregates.total_main_requests} · 工具调用{" "}
               {aggregates.total_tool_calls}
             </p>
+            <p>
+              平均每次运行 输入 {tokens(summary.avg_input_tokens)} · 输出{" "}
+              {tokens(summary.avg_output_tokens)}
+            </p>
+          </div>
+          <div>
+            <span>平均轮次</span>
+            <strong>{decimal(summary.avg_rounds)}</strong>
+            <p>每次运行的模型调用轮数</p>
+          </div>
+          <div>
+            <span>平均工具</span>
+            <strong>{decimal(summary.avg_tool_calls)}</strong>
+            <p>执行数 · 失败 {decimal(summary.avg_tool_failures)}</p>
+          </div>
+          <div>
+            <span>平均耗时</span>
+            <strong>{seconds(summary.avg_duration_ms)}</strong>
+            <p>每次运行的智能体工作时长</p>
           </div>
           <div>
             <span>裁判</span>

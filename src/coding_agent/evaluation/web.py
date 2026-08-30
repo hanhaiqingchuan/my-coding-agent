@@ -79,6 +79,12 @@ class CampaignSummaryDto(StrictDto):
     judge_model: str | None
     corrupt: bool
     note: str | None
+    avg_rounds: float | None
+    avg_tool_calls: float | None
+    avg_tool_failures: float | None
+    avg_input_tokens: float | None
+    avg_output_tokens: float | None
+    avg_duration_ms: float | None
 
     @classmethod
     def from_domain(cls, summary: CampaignSummary) -> CampaignSummaryDto:
@@ -99,6 +105,12 @@ class CampaignSummaryDto(StrictDto):
             judge_model=summary.judge_model,
             corrupt=summary.corrupt,
             note=summary.note,
+            avg_rounds=summary.avg_rounds,
+            avg_tool_calls=summary.avg_tool_calls,
+            avg_tool_failures=summary.avg_tool_failures,
+            avg_input_tokens=summary.avg_input_tokens,
+            avg_output_tokens=summary.avg_output_tokens,
+            avg_duration_ms=summary.avg_duration_ms,
         )
 
 

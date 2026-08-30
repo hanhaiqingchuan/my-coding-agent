@@ -1970,6 +1970,94 @@ input:focus-visible {
   }
 }
 
+/* --- Metric charts: one bar chart per metric, one bar per campaign -------- */
+.eval-charts {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.eval-charts-title {
+  margin: 0;
+  color: var(--ink-faint);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+.eval-charts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: var(--space-3);
+}
+.metric-chart {
+  min-width: 0;
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--card);
+  box-shadow: var(--shadow-card);
+}
+.metric-chart figcaption {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+  color: var(--ink-soft);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+.metric-chart figcaption small {
+  color: var(--ink-faint);
+  font-size: var(--text-2xs);
+  font-weight: 500;
+}
+.metric-chart svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.metric-baseline {
+  stroke: var(--line-strong);
+  stroke-width: 1;
+}
+.metric-bar {
+  fill: var(--accent);
+  transform-box: fill-box;
+  transform-origin: bottom;
+  animation: metric-bar-rise 480ms cubic-bezier(0.2, 0.7, 0.3, 1) backwards;
+}
+@keyframes metric-bar-rise {
+  from {
+    transform: scaleY(0);
+  }
+}
+.metric-bar:hover {
+  fill: var(--accent-strong);
+}
+.metric-value {
+  fill: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 600;
+  text-anchor: middle;
+}
+.metric-label {
+  fill: var(--ink-faint);
+  font-family: var(--font-mono);
+  font-size: 8px;
+  text-anchor: middle;
+}
+.metric-null {
+  fill: var(--ink-faint);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-anchor: middle;
+}
+
 /* Run detail: the facts reuse the run-details list; the judgement card sits
    beside it with the same collapse treatment as provider reasoning. */
 .eval-run-detail {

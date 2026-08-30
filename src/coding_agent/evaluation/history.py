@@ -10,7 +10,7 @@ corrupt entry with a note instead of being skipped silently or failing the scan.
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -44,6 +44,13 @@ class CampaignSummary:
     judge_model: str | None
     corrupt: bool
     note: str | None
+    # Per-run averages over the campaign's valid runs; None when nothing valid.
+    avg_rounds: float | None = None
+    avg_tool_calls: float | None = None
+    avg_tool_failures: float | None = None
+    avg_input_tokens: float | None = None
+    avg_output_tokens: float | None = None
+    avg_duration_ms: float | None = None
 
 
 def scan_campaigns(results_root: Path) -> list[CampaignSummary]:
@@ -148,6 +155,16 @@ def _summarize_campaign(directory: Path) -> CampaignSummary:
         judge_model=_agreed_judge_model(judgements),
         corrupt=False,
         note="; ".join(detail_parts) or None,
+        avg_rounds=_mean_present(_run_number(item, "model", "main_requests") for item in valid),
+        avg_tool_calls=_mean_present(_run_number(item, "tools", "executed") for item in valid),
+        avg_tool_failures=_mean_present(_run_number(item, "tools", "failed") for item in valid),
+        avg_input_tokens=_mean_present(
+            _run_number(item, "model", "usage", "input_tokens") for item in valid
+        ),
+        avg_output_tokens=_mean_present(
+            _run_number(item, "model", "usage", "output_tokens") for item in valid
+        ),
+        avg_duration_ms=_mean_present(_run_duration_ms(item) for item in valid),
     )
 
 
@@ -238,6 +255,37 @@ def _judge_means(scored: Sequence[Mapping[str, object]]) -> dict[str, float | No
                 values.append(float(value))
         means[name] = (sum(values) / len(values)) if values else None
     return means
+
+
+def _run_number(document: Mapping[str, object], *path: str) -> float | None:
+    """Walk a nested run-v1 document to a numeric leaf; anything else is absent."""
+    value: object = document
+    for key in path:
+        if not isinstance(value, Mapping):
+            return None
+        value = value.get(key)
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        return None
+    return float(value)
+
+
+def _run_duration_ms(document: Mapping[str, object]) -> float | None:
+    """The run's own working time first, the wall clock as the fallback."""
+    durations = _mapping(document.get("durations"))
+    for key in ("agent_monotonic_ms", "agent_process_ms", "total_ms"):
+        value = durations.get(key)
+        if isinstance(value, int) and not isinstance(value, bool):
+            return float(value)
+    return None
+
+
+def _mean_of(values: Iterable[float]) -> float | None:
+    present = list(values)
+    return (sum(present) / len(present)) if present else None
+
+
+def _mean_present(values: Iterable[float | None]) -> float | None:
+    return _mean_of(value for value in values if value is not None)
 
 
 def _agreed_model_name(documents: Sequence[Mapping[str, object]]) -> str | None:

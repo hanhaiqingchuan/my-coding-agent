@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { EvaluationDetail } from "./EvaluationDetail";
+import { MetricsCharts } from "./MetricsCharts";
 import { RunDetail } from "./RunDetail";
 import {
   SCORE_NAMES,
@@ -164,7 +165,9 @@ export function EvaluationsPanel({
               尚无评测记录——先运行 make eval-judge 生成
             </p>
           ) : (
-            <ul>
+            <>
+              <MetricsCharts campaigns={campaigns.data} />
+              <ul>
               {campaigns.data.map((summary) => (
                 <li key={summary.directory}>
                   <button
@@ -210,7 +213,8 @@ export function EvaluationsPanel({
                   </button>
                 </li>
               ))}
-            </ul>
+              </ul>
+            </>
           )}
         </section>
       </div>

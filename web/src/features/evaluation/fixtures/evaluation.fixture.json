@@ -41,7 +41,13 @@
       "strict_success_rate": 1.0,
       "strict_success_runs": 2,
       "task_count": 2,
-      "valid_runs": 2
+      "valid_runs": 2,
+      "avg_rounds": 3.5,
+      "avg_tool_calls": 4.0,
+      "avg_tool_failures": 0.5,
+      "avg_input_tokens": 12000.0,
+      "avg_output_tokens": 800.0,
+      "avg_duration_ms": 45000.0
     },
     "tasks": [
       {
@@ -127,7 +133,13 @@
       "strict_success_rate": 1.0,
       "strict_success_runs": 2,
       "task_count": 2,
-      "valid_runs": 2
+      "valid_runs": 2,
+      "avg_rounds": 3.5,
+      "avg_tool_calls": 4.0,
+      "avg_tool_failures": 0.5,
+      "avg_input_tokens": 12000.0,
+      "avg_output_tokens": 800.0,
+      "avg_duration_ms": 45000.0
     },
     {
       "campaign_id": "campaign-judged",
@@ -149,7 +161,13 @@
       "strict_success_rate": 1.0,
       "strict_success_runs": 2,
       "task_count": 2,
-      "valid_runs": 2
+      "valid_runs": 2,
+      "avg_rounds": 2.0,
+      "avg_tool_calls": 3.0,
+      "avg_tool_failures": 0.0,
+      "avg_input_tokens": 9000.0,
+      "avg_output_tokens": 600.0,
+      "avg_duration_ms": 30000.0
     }
   ],
   "runDetail": {
