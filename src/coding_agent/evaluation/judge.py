@@ -38,7 +38,10 @@ SCORE_NAMES = ("task_completion", "process_quality", "communication")
 JUDGE_ERROR = "judge_error"
 SCORE_MINIMUM = 1
 SCORE_MAXIMUM = 5
-JUDGE_MAX_OUTPUT_TOKENS = 1024
+# Reasoning judges spend thinking tokens from the same budget: 1024 was enough
+# for the bare contract, but a real transcript excerpt can push thinking past it
+# and the JSON answer is then never emitted. 4096 leaves that headroom.
+JUDGE_MAX_OUTPUT_TOKENS = 4096
 
 _SYSTEM_PROMPT = (
     "You are the judge of one finished run of a headless coding agent. You read a fixed "

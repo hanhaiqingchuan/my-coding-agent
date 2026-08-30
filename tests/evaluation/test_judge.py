@@ -238,7 +238,7 @@ async def test_judge_run_parses_a_valid_response_with_one_request() -> None:
     assert len(gateway.requests) == 1
     request = gateway.requests[0]
     assert request.tools == ()
-    assert request.max_tokens <= 1024
+    assert request.max_tokens <= 4096
     assert request.system
     assert len(request.messages) == 1
 
@@ -414,7 +414,7 @@ async def test_judge_run_reuses_the_anthropic_messages_adapter_streaming_without
     assert payload["stream"] is True
     assert "tools" not in payload
     assert "tool_choice" not in payload
-    assert payload["max_tokens"] <= 1024
+    assert payload["max_tokens"] <= 4096
 
 
 # --- redaction and the excerpt ---------------------------------------------
