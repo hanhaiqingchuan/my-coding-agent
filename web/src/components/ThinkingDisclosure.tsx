@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 type ThinkingDisclosureProps = {
   text: string;
@@ -33,6 +33,24 @@ export function ThinkingDisclosure({
   // reports what it is — finished reasoning.
   const displayLabel = label ?? (live && !closed ? "思考中" : "思考完成");
 
+  // While the block streams open, the newest line stays in view; a reader who
+  // scrolls up unpins the follow until they return to the bottom.
+  const textRef = useRef<HTMLPreElement>(null);
+  const pinnedToBottom = useRef(true);
+  useEffect(() => {
+    const element = textRef.current;
+    if (element !== null && open && pinnedToBottom.current) {
+      element.scrollTop = element.scrollHeight;
+    }
+  }, [text, open]);
+  const handleScroll = () => {
+    const element = textRef.current;
+    if (element === null) return;
+    const distanceFromBottom =
+      element.scrollHeight - element.scrollTop - element.clientHeight;
+    pinnedToBottom.current = distanceFromBottom < 24;
+  };
+
   return (
     <div
       className={`thinking-box${live ? " thinking-live" : ""}`}
@@ -51,7 +69,9 @@ export function ThinkingDisclosure({
       {/* The body stays mounted so the collapse runs as a CSS transition on
           grid-template-rows; the global prefers-reduced-motion rule removes it. */}
       <div className="thinking-body" id={bodyId}>
-        <pre className="thinking-text">{text}</pre>
+        <pre className="thinking-text" ref={textRef} onScroll={handleScroll}>
+          {text}
+        </pre>
       </div>
     </div>
   );
