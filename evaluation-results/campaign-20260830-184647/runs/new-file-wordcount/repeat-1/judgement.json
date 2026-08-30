@@ -1,0 +1,16 @@
+{
+  "campaign_id": "campaign-9140cce5aff3",
+  "error": null,
+  "error_detail": null,
+  "judge_model": "deepseek-v4-pro-0813",
+  "prompt_version": "judge-v1",
+  "rationale": "The run fully succeeded: the target and regression tests passed, the artifact was correct, and exactly one new file was added with no forbidden or existing files touched. The final report is honest, concise, and includes concrete verification. Process quality is strong overall with no duplicate calls and sensible verification steps, though the recorded tool failures slightly reduce confidence in completely clean execution.",
+  "repeat": 1,
+  "schema_version": "judgement-v1",
+  "scores": {
+    "communication": 5,
+    "process_quality": 4,
+    "task_completion": 5
+  },
+  "task_id": "new-file-wordcount"
+}

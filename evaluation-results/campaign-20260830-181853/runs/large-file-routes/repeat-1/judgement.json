@@ -1,0 +1,16 @@
+{
+  "campaign_id": "campaign-1cfebfb25bf0",
+  "error": null,
+  "error_detail": null,
+  "judge_model": "deepseek-v4-pro-0813",
+  "prompt_version": "judge-v1",
+  "rationale": "The run achieved the target fix with regression and target tests passing, so task completion is fully successful. Process quality is strong overall but slightly tempered by several failed or truncated tool calls despite no redundant calls and eventual recovery. The final message accurately describes the minimal change and provides concrete verification via the passing test suite.",
+  "repeat": 1,
+  "schema_version": "judgement-v1",
+  "scores": {
+    "communication": 5,
+    "process_quality": 4,
+    "task_completion": 5
+  },
+  "task_id": "large-file-routes"
+}

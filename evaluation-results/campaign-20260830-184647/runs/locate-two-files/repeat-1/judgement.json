@@ -1,0 +1,16 @@
+{
+  "campaign_id": "campaign-9140cce5aff3",
+  "error": null,
+  "error_detail": null,
+  "judge_model": "deepseek-v4-pro-0813",
+  "prompt_version": "judge-v1",
+  "rationale": "Strict success, correct artifact, and passing target/regression tests confirm full task completion. The final message honestly and concisely reports the two-file edit and the passing test suite. Process quality is moderate: the trace shows many failed and duplicate tool calls, indicating inefficiency and trial-and-error, though the agent eventually recovered and completed the edits correctly.",
+  "repeat": 1,
+  "schema_version": "judgement-v1",
+  "scores": {
+    "communication": 5,
+    "process_quality": 3,
+    "task_completion": 5
+  },
+  "task_id": "locate-two-files"
+}

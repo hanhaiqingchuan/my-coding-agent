@@ -1,0 +1,851 @@
+{
+  "agent_argv_options": [
+    "--config",
+    "--workspace",
+    "--data-dir",
+    "--prompt-file",
+    "--report-out",
+    "--yes",
+    "--ack-unsafe-auto-approve",
+    "--command-policy"
+  ],
+  "agent_commit": "176cc1ed34f996078f1ec554d6c8494d886b81a3",
+  "agent_exit_code": 0,
+  "agent_report": {
+    "compaction": {
+      "above_target": false,
+      "count": 0,
+      "estimate_error": {
+        "estimated_minus_provider_tokens": null,
+        "estimated_summary_tokens": null,
+        "provider_summary_output_tokens": null
+      },
+      "estimator_id": null,
+      "input_tokens_after": null,
+      "input_tokens_before": null,
+      "requests": 0
+    },
+    "durations": {
+      "agent_monotonic_ms": 174972,
+      "compaction_request_elapsed_ms": 0,
+      "model_request_elapsed_ms": 173970,
+      "retry_wait_monotonic_ms": 0,
+      "tool_execution_monotonic_ms": 56
+    },
+    "error_kind": null,
+    "final_assistant_text": "Done. Both edits are in place and verified.\n\n**What I found in `src/pipeline/`:**\n- `settings.py` — declared `MAX_BATCH_SIZE = 50`\n- `batcher.py` — duplicated the size as `limit = 50`, plus a `50` in its docstring\n\n**Edits made:**\n1. `src/pipeline/settings.py`: `MAX_BATCH_SIZE = 50` → `MAX_BATCH_SIZE = 200`\n2. `src/pipeline/batcher.py`:\n   - added `from .settings import MAX_BATCH_SIZE`\n   - removed the duplicated `limit = 50` and now uses `limit = MAX_BATCH_SIZE`\n   - updated the docstring so the size is referenced via the constant rather than written as another literal\n\n**Constraints respected:** `README.md` and `tests/` were not touched.\n\n**Verification:**\n- After the edits, `batcher.py` contains no batch-size literal — the size appears only once, in `settings.py`.\n- Ran the existing suite: `PYTHONPATH=src python3 -B -m unittest discover -s tests -t tests` → **4 tests, OK**.",
+    "finished_at": "2026-08-30T10:54:38.642794+00:00",
+    "model": {
+      "compaction": {
+        "attempts": 0,
+        "elapsed_ms": 0,
+        "network_retries": 0,
+        "requests": 0,
+        "results": {},
+        "usage": {
+          "cache_creation_input_tokens": null,
+          "cache_read_input_tokens": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        "usage_coverage": null
+      },
+      "main": {
+        "attempts": 19,
+        "elapsed_ms": 173970,
+        "network_retries": 0,
+        "requests": 19,
+        "results": {
+          "succeeded": 19
+        },
+        "usage": {
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 83968,
+          "input_tokens": 17456,
+          "output_tokens": 10864
+        },
+        "usage_coverage": 1.0
+      }
+    },
+    "model_identity": {
+      "context_window": 1000000,
+      "max_output_tokens": 32768,
+      "name": "deepseek-v4-pro-0813",
+      "stream": true
+    },
+    "run_id": "c515f603-3b3e-4b71-ad8d-8d701c48c423",
+    "schema_version": "run-report-v1",
+    "session_id": "5d5b5e6d-ab37-45ed-9a13-8cd9262f84c7",
+    "started_at": "2026-08-30T10:51:43.674970+00:00",
+    "state": "COMPLETED",
+    "stop_reason": "COMPLETED",
+    "tool_schema_hash": "402004785c5bd2b7efdab9a9aca21060e10d9fd397e299a1c466567fe674904a",
+    "tools": {
+      "by_name": {
+        "read_file": {
+          "failed": 48,
+          "proposed": 58,
+          "succeeded": 10
+        },
+        "run_command": {
+          "failed": 8,
+          "proposed": 9,
+          "succeeded": 1
+        },
+        "skill": {
+          "failed": 0,
+          "proposed": 1,
+          "succeeded": 1
+        },
+        "write_file": {
+          "failed": 0,
+          "proposed": 2,
+          "succeeded": 2
+        }
+      },
+      "calls": [
+        {
+          "args_hash": "563a29a5a7699a5e78abfb2647767b96ab94734528b7d35cdde2725a074e5c44",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "run_command",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "7ffdc4df5f015e53dc654811029b03cb4353bd4a6cb485f7ac58237cd10371f9",
+          "duration_ms": 0,
+          "executed": true,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "succeeded",
+          "truncated": false
+        },
+        {
+          "args_hash": "12e2d60123ab641400f3a8b77f000024de97e5d62b9458dd7a72266e917d8ace",
+          "duration_ms": 0,
+          "executed": true,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "succeeded",
+          "truncated": false
+        },
+        {
+          "args_hash": "02298f7a131439bbf79e2bffa3f43ade874c344d32f7037eb928ea864301d7d9",
+          "duration_ms": 0,
+          "executed": true,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "succeeded",
+          "truncated": false
+        },
+        {
+          "args_hash": "c85f25c81af4e0f93f10a7dca17ffa34e1462d89f7a8c4f9e98cb99e0732b5b2",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "b911092f6994e8e634bbdabfd2d0771cc768469ae7d4028bd283a14b8d5e7c9c",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "22d074d8f2e896f58c842054782fc38a6853c48a7126885997dd6eb405e9c1a8",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "91bab01598d496664c7fd5bf93d49aca199e1524ac141dffad0f199d97395475",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "12e2d60123ab641400f3a8b77f000024de97e5d62b9458dd7a72266e917d8ace",
+          "duration_ms": 0,
+          "executed": true,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "succeeded",
+          "truncated": false
+        },
+        {
+          "args_hash": "02298f7a131439bbf79e2bffa3f43ade874c344d32f7037eb928ea864301d7d9",
+          "duration_ms": 0,
+          "executed": true,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "succeeded",
+          "truncated": false
+        },
+        {
+          "args_hash": "22d074d8f2e896f58c842054782fc38a6853c48a7126885997dd6eb405e9c1a8",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "91bab01598d496664c7fd5bf93d49aca199e1524ac141dffad0f199d97395475",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "1654379a826289ff081b5e43c1c50f66f4fda191a4da57cbc4faac270ac31e19",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "7d6441497d2a000b8143602a7817c90abe7db88e139f89c062a1c36cfe0ad9d6",
+          "duration_ms": 0,
+          "executed": true,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "succeeded",
+          "truncated": false
+        },
+        {
+          "args_hash": "978c80f5623ee7cbee2e5f456129e57b4f192a52b37cf4f352ed57b170a4c0bb",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "d135d0cf63b4ecc4cd3c754694e2bb5797f5a24d15a24ade4b0d1de4c9e15c5b",
+          "duration_ms": 0,
+          "executed": true,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "succeeded",
+          "truncated": false
+        },
+        {
+          "args_hash": "f355546a49610bf30c9caa0ddde44d9b579667c83bf2925b48e2d7dd05f4e2c5",
+          "duration_ms": 1,
+          "executed": true,
+          "name": "write_file",
+          "output_bytes": null,
+          "state": "succeeded",
+          "truncated": false
+        },
+        {
+          "args_hash": "9f3e7811f5a83ad7e521ba75fac83f9a6e28c2efe82e9e8de8aa590d911a7f81",
+          "duration_ms": 0,
+          "executed": true,
+          "name": "write_file",
+          "output_bytes": null,
+          "state": "succeeded",
+          "truncated": false
+        },
+        {
+          "args_hash": "63e32c3ea055dd6b8dc8fc5b8a648e5165a1e2bfefb13a18a89a33e7164213e9",
+          "duration_ms": 55,
+          "executed": true,
+          "name": "run_command",
+          "output_bytes": 102,
+          "state": "succeeded",
+          "truncated": false
+        },
+        {
+          "args_hash": "e7360b881ea06e32165b8d42cf3975a0133a01e729114fcbf604172460ed520d",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "run_command",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "645ba81fa36165924da4509a0222fa76fe9bd11fa786a2b947e47a9e550c1a1a",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "run_command",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "12e2d60123ab641400f3a8b77f000024de97e5d62b9458dd7a72266e917d8ace",
+          "duration_ms": 0,
+          "executed": true,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "succeeded",
+          "truncated": false
+        },
+        {
+          "args_hash": "02298f7a131439bbf79e2bffa3f43ade874c344d32f7037eb928ea864301d7d9",
+          "duration_ms": 0,
+          "executed": true,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "succeeded",
+          "truncated": false
+        },
+        {
+          "args_hash": "7ffdc4df5f015e53dc654811029b03cb4353bd4a6cb485f7ac58237cd10371f9",
+          "duration_ms": 0,
+          "executed": true,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "succeeded",
+          "truncated": false
+        },
+        {
+          "args_hash": "1654379a826289ff081b5e43c1c50f66f4fda191a4da57cbc4faac270ac31e19",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "22d074d8f2e896f58c842054782fc38a6853c48a7126885997dd6eb405e9c1a8",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "a31e49d3c9cf82475815715652c6ba4ba7f9400888d66ece01caf4919fc55914",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "01e1a48be60a24e8adf79028ed5787b80fff036806761ef9526ae3e812cbd74c",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "4ee9beab05242a1b368bd46eab9a8bef73bd3d5eecd49f4c1f7bd413330a4ef2",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "e8a97dbaabdabac0626e23324cf1b73fa0a4115bd5d37b053b83aefbf4a82f04",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "7f57cce4a6b77e2835f7f790ecfed6c0db9b7d3de5aa689116b612ac114cc17e",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "run_command",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "a3d2549ffc112e62fef677d0f6043103d99613f38a1e66a8c63c7db598150a07",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "run_command",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "16d5d3d3eda31f5831eaf1add9f3399c72ec967f42dd7578da16627db28143a8",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "run_command",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "a116e07081b17469123492d943d26448224407fe0c8f34ded6306067dff4af1b",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "d1945b5e015deb402d33f8558e0101042c89f382196eb7c29b0a6f63679f3227",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "89a4f35d1eeceb902eb27e684fb308218756cc0e6182197ff70ad4b984a78c4e",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "80a70b8c0167bce5ed1df42bb1ac92ad7313321292f87a909288dfeb5f12263d",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "01efb48f2ac1ffbe7364b841183f1bbca10e41c9cfe929c8ae1e5baa35c9fe5f",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "82c3c01f3e46ecaaad475c87464bc3a5210409c0fb9cc5e05b905d2b1a644c40",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "bdef1e4b7b0cf2eff564aa1962b605cec1ff272aa5e1ac3985a795b543b167ca",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "b0b7073f95a3eab6b6617f9d1c0df1f6f52963c10a57804a2fe1e2468c5c7847",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "01f362a06cc2382b20623d8500e03ebf44b5b8277dc42b2f1c114ed07c12e0e4",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "098ab9321cb741f7dc6259c56ac3c361b4fffb1eba046fb8b7e858fd081dd51f",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "5615b3b1985f7a53cd28813e4b7fef77001cbdddda18f5d7359d7689af275301",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "b2645016c0a2e54ace9862f96b80aebfcf5dcf5cdf4ae94adc5a7d9e44f2329d",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "298a7ff9b13fb41c6d7f911a556980054197e7da4ae4aee05ed6abe0bf6e99ce",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "29093ba4faa6d3d67bb8c5f3e63c1ba30243cd6c02d86a886a77d5ad88336263",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "9a5b1da17faff87baca97616d121a999f660a3a5a4a3bf050b13cd4e5badccf3",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "559d8d73a4f47fcce87c91daca400e4f5dc190eef5b5fb266646b45b9674675b",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "b81ad74e9e37c6baa48eceff703b130402225f758d71dafa2d5441f0fd870790",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "e946c1570df6c4cfbcef2b17d48f92d22af85f1cb666dd59cfd792b024f464ca",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "70e1b5efc80b5bdbec284431abd96dea5ca4e9d5805a0f7c8be0a4b2d75a0c66",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "1b9fe54735620e579cda3fc40fb411972fc2b3ff14c6d70d5dc5f1998868651c",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "ee872aba8e59ce077f6ead9a436b344e253202452690e558c3952b4582b2246a",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "c312f6dc9e16bf7cc52c37f2a36948d9a9866408ff4ce6a5469a5cb40b28bb7c",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "a31e49d3c9cf82475815715652c6ba4ba7f9400888d66ece01caf4919fc55914",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "c8364e612af0eec6c62b611e2cbb509792d2cf747b10cbd204948b8ed8ec0f4d",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "05417ca04921a3d261f5310d95532b027acf3b5d7618b17874fd7f3542fea492",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "c85f25c81af4e0f93f10a7dca17ffa34e1462d89f7a8c4f9e98cb99e0732b5b2",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "6f5a629534f8935373ebf217e1f51594d58fa29eacf1b0387cf93171ce2565b5",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "9627facd18204dc604ebf4facd73d690f6364eef4ddb4c1c0503d04492dc7b7e",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "cd3444991c0e2a3e7502178b4c55cb3db6deea2826daf3c67fa63babba77af9f",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "e4508055609dd67019ea21a82ddea393c9b3c14140e05f82a99cfcd49ce977b1",
+          "duration_ms": 0,
+          "executed": true,
+          "name": "skill",
+          "output_bytes": null,
+          "state": "succeeded",
+          "truncated": false
+        },
+        {
+          "args_hash": "78bd142f23d8bf098b2935811d3714c1668a157fcf5f1cb1109935a05eeba6d9",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "run_command",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "f681f02a4a666b3833a173ed46abf7adfc316e87e9fd5a76fef9ea1578aab5c9",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "run_command",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "7b4d2536d6506c6a1f5113c8f7a6323f3459ae658e72b25d6cf9fdbce84a90bf",
+          "duration_ms": 0,
+          "executed": true,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "c394a5b216b996dd646df5072386fa09b328f640509ae44c2de3aef9c88c862c",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "58dce7946dcbe8a11637950a45e67b2aa8ee911703a46995e38fd944dd8ba0cb",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "e4f127f58543754e225113e29d9da6dd50cc850e81e5ef262adcf38dca96fcc0",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "c394a5b216b996dd646df5072386fa09b328f640509ae44c2de3aef9c88c862c",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        }
+      ],
+      "cancelled": 0,
+      "duplicate_calls": 12,
+      "duration_ms": 56,
+      "executed": 15,
+      "failed": 56,
+      "output_bytes": 102,
+      "proposed": 70,
+      "rejected": 0,
+      "skipped": 0,
+      "succeeded": 14,
+      "truncated": 0,
+      "unknown": 0
+    }
+  },
+  "agent_timed_out": false,
+  "artifact_correct": true,
+  "campaign_id": "campaign-9140cce5aff3",
+  "category": "locate_and_modify",
+  "compaction": {
+    "above_target": false,
+    "count": 0,
+    "estimated_minus_provider_tokens": null,
+    "estimated_summary_tokens": null,
+    "input_tokens_after": null,
+    "input_tokens_before": null,
+    "provider_summary_output_tokens": null,
+    "requests": 0
+  },
+  "durations": {
+    "agent_monotonic_ms": 174972,
+    "agent_process_ms": 175826,
+    "oracle_ms": 73,
+    "retry_wait_monotonic_ms": 0,
+    "tool_execution_monotonic_ms": 56,
+    "total_ms": 175905,
+    "workspace_prepare_ms": 5
+  },
+  "error_kind": null,
+  "failure_kind": null,
+  "failure_stage": null,
+  "finished_at": "2026-08-30T10:54:38.843953+00:00",
+  "harness_detail": null,
+  "hashes": {
+    "baseline_tree": "d5d4cdcde3b36f28eeb5227b96c33f3a6a0bc909ec829e865a0d1da49cc8662c",
+    "config": "56c0b1f00c7c6e4e804f9437b879522aedb93dc21a761ba727be21549f1da471",
+    "diff": "5e1424ee4bb267e5e9b58cfd5333f90c5e282eadaddb0b991aeebcaa3b7c03b8",
+    "prompt": "65d6d696f6f0d0345a3f11bc5d2016272d573373b56f14e9e674114620e42d0e",
+    "task": "6e88bce80dc7caa9cd1aba33a55277e2dfe1c8575d2a24a9def6160387bef642",
+    "tool_schema": "402004785c5bd2b7efdab9a9aca21060e10d9fd397e299a1c466567fe674904a",
+    "workspace_tree": "8c4ae010740daeb7b9341e6f5379f3f243f5370452119634824d8e368a4a7859"
+  },
+  "model": {
+    "attempts": 19,
+    "compaction_requests": 0,
+    "main_requests": 19,
+    "network_retries": 0,
+    "usage": {
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 83968,
+      "input_tokens": 17456,
+      "output_tokens": 10864
+    },
+    "usage_coverage": 1.0
+  },
+  "model_identity": {
+    "context_window": 1000000,
+    "max_output_tokens": 32768,
+    "name": "deepseek-v4-pro-0813",
+    "stream": true
+  },
+  "modifications": {
+    "detected_workspace_escape": false,
+    "files_added": 0,
+    "files_deleted": 0,
+    "files_modified": 2,
+    "forbidden_paths_modified": [],
+    "lines_added": 5,
+    "lines_removed": 3,
+    "out_of_scope_paths": []
+  },
+  "oracle": {
+    "regression": {
+      "duration_ms": 34,
+      "errored": false,
+      "exit_code": 0,
+      "passed": true
+    },
+    "target": {
+      "duration_ms": 29,
+      "errored": false,
+      "exit_code": 0,
+      "passed": true
+    }
+  },
+  "outcome": "OK",
+  "provider": "anthropic_messages",
+  "repeat": 1,
+  "schema_version": "run-v1",
+  "started_at": "2026-08-30T10:51:42.938294+00:00",
+  "state": "COMPLETED",
+  "stop_reason": "COMPLETED",
+  "strict_success": true,
+  "task_id": "locate-two-files",
+  "tools": {
+    "duplicate_calls": 12,
+    "executed": 15,
+    "failed": 56,
+    "output_bytes": 102,
+    "proposed": 70,
+    "skipped": 0,
+    "succeeded": 14,
+    "truncated": 0
+  }
+}

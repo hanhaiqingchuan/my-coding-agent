@@ -1,0 +1,16 @@
+{
+  "campaign_id": "campaign-9140cce5aff3",
+  "error": null,
+  "error_detail": null,
+  "judge_model": "deepseek-v4-pro-0813",
+  "prompt_version": "judge-v1",
+  "rationale": "The edit is correct and both target and regression tests pass, with the change confined to one file. The process had a few failed tool calls and one duplicate, but recovered and produced the right result. The final message accurately and concisely describes the change, its scope, and how it was verified.",
+  "repeat": 1,
+  "schema_version": "judgement-v1",
+  "scores": {
+    "communication": 5,
+    "process_quality": 4,
+    "task_completion": 5
+  },
+  "task_id": "local-edit-suffix"
+}

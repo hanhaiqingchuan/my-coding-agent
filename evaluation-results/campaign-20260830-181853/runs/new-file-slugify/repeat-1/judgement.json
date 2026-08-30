@@ -1,0 +1,12 @@
+{
+  "campaign_id": "campaign-1cfebfb25bf0",
+  "error": "judge_error",
+  "error_detail": "malformed judge response after one retry: the response is not JSON",
+  "judge_model": "deepseek-v4-pro-0813",
+  "prompt_version": "judge-v1",
+  "rationale": "",
+  "repeat": 1,
+  "schema_version": "judgement-v1",
+  "scores": {},
+  "task_id": "new-file-slugify"
+}

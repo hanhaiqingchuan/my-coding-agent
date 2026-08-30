@@ -1,0 +1,16 @@
+{
+  "campaign_id": "campaign-9140cce5aff3",
+  "error": null,
+  "error_detail": null,
+  "judge_model": "deepseek-v4-pro-0813",
+  "prompt_version": "judge-v1",
+  "rationale": "The run achieved the goal with all oracle checks passing and the artifact correct, and the final message honestly and concisely reports the change and verification. Process quality is slightly reduced because the agent had two failed and one truncated tool use, though it recovered without duplicate calls and limited edits appropriately.",
+  "repeat": 1,
+  "schema_version": "judgement-v1",
+  "scores": {
+    "communication": 5,
+    "process_quality": 4,
+    "task_completion": 5
+  },
+  "task_id": "large-file-validators"
+}

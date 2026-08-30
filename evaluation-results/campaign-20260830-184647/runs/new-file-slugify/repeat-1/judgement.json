@@ -1,0 +1,16 @@
+{
+  "campaign_id": "campaign-9140cce5aff3",
+  "error": null,
+  "error_detail": null,
+  "judge_model": "deepseek-v4-pro-0813",
+  "prompt_version": "judge-v1",
+  "rationale": "The file is artifact-correct and both target and regression tests pass, so completion is excellent. The agent read first, wrote the new file, re-read it for verification, and honestly adjusted after command execution was blocked, though the repeated failed run_command attempts and two duplicate calls slightly reduce process quality. The final message accurately reports what was done, explicitly states verification was by file re-read/manual trace, and discloses the inability to run the suite without overclaiming.",
+  "repeat": 1,
+  "schema_version": "judgement-v1",
+  "scores": {
+    "communication": 5,
+    "process_quality": 4,
+    "task_completion": 5
+  },
+  "task_id": "new-file-slugify"
+}

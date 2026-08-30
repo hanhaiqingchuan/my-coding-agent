@@ -1,0 +1,16 @@
+{
+  "campaign_id": "campaign-1cfebfb25bf0",
+  "error": null,
+  "error_detail": null,
+  "judge_model": "deepseek-v4-pro-0813",
+  "prompt_version": "judge-v1",
+  "rationale": "The task was fully achieved: the correct new file was created, target and regression tests passed, and existing files were untouched. However, process quality was weak, with 12 failed and 3 duplicate tool calls out of 17 proposed, indicating repeated missteps despite eventual recovery. The final message is honest, clear, and includes concrete verification, so communication is strong.",
+  "repeat": 1,
+  "schema_version": "judgement-v1",
+  "scores": {
+    "communication": 5,
+    "process_quality": 2,
+    "task_completion": 5
+  },
+  "task_id": "new-file-roman"
+}

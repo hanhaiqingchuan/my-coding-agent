@@ -1,0 +1,157 @@
+{
+  "compaction": {
+    "above_target": false,
+    "count": 0,
+    "estimate_error": {
+      "estimated_minus_provider_tokens": null,
+      "estimated_summary_tokens": null,
+      "provider_summary_output_tokens": null
+    },
+    "estimator_id": null,
+    "input_tokens_after": null,
+    "input_tokens_before": null,
+    "requests": 0
+  },
+  "durations": {
+    "agent_monotonic_ms": 26400,
+    "compaction_request_elapsed_ms": 0,
+    "model_request_elapsed_ms": 26189,
+    "retry_wait_monotonic_ms": 0,
+    "tool_execution_monotonic_ms": 54
+  },
+  "error_kind": null,
+  "final_assistant_text": "Done. I created `src/wordkit/counter.py` with a single public function `word_counts(text: str) -> dict[str, int]`.\n\nWhat it does:\n- Splits on runs of whitespace via `str.split()`.\n- Counts case-insensitively by lowering each word.\n- Returns `{}` when there are no words (e.g., `\"\"` or `\"  \"`).\n\nVerification:\n- `PYTHONPATH=src python3 -B -m unittest discover -s tests -t tests` passes: 3 tests, OK.\n- Re-read the new file to confirm final content and that only this one file was added; no existing files, `README.md`, or `tests/` were touched.",
+  "finished_at": "2026-08-30T10:48:36.443511+00:00",
+  "model": {
+    "compaction": {
+      "attempts": 0,
+      "elapsed_ms": 0,
+      "network_retries": 0,
+      "requests": 0,
+      "results": {},
+      "usage": {
+        "cache_creation_input_tokens": null,
+        "cache_read_input_tokens": null,
+        "input_tokens": null,
+        "output_tokens": null
+      },
+      "usage_coverage": null
+    },
+    "main": {
+      "attempts": 5,
+      "elapsed_ms": 26189,
+      "network_retries": 0,
+      "requests": 5,
+      "results": {
+        "succeeded": 5
+      },
+      "usage": {
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 5120,
+        "input_tokens": 3998,
+        "output_tokens": 1608
+      },
+      "usage_coverage": 1.0
+    }
+  },
+  "model_identity": {
+    "context_window": 1000000,
+    "max_output_tokens": 32768,
+    "name": "deepseek-v4-pro-0813",
+    "stream": true
+  },
+  "run_id": "1c5bc6f8-f8cb-4ab0-a236-3da82ac4f019",
+  "schema_version": "run-report-v1",
+  "session_id": "a973069b-3842-4b40-91a0-f5da82c8f84c",
+  "started_at": "2026-08-30T10:48:10.049320+00:00",
+  "state": "COMPLETED",
+  "stop_reason": "COMPLETED",
+  "tool_schema_hash": "402004785c5bd2b7efdab9a9aca21060e10d9fd397e299a1c466567fe674904a",
+  "tools": {
+    "by_name": {
+      "read_file": {
+        "failed": 0,
+        "proposed": 1,
+        "succeeded": 1
+      },
+      "run_command": {
+        "failed": 3,
+        "proposed": 4,
+        "succeeded": 1
+      },
+      "write_file": {
+        "failed": 0,
+        "proposed": 1,
+        "succeeded": 1
+      }
+    },
+    "calls": [
+      {
+        "args_hash": "5371e8de733f8b94a8042b18672a65be19151d4da37ea5d99da36987fd233055",
+        "duration_ms": 0,
+        "executed": true,
+        "name": "write_file",
+        "output_bytes": null,
+        "state": "succeeded",
+        "truncated": false
+      },
+      {
+        "args_hash": "9c48828ddd045523b06cb2e4d567fa19ed5140fe5b6497550d65693d85b1e853",
+        "duration_ms": 54,
+        "executed": true,
+        "name": "run_command",
+        "output_bytes": 101,
+        "state": "succeeded",
+        "truncated": false
+      },
+      {
+        "args_hash": "e944519091cb94653e3a4b0ecaff75b68add4bf3cda8a58c55e55b1d680ae847",
+        "duration_ms": 0,
+        "executed": false,
+        "name": "run_command",
+        "output_bytes": null,
+        "state": "failed",
+        "truncated": false
+      },
+      {
+        "args_hash": "fb041874c25e3f17af1826e5b7e57be05ec67eeab00491f02e0a422d9dbe8b2c",
+        "duration_ms": 0,
+        "executed": false,
+        "name": "run_command",
+        "output_bytes": null,
+        "state": "failed",
+        "truncated": false
+      },
+      {
+        "args_hash": "be5bb312228b5bd2755e9c7512ed2c62c8c910184be6de2121de9d52e1becaae",
+        "duration_ms": 0,
+        "executed": true,
+        "name": "read_file",
+        "output_bytes": null,
+        "state": "succeeded",
+        "truncated": false
+      },
+      {
+        "args_hash": "c3034c797273ed4da85fd2226267273c796712bc50151b79552ee87cbd58aed6",
+        "duration_ms": 0,
+        "executed": false,
+        "name": "run_command",
+        "output_bytes": null,
+        "state": "failed",
+        "truncated": false
+      }
+    ],
+    "cancelled": 0,
+    "duplicate_calls": 0,
+    "duration_ms": 54,
+    "executed": 3,
+    "failed": 3,
+    "output_bytes": 101,
+    "proposed": 6,
+    "rejected": 0,
+    "skipped": 0,
+    "succeeded": 3,
+    "truncated": 0,
+    "unknown": 0
+  }
+}

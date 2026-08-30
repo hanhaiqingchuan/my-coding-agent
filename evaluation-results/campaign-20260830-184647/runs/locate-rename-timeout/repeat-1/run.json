@@ -1,0 +1,414 @@
+{
+  "agent_argv_options": [
+    "--config",
+    "--workspace",
+    "--data-dir",
+    "--prompt-file",
+    "--report-out",
+    "--yes",
+    "--ack-unsafe-auto-approve",
+    "--command-policy"
+  ],
+  "agent_commit": "176cc1ed34f996078f1ec554d6c8494d886b81a3",
+  "agent_exit_code": 0,
+  "agent_report": {
+    "compaction": {
+      "above_target": false,
+      "count": 0,
+      "estimate_error": {
+        "estimated_minus_provider_tokens": null,
+        "estimated_summary_tokens": null,
+        "provider_summary_output_tokens": null
+      },
+      "estimator_id": null,
+      "input_tokens_after": null,
+      "input_tokens_before": null,
+      "requests": 0
+    },
+    "durations": {
+      "agent_monotonic_ms": 66748,
+      "compaction_request_elapsed_ms": 0,
+      "model_request_elapsed_ms": 66103,
+      "retry_wait_monotonic_ms": 0,
+      "tool_execution_monotonic_ms": 125
+    },
+    "error_kind": null,
+    "final_assistant_text": "All checks pass. Here's a summary of what I did:\n\n## Changes Made\n\n**`src/fetch/config.py`** — renamed the constant and raised its value:\n```python\n\"\"\"Fetch service configuration constants.\"\"\"\n\nREQUEST_TIMEOUT = 45\nMAX_ATTEMPTS = 2\n```\n\n**`src/fetch/client.py`** — deleted the local copy and imported from config:\n```python\n\"\"\"Fetch client using the shared timeout from config.\"\"\"\n\nfrom fetch.config import REQUEST_TIMEOUT\n\n\ndef fetch(url: str) -> dict[str, object]:\n    \"\"\"Return a canned response shape for ``url`` with the effective timeout.\"\"\"\n    return {\"url\": url, \"timeout\": REQUEST_TIMEOUT}\n```\n\n## Verification\n\n- **Single source of truth:** `REQUEST_TIMEOUT` is now defined only in `src/fetch/config.py`, and `src/fetch/client.py` imports it — no duplicate constant remains.\n- **Old name removed:** neither module defines `TIMEOUT_SECONDS` anymore (I checked both files; `src/fetch/` contains only `__init__.py`, `config.py`, and `client.py`).\n- **Value:** `fetch.config.REQUEST_TIMEOUT == 45`, and `fetch(...)` builds its response from that imported value.\n- **Test suite:** `PYTHONPATH=src python3 -B -m unittest discover -s tests -t tests` → `Ran 3 tests ... OK`.\n- **Unchanged:** `README.md` and everything under `tests/` were not modified.",
+    "finished_at": "2026-08-30T10:59:50.029817+00:00",
+    "model": {
+      "compaction": {
+        "attempts": 0,
+        "elapsed_ms": 0,
+        "network_retries": 0,
+        "requests": 0,
+        "results": {},
+        "usage": {
+          "cache_creation_input_tokens": null,
+          "cache_read_input_tokens": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        "usage_coverage": null
+      },
+      "main": {
+        "attempts": 12,
+        "elapsed_ms": 66103,
+        "network_retries": 0,
+        "requests": 12,
+        "results": {
+          "succeeded": 12
+        },
+        "usage": {
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 27648,
+          "input_tokens": 11361,
+          "output_tokens": 4268
+        },
+        "usage_coverage": 1.0
+      }
+    },
+    "model_identity": {
+      "context_window": 1000000,
+      "max_output_tokens": 32768,
+      "name": "deepseek-v4-pro-0813",
+      "stream": true
+    },
+    "run_id": "1010163c-e069-4ec0-be5a-c731e89f0c4a",
+    "schema_version": "run-report-v1",
+    "session_id": "0872e30e-8b13-4f4c-96be-8d33fdf978da",
+    "started_at": "2026-08-30T10:58:43.288841+00:00",
+    "state": "COMPLETED",
+    "stop_reason": "COMPLETED",
+    "tool_schema_hash": "402004785c5bd2b7efdab9a9aca21060e10d9fd397e299a1c466567fe674904a",
+    "tools": {
+      "by_name": {
+        "read_file": {
+          "failed": 8,
+          "proposed": 14,
+          "succeeded": 6
+        },
+        "run_command": {
+          "failed": 4,
+          "proposed": 6,
+          "succeeded": 2
+        },
+        "write_file": {
+          "failed": 0,
+          "proposed": 2,
+          "succeeded": 2
+        }
+      },
+      "calls": [
+        {
+          "args_hash": "290db34f3c5119e45ca08aedf30683156b24d7465822f5280cc9c31e9921118a",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "run_command",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "ed261c6fbda885acdb186f46610bd3ee9d48e083d449a7419b14500986efc8b9",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "run_command",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "168a917291b4328c788c532411d7bed804b18e5ae3be8c70564ad6952004eeac",
+          "duration_ms": 0,
+          "executed": true,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "succeeded",
+          "truncated": false
+        },
+        {
+          "args_hash": "926de8d8d833020a807f294ad7f278613ac79d7107c97056f6bed75c6d8b268c",
+          "duration_ms": 0,
+          "executed": true,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "succeeded",
+          "truncated": false
+        },
+        {
+          "args_hash": "2dede11454ae6dbfefa23b270d0e1c9d1e0f75cf4676d9b4a279103a5f86c1c0",
+          "duration_ms": 0,
+          "executed": true,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "succeeded",
+          "truncated": false
+        },
+        {
+          "args_hash": "6cb707ffaf8945b5f3dd5e7977dc4e2d264b1e60a218437ccfa62698b5a7d432",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "22b2d0a1d087026ed575414f8cb3af87f419d2ab19d6908da0931ac56cb8128c",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "4d94e6687ad87d0a5d267174b492241b3a1dbca91b5602a745ecf138dcf3697e",
+          "duration_ms": 0,
+          "executed": true,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "52338a5a12ba0a82eb8feebe95d7c5601a2929aba0fbb94058e6bf2a44ee3c82",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "59996664803f189b14cdc33568d7b86699a98a45d28822e7022dd5ebc9f370eb",
+          "duration_ms": 0,
+          "executed": true,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "succeeded",
+          "truncated": false
+        },
+        {
+          "args_hash": "1eafe61d1c8037eb40fd5868d7b1a973c3a128b7e39db1d3f501f45a886e7a0a",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "65d4b4a1f7953989cb53f968e38320536b3b384e51b28d8161c8bf2e45fd7519",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "b51ba8bca218923086b3201726c0d7007738d74d7559c7939c402a877c56e6b9",
+          "duration_ms": 1,
+          "executed": true,
+          "name": "write_file",
+          "output_bytes": null,
+          "state": "succeeded",
+          "truncated": false
+        },
+        {
+          "args_hash": "1bda417575bed7f1f53aef275ffda69e16edef80f9f0281ac34c27613870c796",
+          "duration_ms": 0,
+          "executed": true,
+          "name": "write_file",
+          "output_bytes": null,
+          "state": "succeeded",
+          "truncated": false
+        },
+        {
+          "args_hash": "168a917291b4328c788c532411d7bed804b18e5ae3be8c70564ad6952004eeac",
+          "duration_ms": 0,
+          "executed": true,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "succeeded",
+          "truncated": false
+        },
+        {
+          "args_hash": "926de8d8d833020a807f294ad7f278613ac79d7107c97056f6bed75c6d8b268c",
+          "duration_ms": 0,
+          "executed": true,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "succeeded",
+          "truncated": false
+        },
+        {
+          "args_hash": "0ea7f6bf17c86a00401c25df07406aa8f36754b3763479a38bb76d08f6f3e08f",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "7d630af58fb2159ac2904917df79604b169867f378f754dbfea71199c6a888c4",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "63e32c3ea055dd6b8dc8fc5b8a648e5165a1e2bfefb13a18a89a33e7164213e9",
+          "duration_ms": 60,
+          "executed": true,
+          "name": "run_command",
+          "output_bytes": 101,
+          "state": "succeeded",
+          "truncated": false
+        },
+        {
+          "args_hash": "cd528fe6eb5c7f18a738c5a0de3622285c050f50f8d2ee8f7a293a781051a018",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "run_command",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "84fef287ac2209fd493b133df0a3f0b341e767f8cb24fdd428cb50243aad7687",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "run_command",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "80cdcb673652e19e718a30a10de771c196e52fd92aa5c7ec39ef0b84483f1a12",
+          "duration_ms": 64,
+          "executed": true,
+          "name": "run_command",
+          "output_bytes": 101,
+          "state": "succeeded",
+          "truncated": false
+        }
+      ],
+      "cancelled": 0,
+      "duplicate_calls": 2,
+      "duration_ms": 125,
+      "executed": 11,
+      "failed": 12,
+      "output_bytes": 202,
+      "proposed": 22,
+      "rejected": 0,
+      "skipped": 0,
+      "succeeded": 10,
+      "truncated": 0,
+      "unknown": 0
+    }
+  },
+  "agent_timed_out": false,
+  "artifact_correct": true,
+  "campaign_id": "campaign-9140cce5aff3",
+  "category": "locate_and_modify",
+  "compaction": {
+    "above_target": false,
+    "count": 0,
+    "estimated_minus_provider_tokens": null,
+    "estimated_summary_tokens": null,
+    "input_tokens_after": null,
+    "input_tokens_before": null,
+    "provider_summary_output_tokens": null,
+    "requests": 0
+  },
+  "durations": {
+    "agent_monotonic_ms": 66748,
+    "agent_process_ms": 67548,
+    "oracle_ms": 69,
+    "retry_wait_monotonic_ms": 0,
+    "tool_execution_monotonic_ms": 125,
+    "total_ms": 67622,
+    "workspace_prepare_ms": 6
+  },
+  "error_kind": null,
+  "failure_kind": null,
+  "failure_stage": null,
+  "finished_at": "2026-08-30T10:59:50.202921+00:00",
+  "harness_detail": null,
+  "hashes": {
+    "baseline_tree": "f13bf700c31916378dbe52c4e4518cc7184599a3d26d51c1eea62b309be566ef",
+    "config": "56c0b1f00c7c6e4e804f9437b879522aedb93dc21a761ba727be21549f1da471",
+    "diff": "9739c72a64d380aab3e8b0f565eedf8e63d8fec6a0c82bab3bdace634a0dde59",
+    "prompt": "a725388f679c0bd8017ca8118c8572465dee0b1f6cb16a28a155d5344cd58d52",
+    "task": "a570f50dfbf20c61cf5461d516bddce21397ac7f170467cae8890c3175e6310d",
+    "tool_schema": "402004785c5bd2b7efdab9a9aca21060e10d9fd397e299a1c466567fe674904a",
+    "workspace_tree": "47bc4e3086edb37f42d777a424e8e5e2944d7467fc441408c9edfd13e8719769"
+  },
+  "model": {
+    "attempts": 12,
+    "compaction_requests": 0,
+    "main_requests": 12,
+    "network_retries": 0,
+    "usage": {
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 27648,
+      "input_tokens": 11361,
+      "output_tokens": 4268
+    },
+    "usage_coverage": 1.0
+  },
+  "model_identity": {
+    "context_window": 1000000,
+    "max_output_tokens": 32768,
+    "name": "deepseek-v4-pro-0813",
+    "stream": true
+  },
+  "modifications": {
+    "detected_workspace_escape": false,
+    "files_added": 0,
+    "files_deleted": 0,
+    "files_modified": 2,
+    "forbidden_paths_modified": [],
+    "lines_added": 4,
+    "lines_removed": 4,
+    "out_of_scope_paths": []
+  },
+  "oracle": {
+    "regression": {
+      "duration_ms": 35,
+      "errored": false,
+      "exit_code": 0,
+      "passed": true
+    },
+    "target": {
+      "duration_ms": 26,
+      "errored": false,
+      "exit_code": 0,
+      "passed": true
+    }
+  },
+  "outcome": "OK",
+  "provider": "anthropic_messages",
+  "repeat": 1,
+  "schema_version": "run-v1",
+  "started_at": "2026-08-30T10:58:42.580457+00:00",
+  "state": "COMPLETED",
+  "stop_reason": "COMPLETED",
+  "strict_success": true,
+  "task_id": "locate-rename-timeout",
+  "tools": {
+    "duplicate_calls": 2,
+    "executed": 11,
+    "failed": 12,
+    "output_bytes": 202,
+    "proposed": 22,
+    "skipped": 0,
+    "succeeded": 10,
+    "truncated": 0
+  }
+}

@@ -1,0 +1,288 @@
+{
+  "agent_argv_options": [
+    "--config",
+    "--workspace",
+    "--data-dir",
+    "--prompt-file",
+    "--report-out",
+    "--yes",
+    "--ack-unsafe-auto-approve",
+    "--command-policy"
+  ],
+  "agent_commit": "176cc1ed34f996078f1ec554d6c8494d886b81a3",
+  "agent_exit_code": 0,
+  "agent_report": {
+    "compaction": {
+      "above_target": false,
+      "count": 0,
+      "estimate_error": {
+        "estimated_minus_provider_tokens": null,
+        "estimated_summary_tokens": null,
+        "provider_summary_output_tokens": null
+      },
+      "estimator_id": null,
+      "input_tokens_after": null,
+      "input_tokens_before": null,
+      "requests": 0
+    },
+    "durations": {
+      "agent_monotonic_ms": 21972,
+      "compaction_request_elapsed_ms": 0,
+      "model_request_elapsed_ms": 21585,
+      "retry_wait_monotonic_ms": 0,
+      "tool_execution_monotonic_ms": 118
+    },
+    "error_kind": null,
+    "final_assistant_text": "Done. `clamp` in `src/mathkit/ranges.py` now checks `lower > upper` before any clamping and raises `ValueError(\"lower must not exceed upper\")`.\n\nVerification:\n- The existing suite passes: `Ran 4 tests in 0.000s — OK`.\n- The change is local to `clamp` (2 added lines inside the function); `midpoint`, `README.md`, and `tests/` were untouched.",
+    "finished_at": "2026-08-30T10:49:56.169467+00:00",
+    "model": {
+      "compaction": {
+        "attempts": 0,
+        "elapsed_ms": 0,
+        "network_retries": 0,
+        "requests": 0,
+        "results": {},
+        "usage": {
+          "cache_creation_input_tokens": null,
+          "cache_read_input_tokens": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        "usage_coverage": null
+      },
+      "main": {
+        "attempts": 7,
+        "elapsed_ms": 21585,
+        "network_retries": 0,
+        "requests": 7,
+        "results": {
+          "succeeded": 7
+        },
+        "usage": {
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 7168,
+          "input_tokens": 6674,
+          "output_tokens": 1283
+        },
+        "usage_coverage": 1.0
+      }
+    },
+    "model_identity": {
+      "context_window": 1000000,
+      "max_output_tokens": 32768,
+      "name": "deepseek-v4-pro-0813",
+      "stream": true
+    },
+    "run_id": "50f1bdc5-8d74-4167-be1d-ff41974dd569",
+    "schema_version": "run-report-v1",
+    "session_id": "16dd6803-83f9-4085-ab43-368f985c6689",
+    "started_at": "2026-08-30T10:49:34.208892+00:00",
+    "state": "COMPLETED",
+    "stop_reason": "COMPLETED",
+    "tool_schema_hash": "402004785c5bd2b7efdab9a9aca21060e10d9fd397e299a1c466567fe674904a",
+    "tools": {
+      "by_name": {
+        "read_file": {
+          "failed": 0,
+          "proposed": 2,
+          "succeeded": 2
+        },
+        "run_command": {
+          "failed": 2,
+          "proposed": 4,
+          "succeeded": 2
+        },
+        "write_file": {
+          "failed": 1,
+          "proposed": 2,
+          "succeeded": 1
+        }
+      },
+      "calls": [
+        {
+          "args_hash": "97da93b5137beaa9f79a586ec5e92b56a3a52ae980c0e8f9bd1d7ef45c08b89d",
+          "duration_ms": 0,
+          "executed": true,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "succeeded",
+          "truncated": false
+        },
+        {
+          "args_hash": "79da447a34276f189ec03f85172badaf13559f9ae126cfd0fae6a6637bafa510",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "write_file",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "c98567fb278178262ef1854bd91ba3416d680a54d35751d4d8f4b433295ee19e",
+          "duration_ms": 1,
+          "executed": true,
+          "name": "write_file",
+          "output_bytes": null,
+          "state": "succeeded",
+          "truncated": false
+        },
+        {
+          "args_hash": "97da93b5137beaa9f79a586ec5e92b56a3a52ae980c0e8f9bd1d7ef45c08b89d",
+          "duration_ms": 0,
+          "executed": true,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "succeeded",
+          "truncated": false
+        },
+        {
+          "args_hash": "74face514dbfc264b82b23f590255337b94dc4643ac9a1f3489e52df84ddba36",
+          "duration_ms": 62,
+          "executed": true,
+          "name": "run_command",
+          "output_bytes": 102,
+          "state": "succeeded",
+          "truncated": false
+        },
+        {
+          "args_hash": "9f528dd5445ef1b81ce7d868f2e0e1c21e1511740b85a9d9707faf341b5d6df8",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "run_command",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "fd43186563741ed0622532213b1c45ea9a39c48623ec7ca850830b7ceccc8e75",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "run_command",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "121a794ddc40a065e19ab5e21b0ddcc1063a141125af82d6ca3c48e4cefaa71b",
+          "duration_ms": 55,
+          "executed": true,
+          "name": "run_command",
+          "output_bytes": 102,
+          "state": "succeeded",
+          "truncated": false
+        }
+      ],
+      "cancelled": 0,
+      "duplicate_calls": 1,
+      "duration_ms": 118,
+      "executed": 5,
+      "failed": 3,
+      "output_bytes": 204,
+      "proposed": 8,
+      "rejected": 0,
+      "skipped": 0,
+      "succeeded": 5,
+      "truncated": 0,
+      "unknown": 0
+    }
+  },
+  "agent_timed_out": false,
+  "artifact_correct": true,
+  "campaign_id": "campaign-9140cce5aff3",
+  "category": "local_edit",
+  "compaction": {
+    "above_target": false,
+    "count": 0,
+    "estimated_minus_provider_tokens": null,
+    "estimated_summary_tokens": null,
+    "input_tokens_after": null,
+    "input_tokens_before": null,
+    "provider_summary_output_tokens": null,
+    "requests": 0
+  },
+  "durations": {
+    "agent_monotonic_ms": 21972,
+    "agent_process_ms": 22849,
+    "oracle_ms": 61,
+    "retry_wait_monotonic_ms": 0,
+    "tool_execution_monotonic_ms": 118,
+    "total_ms": 22913,
+    "workspace_prepare_ms": 4
+  },
+  "error_kind": null,
+  "failure_kind": null,
+  "failure_stage": null,
+  "finished_at": "2026-08-30T10:49:56.371152+00:00",
+  "harness_detail": null,
+  "hashes": {
+    "baseline_tree": "08608de3259c427b37a71c28f675fad3b912da1c8ebd72e443d184d2341575c8",
+    "config": "56c0b1f00c7c6e4e804f9437b879522aedb93dc21a761ba727be21549f1da471",
+    "diff": "7444368cb92994c587c6d8f38b81d9f99158a362f5e438c81616a342e6e593eb",
+    "prompt": "9964869e40e5d5bc35c71a24ee4e34bfcc52c09efee81a7574d3b59040c18d43",
+    "task": "7e41e4925e752b0f21e2ef4a3fb7ad373bf74d7a53f16f0d5135bba3bff7d0ef",
+    "tool_schema": "402004785c5bd2b7efdab9a9aca21060e10d9fd397e299a1c466567fe674904a",
+    "workspace_tree": "2155f09bb9599b85362ce6e8cf5f5bd8b4dbc1b1faa3dbc77eb2ff05a3393e18"
+  },
+  "model": {
+    "attempts": 7,
+    "compaction_requests": 0,
+    "main_requests": 7,
+    "network_retries": 0,
+    "usage": {
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 7168,
+      "input_tokens": 6674,
+      "output_tokens": 1283
+    },
+    "usage_coverage": 1.0
+  },
+  "model_identity": {
+    "context_window": 1000000,
+    "max_output_tokens": 32768,
+    "name": "deepseek-v4-pro-0813",
+    "stream": true
+  },
+  "modifications": {
+    "detected_workspace_escape": false,
+    "files_added": 0,
+    "files_deleted": 0,
+    "files_modified": 1,
+    "forbidden_paths_modified": [],
+    "lines_added": 2,
+    "lines_removed": 0,
+    "out_of_scope_paths": []
+  },
+  "oracle": {
+    "regression": {
+      "duration_ms": 30,
+      "errored": false,
+      "exit_code": 0,
+      "passed": true
+    },
+    "target": {
+      "duration_ms": 24,
+      "errored": false,
+      "exit_code": 0,
+      "passed": true
+    }
+  },
+  "outcome": "OK",
+  "provider": "anthropic_messages",
+  "repeat": 1,
+  "schema_version": "run-v1",
+  "started_at": "2026-08-30T10:49:33.464908+00:00",
+  "state": "COMPLETED",
+  "stop_reason": "COMPLETED",
+  "strict_success": true,
+  "task_id": "local-edit-clamp",
+  "tools": {
+    "duplicate_calls": 1,
+    "executed": 5,
+    "failed": 3,
+    "output_bytes": 204,
+    "proposed": 8,
+    "skipped": 0,
+    "succeeded": 5,
+    "truncated": 0
+  }
+}

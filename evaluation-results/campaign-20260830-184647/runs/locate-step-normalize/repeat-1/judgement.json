@@ -1,0 +1,16 @@
+{
+  "campaign_id": "campaign-9140cce5aff3",
+  "error": null,
+  "error_detail": null,
+  "judge_model": "deepseek-v4-pro-0813",
+  "prompt_version": "judge-v1",
+  "rationale": "The run achieved the goal: both target and regression checks passed, with strict success and a correct artifact. Process quality is mixed because the tool log shows 10 failed calls and 2 duplicate calls despite eventual recovery and a valid sanctioned test run. The final message is honest, concise, and clearly states the two edits, the passing test verification, and that no other files were modified.",
+  "repeat": 1,
+  "schema_version": "judgement-v1",
+  "scores": {
+    "communication": 5,
+    "process_quality": 3,
+    "task_completion": 5
+  },
+  "task_id": "locate-step-normalize"
+}

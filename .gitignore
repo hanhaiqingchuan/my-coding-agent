@@ -50,4 +50,4 @@ node_modules/
 .vscode/
 
 # Evaluation campaign outputs (raw run documents stay outside the public repo).
-/evaluation-results/
+/evaluation-results/**/data/

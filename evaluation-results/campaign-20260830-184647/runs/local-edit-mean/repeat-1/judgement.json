@@ -1,0 +1,16 @@
+{
+  "campaign_id": "campaign-9140cce5aff3",
+  "error": null,
+  "error_detail": null,
+  "judge_model": "deepseek-v4-pro-0813",
+  "prompt_version": "judge-v1",
+  "rationale": "The change was fully successful: the artifact is correct, both target and regression tests passed, and strict success is true. Process quality is slightly reduced by a duplicate call and several failed tool attempts, though the agent recovered and still made sensible, scoped edits. The final message is honest, concise, clearly describes the exact change and verification, and discloses the failed manual check without overclaiming.",
+  "repeat": 1,
+  "schema_version": "judgement-v1",
+  "scores": {
+    "communication": 5,
+    "process_quality": 4,
+    "task_completion": 5
+  },
+  "task_id": "local-edit-mean"
+}

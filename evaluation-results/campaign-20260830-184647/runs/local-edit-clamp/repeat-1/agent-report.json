@@ -1,0 +1,175 @@
+{
+  "compaction": {
+    "above_target": false,
+    "count": 0,
+    "estimate_error": {
+      "estimated_minus_provider_tokens": null,
+      "estimated_summary_tokens": null,
+      "provider_summary_output_tokens": null
+    },
+    "estimator_id": null,
+    "input_tokens_after": null,
+    "input_tokens_before": null,
+    "requests": 0
+  },
+  "durations": {
+    "agent_monotonic_ms": 21972,
+    "compaction_request_elapsed_ms": 0,
+    "model_request_elapsed_ms": 21585,
+    "retry_wait_monotonic_ms": 0,
+    "tool_execution_monotonic_ms": 118
+  },
+  "error_kind": null,
+  "final_assistant_text": "Done. `clamp` in `src/mathkit/ranges.py` now checks `lower > upper` before any clamping and raises `ValueError(\"lower must not exceed upper\")`.\n\nVerification:\n- The existing suite passes: `Ran 4 tests in 0.000s — OK`.\n- The change is local to `clamp` (2 added lines inside the function); `midpoint`, `README.md`, and `tests/` were untouched.",
+  "finished_at": "2026-08-30T10:49:56.169467+00:00",
+  "model": {
+    "compaction": {
+      "attempts": 0,
+      "elapsed_ms": 0,
+      "network_retries": 0,
+      "requests": 0,
+      "results": {},
+      "usage": {
+        "cache_creation_input_tokens": null,
+        "cache_read_input_tokens": null,
+        "input_tokens": null,
+        "output_tokens": null
+      },
+      "usage_coverage": null
+    },
+    "main": {
+      "attempts": 7,
+      "elapsed_ms": 21585,
+      "network_retries": 0,
+      "requests": 7,
+      "results": {
+        "succeeded": 7
+      },
+      "usage": {
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 7168,
+        "input_tokens": 6674,
+        "output_tokens": 1283
+      },
+      "usage_coverage": 1.0
+    }
+  },
+  "model_identity": {
+    "context_window": 1000000,
+    "max_output_tokens": 32768,
+    "name": "deepseek-v4-pro-0813",
+    "stream": true
+  },
+  "run_id": "50f1bdc5-8d74-4167-be1d-ff41974dd569",
+  "schema_version": "run-report-v1",
+  "session_id": "16dd6803-83f9-4085-ab43-368f985c6689",
+  "started_at": "2026-08-30T10:49:34.208892+00:00",
+  "state": "COMPLETED",
+  "stop_reason": "COMPLETED",
+  "tool_schema_hash": "402004785c5bd2b7efdab9a9aca21060e10d9fd397e299a1c466567fe674904a",
+  "tools": {
+    "by_name": {
+      "read_file": {
+        "failed": 0,
+        "proposed": 2,
+        "succeeded": 2
+      },
+      "run_command": {
+        "failed": 2,
+        "proposed": 4,
+        "succeeded": 2
+      },
+      "write_file": {
+        "failed": 1,
+        "proposed": 2,
+        "succeeded": 1
+      }
+    },
+    "calls": [
+      {
+        "args_hash": "97da93b5137beaa9f79a586ec5e92b56a3a52ae980c0e8f9bd1d7ef45c08b89d",
+        "duration_ms": 0,
+        "executed": true,
+        "name": "read_file",
+        "output_bytes": null,
+        "state": "succeeded",
+        "truncated": false
+      },
+      {
+        "args_hash": "79da447a34276f189ec03f85172badaf13559f9ae126cfd0fae6a6637bafa510",
+        "duration_ms": 0,
+        "executed": false,
+        "name": "write_file",
+        "output_bytes": null,
+        "state": "failed",
+        "truncated": false
+      },
+      {
+        "args_hash": "c98567fb278178262ef1854bd91ba3416d680a54d35751d4d8f4b433295ee19e",
+        "duration_ms": 1,
+        "executed": true,
+        "name": "write_file",
+        "output_bytes": null,
+        "state": "succeeded",
+        "truncated": false
+      },
+      {
+        "args_hash": "97da93b5137beaa9f79a586ec5e92b56a3a52ae980c0e8f9bd1d7ef45c08b89d",
+        "duration_ms": 0,
+        "executed": true,
+        "name": "read_file",
+        "output_bytes": null,
+        "state": "succeeded",
+        "truncated": false
+      },
+      {
+        "args_hash": "74face514dbfc264b82b23f590255337b94dc4643ac9a1f3489e52df84ddba36",
+        "duration_ms": 62,
+        "executed": true,
+        "name": "run_command",
+        "output_bytes": 102,
+        "state": "succeeded",
+        "truncated": false
+      },
+      {
+        "args_hash": "9f528dd5445ef1b81ce7d868f2e0e1c21e1511740b85a9d9707faf341b5d6df8",
+        "duration_ms": 0,
+        "executed": false,
+        "name": "run_command",
+        "output_bytes": null,
+        "state": "failed",
+        "truncated": false
+      },
+      {
+        "args_hash": "fd43186563741ed0622532213b1c45ea9a39c48623ec7ca850830b7ceccc8e75",
+        "duration_ms": 0,
+        "executed": false,
+        "name": "run_command",
+        "output_bytes": null,
+        "state": "failed",
+        "truncated": false
+      },
+      {
+        "args_hash": "121a794ddc40a065e19ab5e21b0ddcc1063a141125af82d6ca3c48e4cefaa71b",
+        "duration_ms": 55,
+        "executed": true,
+        "name": "run_command",
+        "output_bytes": 102,
+        "state": "succeeded",
+        "truncated": false
+      }
+    ],
+    "cancelled": 0,
+    "duplicate_calls": 1,
+    "duration_ms": 118,
+    "executed": 5,
+    "failed": 3,
+    "output_bytes": 204,
+    "proposed": 8,
+    "rejected": 0,
+    "skipped": 0,
+    "succeeded": 5,
+    "truncated": 0,
+    "unknown": 0
+  }
+}

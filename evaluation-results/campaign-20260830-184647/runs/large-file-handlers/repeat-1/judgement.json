@@ -1,0 +1,16 @@
+{
+  "campaign_id": "campaign-9140cce5aff3",
+  "error": null,
+  "error_detail": null,
+  "judge_model": "deepseek-v4-pro-0813",
+  "prompt_version": "judge-v1",
+  "rationale": "The artifact is correct and all oracle regression/target tests pass, so completion is full. Process was mostly sound but had a duplicate call, two failed tool attempts, and five truncated outputs across ten executions, indicating some inefficiency despite successful recovery. The final message is concise and honest, clearly describing the one-line change and its verification via tests and review.",
+  "repeat": 1,
+  "schema_version": "judgement-v1",
+  "scores": {
+    "communication": 5,
+    "process_quality": 4,
+    "task_completion": 5
+  },
+  "task_id": "large-file-handlers"
+}

@@ -1,0 +1,16 @@
+{
+  "campaign_id": "campaign-1cfebfb25bf0",
+  "error": null,
+  "error_detail": null,
+  "judge_model": "deepseek-v4-pro-0813",
+  "prompt_version": "judge-v1",
+  "rationale": "The edit was fully successful: the artifact is correct, both target and regression tests pass, and only the intended file was modified. Tool use was mostly clean with four successful executions and no failures or workspace escapes, though one duplicate call prevents a perfect process score. The final message is honest, concise, shows the changed behavior with examples, and explicitly states the verification result.",
+  "repeat": 1,
+  "schema_version": "judgement-v1",
+  "scores": {
+    "communication": 5,
+    "process_quality": 4,
+    "task_completion": 5
+  },
+  "task_id": "local-edit-suffix"
+}

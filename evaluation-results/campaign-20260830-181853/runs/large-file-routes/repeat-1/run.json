@@ -1,0 +1,306 @@
+{
+  "agent_argv_options": [
+    "--config",
+    "--workspace",
+    "--data-dir",
+    "--prompt-file",
+    "--report-out",
+    "--yes",
+    "--ack-unsafe-auto-approve",
+    "--command-policy"
+  ],
+  "agent_commit": "cbaae7496c77696bb5ec4afb1067cad61fa07478",
+  "agent_exit_code": 0,
+  "agent_report": {
+    "compaction": {
+      "above_target": false,
+      "count": 0,
+      "estimate_error": {
+        "estimated_minus_provider_tokens": null,
+        "estimated_summary_tokens": null,
+        "provider_summary_output_tokens": null
+      },
+      "estimator_id": null,
+      "input_tokens_after": null,
+      "input_tokens_before": null,
+      "requests": 0
+    },
+    "durations": {
+      "agent_monotonic_ms": 31660,
+      "compaction_request_elapsed_ms": 0,
+      "model_request_elapsed_ms": 31247,
+      "retry_wait_monotonic_ms": 0,
+      "tool_execution_monotonic_ms": 71
+    },
+    "error_kind": null,
+    "final_assistant_text": "Fixed `route_path_57` in `src/router/table.py`: its return is now `prefix + \"57\"`, matching its neighbours, so `path_for(\"route_57\")` resolves to `\"/v1/routes/57\"`.\n\nVerification:\n- The change is confined to that single helper.\n- The existing test suite passes: 4 tests, all OK.",
+    "finished_at": "2026-08-30T10:35:24.380302+00:00",
+    "model": {
+      "compaction": {
+        "attempts": 0,
+        "elapsed_ms": 0,
+        "network_retries": 0,
+        "requests": 0,
+        "results": {},
+        "usage": {
+          "cache_creation_input_tokens": null,
+          "cache_read_input_tokens": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        "usage_coverage": null
+      },
+      "main": {
+        "attempts": 10,
+        "elapsed_ms": 31247,
+        "network_retries": 0,
+        "requests": 10,
+        "results": {
+          "succeeded": 10
+        },
+        "usage": {
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 65536,
+          "input_tokens": 15044,
+          "output_tokens": 1834
+        },
+        "usage_coverage": 1.0
+      }
+    },
+    "model_identity": {
+      "context_window": 1000000,
+      "max_output_tokens": 32768,
+      "name": "deepseek-v4-pro-0813",
+      "stream": true
+    },
+    "run_id": "8b67f2d1-40c1-42c3-b644-846dfcda2893",
+    "schema_version": "run-report-v1",
+    "session_id": "08836629-5b01-4ab8-9ef8-87b8515cb34e",
+    "started_at": "2026-08-30T10:34:52.725744+00:00",
+    "state": "COMPLETED",
+    "stop_reason": "COMPLETED",
+    "tool_schema_hash": "402004785c5bd2b7efdab9a9aca21060e10d9fd397e299a1c466567fe674904a",
+    "tools": {
+      "by_name": {
+        "read_file": {
+          "failed": 1,
+          "proposed": 5,
+          "succeeded": 4
+        },
+        "run_command": {
+          "failed": 3,
+          "proposed": 4,
+          "succeeded": 1
+        },
+        "write_file": {
+          "failed": 0,
+          "proposed": 1,
+          "succeeded": 1
+        }
+      },
+      "calls": [
+        {
+          "args_hash": "1ca36b38e7b667fa9d635cd2b908f3e6b4fe86622c3610cd5ddc2717ed608107",
+          "duration_ms": 0,
+          "executed": true,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "succeeded",
+          "truncated": false
+        },
+        {
+          "args_hash": "4f34ca9397185d080a4b39bb1abfa30744049de871a155021b3f56349bb750ed",
+          "duration_ms": 1,
+          "executed": true,
+          "name": "write_file",
+          "output_bytes": null,
+          "state": "succeeded",
+          "truncated": false
+        },
+        {
+          "args_hash": "752122bdcee2da05ec77c9b6db923666d988505f0e6836d67c97513213d4505c",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "run_command",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "63c39039b28b72b49ac941ee389849142612295d81aa6ed4d6ad3bf504117ac3",
+          "duration_ms": 70,
+          "executed": true,
+          "name": "run_command",
+          "output_bytes": 102,
+          "state": "succeeded",
+          "truncated": false
+        },
+        {
+          "args_hash": "d8815b9cb8bc4210527afeb4c75818e3d2bbc8a58c1dab67e0b22ed1e40046ba",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "run_command",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "691a9dba06419808662cda3d2724cbcb1498c06dc0340aa14e2153d7814bf490",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "run_command",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "cef3549eb12f6fb8e1a342dc1e221e709c45fb68dd3365254382f5857727bd0b",
+          "duration_ms": 0,
+          "executed": true,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "succeeded",
+          "truncated": true
+        },
+        {
+          "args_hash": "4d94e6687ad87d0a5d267174b492241b3a1dbca91b5602a745ecf138dcf3697e",
+          "duration_ms": 0,
+          "executed": true,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "e74e39966c4d04818a6fe8c426da95dfcb260191cb905f8f4ecb4c331f7798ed",
+          "duration_ms": 0,
+          "executed": true,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "succeeded",
+          "truncated": true
+        },
+        {
+          "args_hash": "bf8808209a73c38b6d70442660ef87b1f01714287bbf6095dba44536ab2eed22",
+          "duration_ms": 0,
+          "executed": true,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "succeeded",
+          "truncated": true
+        }
+      ],
+      "cancelled": 0,
+      "duplicate_calls": 0,
+      "duration_ms": 71,
+      "executed": 7,
+      "failed": 4,
+      "output_bytes": 102,
+      "proposed": 10,
+      "rejected": 0,
+      "skipped": 0,
+      "succeeded": 6,
+      "truncated": 3,
+      "unknown": 0
+    }
+  },
+  "agent_timed_out": false,
+  "artifact_correct": true,
+  "campaign_id": "campaign-1cfebfb25bf0",
+  "category": "large_file_edit",
+  "compaction": {
+    "above_target": false,
+    "count": 0,
+    "estimated_minus_provider_tokens": null,
+    "estimated_summary_tokens": null,
+    "input_tokens_after": null,
+    "input_tokens_before": null,
+    "provider_summary_output_tokens": null,
+    "requests": 0
+  },
+  "durations": {
+    "agent_monotonic_ms": 31660,
+    "agent_process_ms": 32618,
+    "oracle_ms": 75,
+    "retry_wait_monotonic_ms": 0,
+    "tool_execution_monotonic_ms": 71,
+    "total_ms": 32703,
+    "workspace_prepare_ms": 10
+  },
+  "error_kind": null,
+  "failure_kind": null,
+  "failure_stage": null,
+  "finished_at": "2026-08-30T10:35:24.589691+00:00",
+  "harness_detail": null,
+  "hashes": {
+    "baseline_tree": "0f2dc3a6b18f1ed8404cea711fcf58b11509f7e19fcccc70054acbb119ae4b2b",
+    "config": "56c0b1f00c7c6e4e804f9437b879522aedb93dc21a761ba727be21549f1da471",
+    "diff": "72294c95b05ae2a1f40c3e18a8c8ce8965dae9a6945fc7ab1bf1dfaf1ea3666f",
+    "prompt": "510ffb741b4b65b111c9e1c18a4c23950fd1cb7da0e049930ea1ba246ba92937",
+    "task": "9df76e6f0372309d1f1dd41b32c1ee84c90a7253158733bdd651b931da69b257",
+    "tool_schema": "402004785c5bd2b7efdab9a9aca21060e10d9fd397e299a1c466567fe674904a",
+    "workspace_tree": "883faf8610f6bd476f8bbcf0d6f20f59088eeaec886b4763b9c1d7e8f36d3f9f"
+  },
+  "model": {
+    "attempts": 10,
+    "compaction_requests": 0,
+    "main_requests": 10,
+    "network_retries": 0,
+    "usage": {
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 65536,
+      "input_tokens": 15044,
+      "output_tokens": 1834
+    },
+    "usage_coverage": 1.0
+  },
+  "model_identity": {
+    "context_window": 1000000,
+    "max_output_tokens": 32768,
+    "name": "deepseek-v4-pro-0813",
+    "stream": true
+  },
+  "modifications": {
+    "detected_workspace_escape": false,
+    "files_added": 0,
+    "files_deleted": 0,
+    "files_modified": 1,
+    "forbidden_paths_modified": [],
+    "lines_added": 1,
+    "lines_removed": 1,
+    "out_of_scope_paths": []
+  },
+  "oracle": {
+    "regression": {
+      "duration_ms": 37,
+      "errored": false,
+      "exit_code": 0,
+      "passed": true
+    },
+    "target": {
+      "duration_ms": 31,
+      "errored": false,
+      "exit_code": 0,
+      "passed": true
+    }
+  },
+  "outcome": "OK",
+  "provider": "anthropic_messages",
+  "repeat": 1,
+  "schema_version": "run-v1",
+  "started_at": "2026-08-30T10:34:51.886621+00:00",
+  "state": "COMPLETED",
+  "stop_reason": "COMPLETED",
+  "strict_success": true,
+  "task_id": "large-file-routes",
+  "tools": {
+    "duplicate_calls": 0,
+    "executed": 7,
+    "failed": 4,
+    "output_bytes": 102,
+    "proposed": 10,
+    "skipped": 0,
+    "succeeded": 6,
+    "truncated": 3
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "campaign_id": "campaign-1cfebfb25bf0",
+  "error": null,
+  "error_detail": null,
+  "judge_model": "deepseek-v4-pro-0813",
+  "prompt_version": "judge-v1",
+  "rationale": "The artifact is correct and both oracle test suites passed, so the task was fully achieved. The process had a few failed and duplicate tool calls, but the agent recovered sensibly by relying on direct file reads when command execution was blocked. The final message accurately summarizes the edits, notes unmodified files, and honestly explains the verification limitations.",
+  "repeat": 1,
+  "schema_version": "judgement-v1",
+  "scores": {
+    "communication": 5,
+    "process_quality": 4,
+    "task_completion": 5
+  },
+  "task_id": "locate-rename-timeout"
+}

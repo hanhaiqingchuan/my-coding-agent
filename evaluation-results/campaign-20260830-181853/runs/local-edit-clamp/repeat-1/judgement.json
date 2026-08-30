@@ -1,0 +1,16 @@
+{
+  "campaign_id": "campaign-1cfebfb25bf0",
+  "error": null,
+  "error_detail": null,
+  "judge_model": "deepseek-v4-pro-0813",
+  "prompt_version": "judge-v1",
+  "rationale": "The edit was correct and minimal, with both target and regression tests passing and no workspace escape. Process quality is strong overall, with the agent recovering after one failed tool call, though one duplicate/redundant call slightly reduces the score. The final message accurately describes the change and reports the passing test suite.",
+  "repeat": 1,
+  "schema_version": "judgement-v1",
+  "scores": {
+    "communication": 5,
+    "process_quality": 4,
+    "task_completion": 5
+  },
+  "task_id": "local-edit-clamp"
+}

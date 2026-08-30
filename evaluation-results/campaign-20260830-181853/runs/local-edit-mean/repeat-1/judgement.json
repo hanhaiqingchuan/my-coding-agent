@@ -1,0 +1,16 @@
+{
+  "campaign_id": "campaign-1cfebfb25bf0",
+  "error": null,
+  "error_detail": null,
+  "judge_model": "deepseek-v4-pro-0813",
+  "prompt_version": "judge-v1",
+  "rationale": "The change matches the required two-line guard and both target and regression tests pass, so the task is fully complete. Tool use succeeded overall despite some duplicate or failed calls, suggesting minor redundancy but no harmful process issue. The final message is concise, accurately describes the edit, and clearly states how it was verified.",
+  "repeat": 1,
+  "schema_version": "judgement-v1",
+  "scores": {
+    "communication": 5,
+    "process_quality": 4,
+    "task_completion": 5
+  },
+  "task_id": "local-edit-mean"
+}

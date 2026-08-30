@@ -1,0 +1,270 @@
+{
+  "agent_argv_options": [
+    "--config",
+    "--workspace",
+    "--data-dir",
+    "--prompt-file",
+    "--report-out",
+    "--yes",
+    "--ack-unsafe-auto-approve",
+    "--command-policy"
+  ],
+  "agent_commit": "176cc1ed34f996078f1ec554d6c8494d886b81a3",
+  "agent_exit_code": 0,
+  "agent_report": {
+    "compaction": {
+      "above_target": false,
+      "count": 0,
+      "estimate_error": {
+        "estimated_minus_provider_tokens": null,
+        "estimated_summary_tokens": null,
+        "provider_summary_output_tokens": null
+      },
+      "estimator_id": null,
+      "input_tokens_after": null,
+      "input_tokens_before": null,
+      "requests": 0
+    },
+    "durations": {
+      "agent_monotonic_ms": 20698,
+      "compaction_request_elapsed_ms": 0,
+      "model_request_elapsed_ms": 20467,
+      "retry_wait_monotonic_ms": 0,
+      "tool_execution_monotonic_ms": 0
+    },
+    "error_kind": null,
+    "final_assistant_text": "Done. `route_path_57` now matches its neighbours:\n\n```python\ndef route_path_57() -> str:\n    \"\"\"Return the canonical path for route_57.\"\"\"\n    prefix = \"/v1/routes/\"\n    return prefix + \"57\"\n```\n\nSo `path_for(\"route_57\")` now evaluates to `\"/v1/routes/57\"`. I verified the edited section by reading `src/router/table.py` directly and confirmed it's the only changed part of the file.\n\nOne note: I attempted to run the provided test suite command, but this environment's policy blocks command execution. The change is a single `\"999\"` → `\"57\"` edit scoped to that helper — consistent with every neighbouring helper, with `ROUTES`, `path_for`, `README.md`, and `tests/` untouched.",
+    "finished_at": "2026-08-30T11:01:36.094049+00:00",
+    "model": {
+      "compaction": {
+        "attempts": 0,
+        "elapsed_ms": 0,
+        "network_retries": 0,
+        "requests": 0,
+        "results": {},
+        "usage": {
+          "cache_creation_input_tokens": null,
+          "cache_read_input_tokens": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        "usage_coverage": null
+      },
+      "main": {
+        "attempts": 7,
+        "elapsed_ms": 20467,
+        "network_retries": 0,
+        "requests": 7,
+        "results": {
+          "succeeded": 7
+        },
+        "usage": {
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 38912,
+          "input_tokens": 13346,
+          "output_tokens": 1102
+        },
+        "usage_coverage": 1.0
+      }
+    },
+    "model_identity": {
+      "context_window": 1000000,
+      "max_output_tokens": 32768,
+      "name": "deepseek-v4-pro-0813",
+      "stream": true
+    },
+    "run_id": "811be4d4-2b61-40b5-af31-b4bda912f261",
+    "schema_version": "run-report-v1",
+    "session_id": "e3a5da00-01aa-4c51-9f0f-2ff32efe3019",
+    "started_at": "2026-08-30T11:01:15.400498+00:00",
+    "state": "COMPLETED",
+    "stop_reason": "COMPLETED",
+    "tool_schema_hash": "402004785c5bd2b7efdab9a9aca21060e10d9fd397e299a1c466567fe674904a",
+    "tools": {
+      "by_name": {
+        "read_file": {
+          "failed": 0,
+          "proposed": 4,
+          "succeeded": 4
+        },
+        "run_command": {
+          "failed": 1,
+          "proposed": 1,
+          "succeeded": 0
+        },
+        "write_file": {
+          "failed": 0,
+          "proposed": 1,
+          "succeeded": 1
+        }
+      },
+      "calls": [
+        {
+          "args_hash": "1ca36b38e7b667fa9d635cd2b908f3e6b4fe86622c3610cd5ddc2717ed608107",
+          "duration_ms": 0,
+          "executed": true,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "succeeded",
+          "truncated": false
+        },
+        {
+          "args_hash": "4f34ca9397185d080a4b39bb1abfa30744049de871a155021b3f56349bb750ed",
+          "duration_ms": 0,
+          "executed": true,
+          "name": "write_file",
+          "output_bytes": null,
+          "state": "succeeded",
+          "truncated": false
+        },
+        {
+          "args_hash": "f72949a2162776387701342caf71824d34db2847add4defb96c6f2cb4f1f3f7b",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "run_command",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "eafe7de4432c376bf51ec6e3a092c6711461d62224b852e99e0737825afdcc21",
+          "duration_ms": 0,
+          "executed": true,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "succeeded",
+          "truncated": true
+        },
+        {
+          "args_hash": "14f179dde5f28687dcb7d9bbc798ac4fec36ea4f3a1a6e29528a925863bc4ca9",
+          "duration_ms": 0,
+          "executed": true,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "succeeded",
+          "truncated": true
+        },
+        {
+          "args_hash": "4a68ef0fa513e754e333b5704db53a439e173fca80d7b19360ccdecbec5d0fe9",
+          "duration_ms": 0,
+          "executed": true,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "succeeded",
+          "truncated": true
+        }
+      ],
+      "cancelled": 0,
+      "duplicate_calls": 0,
+      "duration_ms": 0,
+      "executed": 5,
+      "failed": 1,
+      "output_bytes": 0,
+      "proposed": 6,
+      "rejected": 0,
+      "skipped": 0,
+      "succeeded": 5,
+      "truncated": 3,
+      "unknown": 0
+    }
+  },
+  "agent_timed_out": false,
+  "artifact_correct": true,
+  "campaign_id": "campaign-9140cce5aff3",
+  "category": "large_file_edit",
+  "compaction": {
+    "above_target": false,
+    "count": 0,
+    "estimated_minus_provider_tokens": null,
+    "estimated_summary_tokens": null,
+    "input_tokens_after": null,
+    "input_tokens_before": null,
+    "provider_summary_output_tokens": null,
+    "requests": 0
+  },
+  "durations": {
+    "agent_monotonic_ms": 20698,
+    "agent_process_ms": 21619,
+    "oracle_ms": 81,
+    "retry_wait_monotonic_ms": 0,
+    "tool_execution_monotonic_ms": 0,
+    "total_ms": 21706,
+    "workspace_prepare_ms": 6
+  },
+  "error_kind": null,
+  "failure_kind": null,
+  "failure_stage": null,
+  "finished_at": "2026-08-30T11:01:36.316874+00:00",
+  "harness_detail": null,
+  "hashes": {
+    "baseline_tree": "0f2dc3a6b18f1ed8404cea711fcf58b11509f7e19fcccc70054acbb119ae4b2b",
+    "config": "56c0b1f00c7c6e4e804f9437b879522aedb93dc21a761ba727be21549f1da471",
+    "diff": "72294c95b05ae2a1f40c3e18a8c8ce8965dae9a6945fc7ab1bf1dfaf1ea3666f",
+    "prompt": "510ffb741b4b65b111c9e1c18a4c23950fd1cb7da0e049930ea1ba246ba92937",
+    "task": "9df76e6f0372309d1f1dd41b32c1ee84c90a7253158733bdd651b931da69b257",
+    "tool_schema": "402004785c5bd2b7efdab9a9aca21060e10d9fd397e299a1c466567fe674904a",
+    "workspace_tree": "883faf8610f6bd476f8bbcf0d6f20f59088eeaec886b4763b9c1d7e8f36d3f9f"
+  },
+  "model": {
+    "attempts": 7,
+    "compaction_requests": 0,
+    "main_requests": 7,
+    "network_retries": 0,
+    "usage": {
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 38912,
+      "input_tokens": 13346,
+      "output_tokens": 1102
+    },
+    "usage_coverage": 1.0
+  },
+  "model_identity": {
+    "context_window": 1000000,
+    "max_output_tokens": 32768,
+    "name": "deepseek-v4-pro-0813",
+    "stream": true
+  },
+  "modifications": {
+    "detected_workspace_escape": false,
+    "files_added": 0,
+    "files_deleted": 0,
+    "files_modified": 1,
+    "forbidden_paths_modified": [],
+    "lines_added": 1,
+    "lines_removed": 1,
+    "out_of_scope_paths": []
+  },
+  "oracle": {
+    "regression": {
+      "duration_ms": 37,
+      "errored": false,
+      "exit_code": 0,
+      "passed": true
+    },
+    "target": {
+      "duration_ms": 32,
+      "errored": false,
+      "exit_code": 0,
+      "passed": true
+    }
+  },
+  "outcome": "OK",
+  "provider": "anthropic_messages",
+  "repeat": 1,
+  "schema_version": "run-v1",
+  "started_at": "2026-08-30T11:01:14.610249+00:00",
+  "state": "COMPLETED",
+  "stop_reason": "COMPLETED",
+  "strict_success": true,
+  "task_id": "large-file-routes",
+  "tools": {
+    "duplicate_calls": 0,
+    "executed": 5,
+    "failed": 1,
+    "output_bytes": 0,
+    "proposed": 6,
+    "skipped": 0,
+    "succeeded": 5,
+    "truncated": 3
+  }
+}
