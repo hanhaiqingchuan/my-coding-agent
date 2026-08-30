@@ -30,7 +30,7 @@ class ContextRequest:
     safety_margin_tokens: int
     compact_trigger_ratio: float = 0.80
     compact_target_ratio: float = 0.60
-    summary_max_tokens: int = 1_024
+    summary_max_tokens: int = 16_384
     recent_user_turns: int = 2
     current_run_id: str | None = None
     tool_schemas: tuple[Mapping[str, object], ...] = ()

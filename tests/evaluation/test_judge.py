@@ -244,6 +244,24 @@ async def test_judge_run_parses_a_valid_response_with_one_request() -> None:
 
 
 @pytest.mark.asyncio
+async def test_judge_run_honors_the_configured_output_budget() -> None:
+    """The [evaluation] judge_max_output_tokens value reaches the request."""
+    gateway = FakeGateway(responses=[VALID_RESPONSE])
+    run = _run_document()
+
+    judgement = await judge_run(
+        run,
+        build_transcript_excerpt(run),
+        ModelSettings(model="claude-judge-2026", max_output_tokens=8192),
+        gateway=gateway,
+        max_output_tokens=6000,
+    )
+
+    assert judgement.ok is True
+    assert gateway.requests[0].max_tokens == 6000
+
+
+@pytest.mark.asyncio
 async def test_judge_run_retries_malformed_json_once_then_records_judge_error() -> None:
     """A second malformed answer becomes a recorded judge_error, never an exception."""
     gateway = FakeGateway(responses=["garbage", "still not json"])
@@ -691,7 +709,8 @@ def test_build_judge_hook_passes_the_campaign_retry_settings(
     config.write_text(
         "[agent]\nmax_rounds = 4\n\n"
         "[retry]\nmax_attempts = 3\ninitial_delay_seconds = 0.5\n"
-        "max_delay_seconds = 4\njitter_ratio = 0.1\n",
+        "max_delay_seconds = 4\njitter_ratio = 0.1\n\n"
+        "[evaluation]\njudge_max_output_tokens = 6000\n",
         encoding="utf-8",
     )
     captured: dict[str, object] = {}
@@ -705,8 +724,10 @@ def test_build_judge_hook_passes_the_campaign_retry_settings(
         api_key: str = "",
         retry: Any = None,
         invoker: Any = None,
+        max_output_tokens: int = 0,
     ) -> Judgement:
         captured["retry"] = retry
+        captured["max_output_tokens"] = max_output_tokens
         return parse_judgement(VALID_RESPONSE, judge_model=settings.model)
 
     monkeypatch.setattr(evaluation_runner, "judge_run", spy)
@@ -719,6 +740,7 @@ def test_build_judge_hook_passes_the_campaign_retry_settings(
     assert captured["retry"] == RetrySettings(
         max_attempts=3, initial_delay_seconds=0.5, max_delay_seconds=4, jitter_ratio=0.1
     )
+    assert captured["max_output_tokens"] == 6000
 
 
 def test_run_campaign_judge_hook_writes_judgement_records(

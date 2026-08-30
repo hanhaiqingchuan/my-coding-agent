@@ -41,7 +41,7 @@ class ContextSettings:
     compact_trigger_ratio: float = 0.80
     compact_target_ratio: float = 0.60
     safety_margin_tokens: int = 2048
-    summary_max_tokens: int = 2048
+    summary_max_tokens: int = 16384
     recent_turns_min: int = 2
     recent_budget_ratio: float = 0.40
 
@@ -78,6 +78,11 @@ class PathsSettings:
 
 
 @dataclass(frozen=True, slots=True)
+class EvaluationSettings:
+    judge_max_output_tokens: int = 4096
+
+
+@dataclass(frozen=True, slots=True)
 class AppSettings:
     server: ServerSettings
     model: ModelSettings
@@ -86,6 +91,7 @@ class AppSettings:
     retry: RetrySettings
     tools: ToolSettings
     paths: PathsSettings = PathsSettings()
+    evaluation: EvaluationSettings = EvaluationSettings()
 
 
 _DEFAULTS: dict[str, dict[str, object]] = {
@@ -103,7 +109,7 @@ _DEFAULTS: dict[str, dict[str, object]] = {
         "compact_trigger_ratio": 0.80,
         "compact_target_ratio": 0.60,
         "safety_margin_tokens": 2048,
-        "summary_max_tokens": 2048,
+        "summary_max_tokens": 16384,
         "recent_turns_min": 2,
         "recent_budget_ratio": 0.40,
     },
@@ -122,6 +128,7 @@ _DEFAULTS: dict[str, dict[str, object]] = {
         "pass_env": (),
     },
     "paths": {"data_dir": None, "evaluation_results": None},
+    "evaluation": {"judge_max_output_tokens": 4096},
 }
 
 
@@ -255,8 +262,14 @@ def _make_settings(values: dict[str, dict[str, object]]) -> AppSettings:
             values["paths"]["evaluation_results"], "paths.evaluation_results"
         ),
     )
-    _validate(server, model, agent, context, retry, tools)
-    return AppSettings(server, model, agent, context, retry, tools, paths)
+    evaluation = EvaluationSettings(
+        judge_max_output_tokens=_integer(
+            values["evaluation"]["judge_max_output_tokens"],
+            "evaluation.judge_max_output_tokens",
+        ),
+    )
+    _validate(server, model, agent, context, retry, tools, evaluation)
+    return AppSettings(server, model, agent, context, retry, tools, paths, evaluation)
 
 
 def _validate(
@@ -266,6 +279,7 @@ def _validate(
     context: ContextSettings,
     retry: RetrySettings,
     tools: ToolSettings,
+    evaluation: EvaluationSettings,
 ) -> None:
     _require_positive(server.port, "server.port")
     _require_positive(model.context_window, "model.context_window")
@@ -313,6 +327,9 @@ def _validate(
     _require_positive(tools.command_timeout_seconds, "tools.command_timeout_seconds")
     _require_positive(tools.command_output_bytes, "tools.command_output_bytes")
     _require_positive(tools.kill_grace_seconds, "tools.kill_grace_seconds")
+    _require_positive(
+        evaluation.judge_max_output_tokens, "evaluation.judge_max_output_tokens"
+    )
 
 
 def _nonempty_string(value: object, field: str) -> str:

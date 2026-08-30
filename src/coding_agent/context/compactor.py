@@ -14,6 +14,7 @@ from coding_agent.context.builder import CompactionCandidate, CompactionPlan
 from coding_agent.context.estimator import estimate_input_tokens
 from coding_agent.core.cancellation import CancellationToken
 from coding_agent.core.errors import CancellationRequested, StoreError
+from coding_agent.core.json_extract import extract_json_object
 from coding_agent.core.models import (
     AssistantTurn,
     ContextSnapshot,
@@ -46,6 +47,12 @@ _SUMMARY_FIELDS = (
     "remaining_work",
     "blockers",
     "next_steps",
+)
+# Model-nondeterministic validation failures: the same request can succeed on a
+# fresh draw, so each chunk gets exactly one retry — the same policy the
+# evaluation judge applies to malformed answers.
+_RETRYABLE_SUMMARY_CODES = frozenset(
+    {"SUMMARY_TRUNCATED", "EMPTY_SUMMARY", "INVALID_SUMMARY_STRUCTURE"}
 )
 
 
@@ -129,38 +136,12 @@ class Compactor:
                     available_tokens=plan.compaction_input_budget_tokens,
                 )
 
-            cancellation.raise_if_cancelled()
-            try:
-                turn = (
-                    await invoke(request, cancellation)
-                    if invoke is not None
-                    else await self._gateway.complete(request, _ignore_delta, cancellation)
-                )
-            except ModelAPIError as error:
-                return _failure(
-                    phase="request",
-                    code="MODEL_API_ERROR",
-                    available_tokens=plan.compaction_input_budget_tokens,
-                    retryable=error.retryable,
-                )
-            except ModelTransportError as error:
-                return _failure(
-                    phase="request",
-                    code="MODEL_TRANSPORT_ERROR",
-                    available_tokens=plan.compaction_input_budget_tokens,
-                    retryable=error.retryable,
-                )
-            except ModelProtocolError:
-                return _failure(
-                    phase="request",
-                    code="MODEL_PROTOCOL_ERROR",
-                    available_tokens=plan.compaction_input_budget_tokens,
-                )
-
-            validation = _validated_summary(
-                turn.parts,
-                turn.stop_reason,
-                plan.summary_max_tokens,
+            validation = await self._summarize_chunk(
+                request,
+                cancellation,
+                invoke=invoke,
+                summary_max_tokens=plan.summary_max_tokens,
+                available_tokens=plan.compaction_input_budget_tokens,
             )
             if isinstance(validation, CompressionError):
                 return CompactionResult(snapshot=None, error=validation)
@@ -189,6 +170,43 @@ class Compactor:
                 available_tokens=plan.summary_max_tokens,
             )
         return CompactionResult(snapshot=snapshot, error=None)
+
+    async def _summarize_chunk(
+        self,
+        request: ModelRequest,
+        cancellation: CancellationToken,
+        *,
+        invoke: CompactionInvoker | None,
+        summary_max_tokens: int,
+        available_tokens: int,
+    ) -> tuple[str, int] | CompressionError:
+        for attempt in (1, 2):
+            cancellation.raise_if_cancelled()
+            try:
+                turn = (
+                    await invoke(request, cancellation)
+                    if invoke is not None
+                    else await self._gateway.complete(request, _ignore_delta, cancellation)
+                )
+            except ModelAPIError as error:
+                return CompressionError(
+                    "request", "MODEL_API_ERROR", 0, available_tokens, error.retryable
+                )
+            except ModelTransportError as error:
+                return CompressionError(
+                    "request", "MODEL_TRANSPORT_ERROR", 0, available_tokens, error.retryable
+                )
+            except ModelProtocolError:
+                return CompressionError("request", "MODEL_PROTOCOL_ERROR", 0, available_tokens)
+
+            validation = _validated_summary(turn.parts, turn.stop_reason, summary_max_tokens)
+            if (
+                not isinstance(validation, CompressionError)
+                or validation.code not in _RETRYABLE_SUMMARY_CODES
+                or attempt == 2
+            ):
+                return validation
+        raise AssertionError("unreachable: the retry loop always returns on attempt 2")
 
 
 def _validate_plan(plan: CompactionPlan) -> CompactionResult | None:
@@ -449,8 +467,8 @@ def _validated_summary(
     if not text:
         return CompressionError("validation", "EMPTY_SUMMARY", 0, max_tokens, False)
     try:
-        value = json.loads(text)
-    except (json.JSONDecodeError, TypeError):
+        value = extract_json_object(text)
+    except ValueError:
         return CompressionError("validation", "INVALID_SUMMARY_STRUCTURE", 0, max_tokens, False)
     if not isinstance(value, dict) or tuple(sorted(value)) != tuple(sorted(_SUMMARY_FIELDS)):
         return CompressionError("validation", "INVALID_SUMMARY_STRUCTURE", 0, max_tokens, False)

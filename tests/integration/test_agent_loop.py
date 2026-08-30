@@ -1768,6 +1768,7 @@ async def test_maintenance_compaction_reports_a_model_failure_as_an_event(
         [
             _final_turn("seeded"),
             _turn("garbage summary", ModelStopReason.END_TURN, TextPart("not json")),
+            _turn("garbage summary", ModelStopReason.END_TURN, TextPart("not json")),
         ],
         history=("first big answer " * 400, "second answer", "third answer"),
     )
@@ -1778,7 +1779,7 @@ async def test_maintenance_compaction_reports_a_model_failure_as_an_event(
     )
 
     assert session.id == session_id
-    assert model.call_count == 2
+    assert model.call_count == 3
     finished = next(
         event for event in store.events_after(session_id, 0) if event.type == "compaction.finished"
     )

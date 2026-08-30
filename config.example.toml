@@ -52,8 +52,10 @@ compact_trigger_ratio = 0.80
 compact_target_ratio = 0.60
 # 上下文安全余量（token）。可用输入预算 = context_window - max_output_tokens - 本值。
 safety_margin_tokens = 2048
-# 压缩摘要单次请求的输出 token 上限。
-summary_max_tokens = 2048
+# 压缩摘要单次请求的输出 token 上限（同时是摘要内容的大小上限）。
+# 注意：推理模型的「思考」与正文共用该预算——预算过小会让思考耗尽额度、
+# 摘要还没写出就被截断（SUMMARY_TRUNCATED）。用推理模型时建议不低于 16384。
+summary_max_tokens = 32768
 # 每次模型视图至少保留的「最近完整用户轮次」数（须 ≥ 2）。
 recent_turns_min = 2
 # 最近完整轮次尽量占可用输入预算的比例上限。
@@ -87,6 +89,13 @@ kill_grace_seconds = 3
 # 模型密钥变量（[model].api_key_env 指向的）永远禁止透传，写了也会被剔除。
 # 例：pass_env = ["HTTP_PROXY", "NPM_CONFIG_REGISTRY"]
 pass_env = []
+
+# ─── 评测裁判 ───────────────────────────────────────────────────────────────
+[evaluation]
+# LLM 裁判单次请求的输出 token 上限（实际生效值为它与 model.max_output_tokens
+# 的较小者）。推理模型的思考与正文共用该预算，过小会让裁判还没写出 JSON 就被
+# 截断，表现为 judge_error。
+judge_max_output_tokens = 4096
 
 # ─── 可选路径 ───────────────────────────────────────────────────────────────
 [paths]

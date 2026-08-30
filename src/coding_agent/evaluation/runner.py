@@ -347,7 +347,14 @@ def build_judge_hook(
         document = run_document(result, campaign_id=campaign_id)
         excerpt = build_transcript_excerpt(document)
         judgement = asyncio.run(
-            judge_run(document, excerpt, settings.model, gateway=model, retry=settings.retry)
+            judge_run(
+                document,
+                excerpt,
+                settings.model,
+                gateway=model,
+                retry=settings.retry,
+                max_output_tokens=settings.evaluation.judge_max_output_tokens,
+            )
         )
         write_judgement(
             run_dir / "judgement.json",

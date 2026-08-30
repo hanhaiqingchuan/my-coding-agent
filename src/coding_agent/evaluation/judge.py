@@ -27,6 +27,7 @@ from pathlib import Path
 
 from coding_agent.config import ModelSettings, RetrySettings
 from coding_agent.core.cancellation import CancellationToken
+from coding_agent.core.json_extract import extract_json_object
 from coding_agent.core.models import AssistantTurn, TextPart
 from coding_agent.model.anthropic_messages import AnthropicMessagesModel
 from coding_agent.model.protocol import ModelGateway, ModelMessage, ModelRequest
@@ -40,7 +41,8 @@ SCORE_MINIMUM = 1
 SCORE_MAXIMUM = 5
 # Reasoning judges spend thinking tokens from the same budget: 1024 was enough
 # for the bare contract, but a real transcript excerpt can push thinking past it
-# and the JSON answer is then never emitted. 4096 leaves that headroom.
+# and the JSON answer is then never emitted. 4096 leaves that headroom. This is
+# the fallback default; operators tune it via [evaluation] judge_max_output_tokens.
 JUDGE_MAX_OUTPUT_TOKENS = 4096
 
 _SYSTEM_PROMPT = (
@@ -274,6 +276,7 @@ async def judge_run(
     api_key: str = "",
     retry: RetrySettings | None = None,
     invoker: RetryingInvoker | None = None,
+    max_output_tokens: int = JUDGE_MAX_OUTPUT_TOKENS,
 ) -> Judgement:
     """Judge one run with a single-model conversation, never raising.
 
@@ -304,7 +307,7 @@ async def judge_run(
         request_attempts = 1
         try:
             text = await retry_owner.invoke(
-                lambda: _request_judgement(model, prompt, settings),
+                lambda: _request_judgement(model, prompt, settings, max_output_tokens),
                 CancellationToken(),
                 record_attempts,
             )
@@ -338,14 +341,19 @@ def write_judgement(
     )
 
 
-async def _request_judgement(model: ModelGateway, prompt: str, settings: ModelSettings) -> str:
+async def _request_judgement(
+    model: ModelGateway,
+    prompt: str,
+    settings: ModelSettings,
+    max_output_tokens: int,
+) -> str:
     """Send the one judge request: streaming, no tools, a small output budget."""
     chunks: list[str] = []
     request = ModelRequest(
         system=_SYSTEM_PROMPT,
         messages=(ModelMessage(role="user", parts=(TextPart(prompt),)),),
         tools=(),
-        max_tokens=max(1, min(settings.max_output_tokens, JUDGE_MAX_OUTPUT_TOKENS)),
+        max_tokens=max(1, min(settings.max_output_tokens, max_output_tokens)),
     )
     turn = await model.complete(
         request, lambda delta: chunks.append(delta.text), CancellationToken()
@@ -398,47 +406,10 @@ def _error_judgement(judge_model: str, detail: str) -> Judgement:
 
 
 def _extract_json(text: str) -> object:
-    candidates = [text.strip()]
-    fenced = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
-    if fenced is not None:
-        candidates.append(fenced.group(1))
-    balanced = _first_balanced_object(text)
-    if balanced is not None:
-        candidates.append(balanced)
-    for candidate in candidates:
-        try:
-            return json.loads(candidate)
-        except json.JSONDecodeError:
-            continue
-    raise JudgeParseError("the response is not JSON")
-
-
-def _first_balanced_object(text: str) -> str | None:
-    depth = 0
-    start = -1
-    in_string = False
-    escaped = False
-    for index, character in enumerate(text):
-        if in_string:
-            if escaped:
-                escaped = False
-            elif character == "\\":
-                escaped = True
-            elif character == '"':
-                in_string = False
-            continue
-        if character == '"':
-            in_string = True
-        elif character == "{":
-            if depth == 0:
-                start = index
-            depth += 1
-        elif character == "}":
-            if depth > 0:
-                depth -= 1
-                if depth == 0 and start >= 0:
-                    return text[start : index + 1]
-    return None
+    try:
+        return extract_json_object(text)
+    except ValueError as error:
+        raise JudgeParseError("the response is not JSON") from error
 
 
 def _mapping(value: object) -> Mapping[str, object]:

@@ -439,12 +439,12 @@ async def test_user_message_cannot_become_a_replaceable_candidate(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    ("response", "summary_max_tokens", "expected_code"),
+    ("response", "summary_max_tokens", "expected_code", "expected_calls"),
     [
-        ("", 256, "EMPTY_SUMMARY"),
-        ("{}", 256, "INVALID_SUMMARY_STRUCTURE"),
-        (json.dumps(_summary(next_steps=["x" * 2_000])), 32, "SUMMARY_BUDGET_EXCEEDED"),
-        (json.dumps({field: [] for field in SUMMARY_FIELDS}), 256, "EMPTY_SUMMARY"),
+        ("", 256, "EMPTY_SUMMARY", 2),
+        ("{}", 256, "INVALID_SUMMARY_STRUCTURE", 2),
+        (json.dumps(_summary(next_steps=["x" * 2_000])), 32, "SUMMARY_BUDGET_EXCEEDED", 1),
+        (json.dumps({field: [] for field in SUMMARY_FIELDS}), 256, "EMPTY_SUMMARY", 2),
     ],
 )
 async def test_invalid_summary_never_replaces_the_previous_snapshot(
@@ -453,6 +453,7 @@ async def test_invalid_summary_never_replaces_the_previous_snapshot(
     response: str,
     summary_max_tokens: int,
     expected_code: str,
+    expected_calls: int,
 ) -> None:
     old = _old_snapshot(session.id)
     store.replace_context_snapshot(old)
@@ -462,8 +463,9 @@ async def test_invalid_summary_never_replaces_the_previous_snapshot(
         input_budget=5_000,
         summary_max_tokens=summary_max_tokens,
     )
+    model = ScriptedModel([_turn(response), _turn(response)])
 
-    result = await Compactor(ScriptedModel([_turn(response)]), store, model="claude-test").compact(
+    result = await Compactor(model, store, model="claude-test").compact(
         plan, CancellationToken()
     )
 
@@ -471,7 +473,49 @@ async def test_invalid_summary_never_replaces_the_previous_snapshot(
     assert result.error is not None
     assert result.error.code == expected_code
     assert result.error.phase == "validation"
+    assert model.call_count == expected_calls
     assert store.load_context_snapshot(session.id) == old
+
+
+@pytest.mark.asyncio
+async def test_a_nondeterministic_bad_summary_is_retried_once(
+    store: SQLiteStore,
+    session,
+) -> None:
+    old = _old_snapshot(session.id)
+    store.replace_context_snapshot(old)
+    plan = _plan(old, (_tool_candidate(session.id),), input_budget=5_000)
+    model = ScriptedModel([_turn("not json at all"), _turn(json.dumps(_summary()))])
+
+    result = await Compactor(model, store, model="claude-test").compact(
+        plan, CancellationToken()
+    )
+
+    assert result.error is None
+    assert result.snapshot is not None
+    assert model.call_count == 2
+    assert store.load_context_snapshot(session.id) == result.snapshot
+
+
+@pytest.mark.asyncio
+async def test_a_fenced_or_prose_wrapped_summary_is_accepted(
+    store: SQLiteStore,
+    session,
+) -> None:
+    old = _old_snapshot(session.id)
+    store.replace_context_snapshot(old)
+    plan = _plan(old, (_tool_candidate(session.id),), input_budget=5_000)
+    wrapped = f"Here is the summary:\n```json\n{json.dumps(_summary())}\n```\nDone."
+    model = ScriptedModel([_turn(wrapped)])
+
+    result = await Compactor(model, store, model="claude-test").compact(
+        plan, CancellationToken()
+    )
+
+    assert result.error is None
+    assert result.snapshot is not None
+    assert model.call_count == 1
+    assert store.load_context_snapshot(session.id) == result.snapshot
 
 
 @pytest.mark.asyncio
@@ -502,14 +546,14 @@ async def test_truncated_model_summary_is_not_persisted_even_when_json_is_comple
 ) -> None:
     old = _old_snapshot(session.id)
     store.replace_context_snapshot(old)
-    response = _turn(
+    truncated = _turn(
         json.dumps(_summary()),
         stop_reason=ModelStopReason.MAX_TOKENS,
     )
 
-    result = await Compactor(ScriptedModel([response]), store, model="claude-test").compact(
-        _plan(old, (_tool_candidate(session.id),)), CancellationToken()
-    )
+    result = await Compactor(
+        ScriptedModel([truncated, truncated]), store, model="claude-test"
+    ).compact(_plan(old, (_tool_candidate(session.id),)), CancellationToken())
 
     assert result.snapshot is None
     assert result.error is not None

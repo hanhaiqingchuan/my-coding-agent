@@ -59,6 +59,20 @@ def test_unknown_toml_field_is_rejected(tmp_path: Path) -> None:
         load_settings(config_file, {}, {})
 
 
+def test_evaluation_section_defaults_and_override(tmp_path: Path) -> None:
+    """The judge budget is operator-tunable like every other model budget."""
+    assert load_settings(None, {}, {}).evaluation.judge_max_output_tokens == 4096
+
+    config_file = tmp_path / "config.toml"
+    config_file.write_text("[evaluation]\njudge_max_output_tokens = 8192\n", encoding="utf-8")
+    settings = load_settings(config_file, {}, {})
+    assert settings.evaluation.judge_max_output_tokens == 8192
+
+    config_file.write_text("[evaluation]\njudge_max_output_tokens = 0\n", encoding="utf-8")
+    with pytest.raises(ConfigurationError, match="evaluation.judge_max_output_tokens"):
+        load_settings(config_file, {}, {})
+
+
 @pytest.mark.parametrize(
     ("toml", "field", "fix"),
     [
@@ -96,7 +110,8 @@ def test_smallest_accepted_context_budget_builds_a_context_request(tmp_path: Pat
     config_file = tmp_path / "config.toml"
     config_file.write_text(
         "[model]\ncontext_window = 10241\nmax_output_tokens = 8192\n"
-        "[context]\nsafety_margin_tokens = 2048\nrecent_turns_min = 2\n",
+        "[context]\nsafety_margin_tokens = 2048\nrecent_turns_min = 2\n"
+        "summary_max_tokens = 1024\n",
         encoding="utf-8",
     )
 
