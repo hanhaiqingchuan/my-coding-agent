@@ -22,7 +22,9 @@
 #
 # 测评（需要 DASHSCOPE_API_KEY 等真实凭据，走真实模型）:
 #   make eval-run                跑一轮 campaign（默认 12 个公开任务 × 1 次）
-#     EVAL_OUT=<dir>             结果目录（默认 evaluation-results/，勿入 git；与
+#     EVAL_OUT=<dir>             本轮 campaign 的输出目录（默认在 EVAL_ROOT 下按时间戳新建；
+#                                勿入 git）。runner 拒绝写入非空目录，重复运行无需清理
+#     EVAL_ROOT=<dir>            历史 campaign 容器目录（默认 evaluation-results/，勿入 git；与
 #                                config.toml [paths].evaluation_results 保持一致即可
 #                                在 make run 的网页里直接看到）
 #     EVAL_REPEATS=<n>           每任务重复次数，默认 1
@@ -30,7 +32,7 @@
 #   make eval-judge              同 eval-run，并在每次运行后用 LLM 裁判打
 #                                task_completion/process_quality/communication 三项分
 #   make eval-history            在终端列出历史 campaign（含成功率与裁判均分）
-#   make eval-web                同 make run，但用 EVAL_OUT 显式覆盖评测结果目录
+#   make eval-web                同 make run，但用 EVAL_ROOT 显式覆盖评测结果容器目录
 #                                （临时查看其它位置的历史数据时用）
 #
 # 测试（默认全部离线，不访问模型网络）:
@@ -42,7 +44,8 @@
 
 CONFIG ?= config.toml
 ARGS ?=
-EVAL_OUT ?= evaluation-results
+EVAL_ROOT ?= evaluation-results
+EVAL_OUT ?= $(EVAL_ROOT)/campaign-$(shell date +%Y%m%d-%H%M%S)
 EVAL_REPEATS ?= 1
 MANIFEST ?= evaluation/tasks/public/manifest.toml
 
@@ -64,8 +67,8 @@ help:
 	@echo "Evaluation (real model, needs the API key env var)"
 	@echo "  eval-run       Run a campaign over the public task set (EVAL_OUT/EVAL_REPEATS/CONFIG)"
 	@echo "  eval-judge     eval-run plus the LLM judge scoring every finished run"
-	@echo "  eval-history   List past campaigns with success rates and judge means"
-	@echo "  eval-web       Same as run, but overrides the results dir with EVAL_OUT"
+	@echo "  eval-history   List past campaigns with success rates and judge means (EVAL_ROOT)"
+	@echo "  eval-web       Same as run, but overrides the results container with EVAL_ROOT"
 	@echo ""
 	@echo "Test (offline by default)"
 	@echo "  test-backend   Run offline Python tests (excluding tests/live)"
@@ -78,7 +81,8 @@ help:
 	@echo ""
 	@echo "Variables"
 	@echo "  CONFIG=$(CONFIG)  ARGS='--workspace /path/to/project --open'"
-	@echo "  EVAL_OUT=$(EVAL_OUT)  EVAL_REPEATS=$(EVAL_REPEATS)  MANIFEST=$(MANIFEST)"
+	@echo "  EVAL_ROOT=$(EVAL_ROOT)  EVAL_OUT=$(EVAL_OUT)"
+	@echo "  EVAL_REPEATS=$(EVAL_REPEATS)  MANIFEST=$(MANIFEST)"
 
 install:
 	@test -d .venv || uv venv .venv --python 3.12
@@ -116,12 +120,12 @@ eval-judge:
 		--out "$(EVAL_OUT)"
 
 eval-history:
-	uv run --python 3.12 coding-agent-eval history --results "$(EVAL_OUT)"
+	uv run --python 3.12 coding-agent-eval history --results "$(EVAL_ROOT)"
 
 eval-web: build
 	uv run --python 3.12 coding-agent serve \
 		--config "$(CONFIG)" \
-		--eval-results "$(EVAL_OUT)" \
+		--eval-results "$(EVAL_ROOT)" \
 		$(ARGS)
 
 test-backend:
