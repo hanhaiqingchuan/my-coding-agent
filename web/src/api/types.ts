@@ -201,6 +201,16 @@ export type SessionTotalsDto = {
   cache_read_input_tokens: number;
 };
 
+export type DirectoryEntryDto = {
+  name: string;
+  path: string;
+};
+
+export type DirectoryListingDto = {
+  path: string;
+  directories: DirectoryEntryDto[];
+};
+
 export type SessionSnapshotDto = {
   session: SessionDto;
   active_run: RunDto | null;

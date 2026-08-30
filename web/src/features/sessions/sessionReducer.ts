@@ -211,7 +211,12 @@ function compactionFromEvent(event: DurableEvent): CompactionStatus | null {
         ? String((error as { code: unknown }).code)
         : undefined;
     if (typeof before === "number" && typeof after === "number") {
-      return { phase: "finished", beforeTokens: before, afterTokens: after, errorCode };
+      return {
+        phase: "finished",
+        beforeTokens: before,
+        afterTokens: after,
+        errorCode,
+      };
     }
     return { phase: "finished", beforeTokens: 0, afterTokens: 0, errorCode };
   }

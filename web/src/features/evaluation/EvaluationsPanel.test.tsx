@@ -53,9 +53,7 @@ test("shows the empty state when the results root has no campaigns", async () =>
 
   await waitFor(() =>
     expect(
-      screen.getByText(
-        "尚无评测记录——先运行 make eval-judge 生成",
-      ),
+      screen.getByText("尚无评测记录——先运行 make eval-judge 生成"),
     ).toBeTruthy(),
   );
 });
@@ -82,9 +80,7 @@ test("shows an error state when the campaign index cannot be read", async () => 
   );
 
   await waitFor(() =>
-    expect(
-      screen.getByText("无法加载评测轮次。"),
-    ).toBeTruthy(),
+    expect(screen.getByText("无法加载评测轮次。")).toBeTruthy(),
   );
 });
 

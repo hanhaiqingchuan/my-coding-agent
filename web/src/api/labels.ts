@@ -54,9 +54,3 @@ export function runStateLabel(state: RunState): string {
 export function toolStateLabel(state: ToolExecutionState): string {
   return TOOL_STATE_LABELS[state] ?? state;
 }
-
-export function roleLabel(role: string): string {
-  if (role === "user") return "用户";
-  if (role === "assistant") return "助手";
-  return role;
-}

@@ -161,10 +161,7 @@ export function RunDetail({ detail }: RunDetailProps) {
             </div>
           </dl>
           {typeof finalMessage === "string" && finalMessage !== "" ? (
-            <section
-              className="eval-final-message"
-              aria-label="最终助手消息"
-            >
+            <section className="eval-final-message" aria-label="最终助手消息">
               <h3>最终助手消息</h3>
               <p>{finalMessage}</p>
             </section>

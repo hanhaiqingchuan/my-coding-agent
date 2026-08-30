@@ -168,51 +168,51 @@ export function EvaluationsPanel({
             <>
               <MetricsCharts campaigns={campaigns.data} />
               <ul>
-              {campaigns.data.map((summary) => (
-                <li key={summary.directory}>
-                  <button
-                    type="button"
-                    className="eval-campaign-row"
-                    onClick={() =>
-                      setScreen({
-                        kind: "campaign",
-                        campaign: summary.directory,
-                      })
-                    }
-                  >
-                    <span className="eval-campaign-name">
-                      {campaignName(summary)}
-                      {summary.corrupt ? (
-                        <span className="eval-badge eval-fail">已损坏</span>
-                      ) : null}
-                    </span>
-                    <small className="eval-campaign-window">
-                      {timestamp(summary.started_at)} →{" "}
-                      {timestamp(summary.finished_at)}
-                    </small>
-                    <small className="eval-campaign-metrics">
-                      <span>{summary.task_count} 个任务</span>
-                      <span>{summary.started_runs} 次运行</span>
-                      <span>
-                        严格成功 <b>{percent(summary.strict_success_rate)}</b>
+                {campaigns.data.map((summary) => (
+                  <li key={summary.directory}>
+                    <button
+                      type="button"
+                      className="eval-campaign-row"
+                      onClick={() =>
+                        setScreen({
+                          kind: "campaign",
+                          campaign: summary.directory,
+                        })
+                      }
+                    >
+                      <span className="eval-campaign-name">
+                        {campaignName(summary)}
+                        {summary.corrupt ? (
+                          <span className="eval-badge eval-fail">已损坏</span>
+                        ) : null}
                       </span>
-                      {summary.judged_runs > 0 ? (
-                        <span>
-                          裁判 <b>{judgeMeans(summary)}</b>
-                        </span>
-                      ) : (
-                        <span>未评判</span>
-                      )}
-                      <span>{summary.model_name ?? "未知模型"}</span>
-                    </small>
-                    {summary.corrupt && summary.note !== null ? (
-                      <small className="eval-campaign-note">
-                        {summary.note}
+                      <small className="eval-campaign-window">
+                        {timestamp(summary.started_at)} →{" "}
+                        {timestamp(summary.finished_at)}
                       </small>
-                    ) : null}
-                  </button>
-                </li>
-              ))}
+                      <small className="eval-campaign-metrics">
+                        <span>{summary.task_count} 个任务</span>
+                        <span>{summary.started_runs} 次运行</span>
+                        <span>
+                          严格成功 <b>{percent(summary.strict_success_rate)}</b>
+                        </span>
+                        {summary.judged_runs > 0 ? (
+                          <span>
+                            裁判 <b>{judgeMeans(summary)}</b>
+                          </span>
+                        ) : (
+                          <span>未评判</span>
+                        )}
+                        <span>{summary.model_name ?? "未知模型"}</span>
+                      </small>
+                      {summary.corrupt && summary.note !== null ? (
+                        <small className="eval-campaign-note">
+                          {summary.note}
+                        </small>
+                      ) : null}
+                    </button>
+                  </li>
+                ))}
               </ul>
             </>
           )}

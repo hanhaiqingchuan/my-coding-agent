@@ -32,7 +32,15 @@ export function IconSend({ size = 14 }: IconProps) {
 export function IconStop({ size = 13 }: IconProps) {
   return (
     <svg {...base(size)}>
-      <rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor" stroke="none" />
+      <rect
+        x="6"
+        y="6"
+        width="12"
+        height="12"
+        rx="2"
+        fill="currentColor"
+        stroke="none"
+      />
     </svg>
   );
 }
@@ -109,7 +117,13 @@ export function IconChevronRight({ size = 12 }: IconProps) {
 }
 
 /** The tool-type glyph riding beside a tool card's name. */
-export function ToolGlyph({ name, size = 14 }: { name: string; size?: number }) {
+export function ToolGlyph({
+  name,
+  size = 14,
+}: {
+  name: string;
+  size?: number;
+}) {
   if (name.includes("command")) return <IconTerminal size={size} />;
   if (name.includes("write")) return <IconFileEdit size={size} />;
   if (name.includes("skill")) return <IconBook size={size} />;

@@ -95,9 +95,7 @@ test("the approval-mode button reports every flip and reflects the persisted mod
 test("typing a slash opens the command menu and picking one sends the command", async () => {
   const user = userEvent.setup();
   const onSend = vi.fn();
-  render(
-    <SlashHarness onSend={onSend} />,
-  );
+  render(<SlashHarness onSend={onSend} />);
 
   await user.type(screen.getByRole("textbox", { name: "消息" }), "/c");
 
@@ -113,9 +111,7 @@ test("typing a slash opens the command menu and picking one sends the command", 
 test("the slash menu filters by the typed prefix and Enter sends the highlight", async () => {
   const user = userEvent.setup();
   const onSend = vi.fn();
-  render(
-    <SlashHarness onSend={onSend} initialDraft="/comp" />,
-  );
+  render(<SlashHarness onSend={onSend} initialDraft="/comp" />);
 
   const textarea = screen.getByRole("textbox", { name: "消息" });
   await user.click(textarea);
@@ -128,9 +124,7 @@ test("the slash menu filters by the typed prefix and Enter sends the highlight",
 
 test("the slash menu stays closed for plain text and words with spaces", async () => {
   const user = userEvent.setup();
-  render(
-    <SlashHarness initialDraft="hello /clear world" />,
-  );
+  render(<SlashHarness initialDraft="hello /clear world" />);
 
   expect(screen.queryByRole("listbox", { name: "斜杠命令" })).toBeNull();
 

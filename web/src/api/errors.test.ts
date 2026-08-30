@@ -1,10 +1,7 @@
 import { afterEach, expect, test } from "vitest";
 import { cleanup } from "@testing-library/react";
 
-import {
-  describeStopOutcome,
-  failureBannerFor,
-} from "./errors";
+import { describeStopOutcome, failureBannerFor } from "./errors";
 import { STOP_REASONS, type RunDto, type RunTotalsDto } from "./types";
 
 afterEach(cleanup);
@@ -48,42 +45,12 @@ test("keeps the neutral outcomes separate from the error outcomes", () => {
 });
 
 test.each([
-  [
-    "auth_error",
-    "鉴权",
-    /密钥/,
-    /密钥|环境变量/,
-  ],
-  [
-    "retry_exhausted",
-    "重试",
-    /限流|服务/,
-    /稍后|重试/,
-  ],
-  [
-    "context_overflow",
-    "上下文",
-    /上下文/,
-    /新会话|窗口/,
-  ],
-  [
-    "model_protocol_error",
-    "协议",
-    /协议/,
-    /.+/,
-  ],
-  [
-    "internal_error",
-    "内部错误",
-    /内部/,
-    /运行 ID|重试/,
-  ],
-  [
-    "output_truncated",
-    "截断",
-    /截断/,
-    /继续|token/,
-  ],
+  ["auth_error", "鉴权", /密钥/, /密钥|环境变量/],
+  ["retry_exhausted", "重试", /限流|服务/, /稍后|重试/],
+  ["context_overflow", "上下文", /上下文/, /新会话|窗口/],
+  ["model_protocol_error", "协议", /协议/, /.+/],
+  ["internal_error", "内部错误", /内部/, /运行 ID|重试/],
+  ["output_truncated", "截断", /截断/, /继续|token/],
 ])(
   "describes %s with a title, a cause and an actionable hint",
   (code, titleFragment, descriptionPattern, hintPattern) => {
@@ -122,7 +89,9 @@ test("a failed run yields a banner that carries the retry fact", () => {
   const banner = failureBannerFor(finishedRun({ state: "failed" }));
   expect(banner).not.toBeNull();
   expect(banner?.runId).toBe("run-1");
-  expect(banner?.title).toBe(describeStopOutcome("retry_exhausted", null)?.title);
+  expect(banner?.title).toBe(
+    describeStopOutcome("retry_exhausted", null)?.title,
+  );
   expect(banner?.description).toContain("限流");
   expect(banner?.hint).not.toBeNull();
   expect(banner?.retryCount).toBe(3);
@@ -130,20 +99,27 @@ test("a failed run yields a banner that carries the retry fact", () => {
 
 test("a failed run with zero retries reports no retry count", () => {
   const banner = failureBannerFor(
-    finishedRun({ state: "failed", totals: { ...ZERO_TOTALS, retry_count: 0 } }),
+    finishedRun({
+      state: "failed",
+      totals: { ...ZERO_TOTALS, retry_count: 0 },
+    }),
   );
   expect(banner?.retryCount).toBe(0);
 });
 
 test("a user stop never yields a banner", () => {
   expect(
-    failureBannerFor(finishedRun({ state: "cancelled", stop_reason: "user_stop" })),
+    failureBannerFor(
+      finishedRun({ state: "cancelled", stop_reason: "user_stop" }),
+    ),
   ).toBeNull();
 });
 
 test("a completed run never yields a banner", () => {
   expect(
-    failureBannerFor(finishedRun({ state: "completed", stop_reason: "completed" })),
+    failureBannerFor(
+      finishedRun({ state: "completed", stop_reason: "completed" }),
+    ),
   ).toBeNull();
 });
 

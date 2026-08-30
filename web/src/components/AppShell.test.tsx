@@ -1,4 +1,10 @@
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, test, vi } from "vitest";
 
@@ -16,12 +22,11 @@ test("renders semantic session, conversation, and run-details regions", () => {
   );
 
   expect(
-    screen.getByRole("navigation", { name: "会话与工作区" })
-      .textContent,
+    screen.getByRole("navigation", { name: "会话与工作区" }).textContent,
   ).toContain("Sessions");
-  expect(
-    screen.getByRole("main", { name: "对话" }).textContent,
-  ).toContain("Conversation");
+  expect(screen.getByRole("main", { name: "对话" }).textContent).toContain(
+    "Conversation",
+  );
   expect(
     screen.getByRole("complementary", { name: "运行详情" }).textContent,
   ).toContain("Idle");

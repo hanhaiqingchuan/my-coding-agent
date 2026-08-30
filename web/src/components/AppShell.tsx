@@ -81,16 +81,18 @@ export function AppShell({
   // Dragging the left rail's right edge rightwards widens it; dragging the right
   // rail's left edge rightwards narrows it, hence the opposite signs.
   const resizeSidebar = useCallback((delta: number) => {
-    setSidebarWidth((width) => clampWidth(width + delta, SIDEBAR_MIN, SIDEBAR_MAX));
+    setSidebarWidth((width) =>
+      clampWidth(width + delta, SIDEBAR_MIN, SIDEBAR_MAX),
+    );
   }, []);
   const resizeDetails = useCallback((delta: number) => {
-    setDetailsWidth((width) => clampWidth(width - delta, DETAILS_MIN, DETAILS_MAX));
+    setDetailsWidth((width) =>
+      clampWidth(width - delta, DETAILS_MIN, DETAILS_MAX),
+    );
   }, []);
 
   const shellStyle = {
-    "--sidebar-track": sidebarCollapsed
-      ? COLLAPSED_TRACK
-      : `${sidebarWidth}px`,
+    "--sidebar-track": sidebarCollapsed ? COLLAPSED_TRACK : `${sidebarWidth}px`,
     "--details-track": detailsCollapsed ? COLLAPSED_TRACK : `${detailsWidth}px`,
   } as CSSProperties;
 
@@ -148,7 +150,10 @@ export function AppShell({
         </button>
         {detailsCollapsed ? null : (
           <>
-            <RailResizeHandle label="调整运行详情栏宽度" onDelta={resizeDetails} />
+            <RailResizeHandle
+              label="调整运行详情栏宽度"
+              onDelta={resizeDetails}
+            />
             <div className="rail-scroll">{runDetails}</div>
           </>
         )}

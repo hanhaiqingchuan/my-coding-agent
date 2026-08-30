@@ -35,16 +35,8 @@
       "model_protocol_error",
       "internal_error"
     ],
-    "ApprovalStatus": [
-      "pending",
-      "approved",
-      "rejected",
-      "cancelled"
-    ],
-    "ApprovalDecision": [
-      "approve",
-      "reject"
-    ],
+    "ApprovalStatus": ["pending", "approved", "rejected", "cancelled"],
+    "ApprovalDecision": ["approve", "reject"],
     "ToolExecutionState": [
       "queued",
       "awaiting_approval",

@@ -23,9 +23,7 @@ function seconds(ms: number | null): string {
 }
 
 function tokens(value: number | null): string {
-  return value === null
-    ? "—"
-    : Math.round(value).toLocaleString("en-US");
+  return value === null ? "—" : Math.round(value).toLocaleString("en-US");
 }
 
 function means(values: Record<string, number | null>): string {
@@ -187,9 +185,7 @@ export function EvaluationDetail({ detail, onOpenRun }: EvaluationDetailProps) {
                     <td aria-label="轮次">{row.rounds ?? "—"}</td>
                     <td aria-label="工具调用">{row.tool_calls ?? "—"}</td>
                     <td aria-label="输入 Token">{row.input_tokens ?? "—"}</td>
-                    <td aria-label="输出 Token">
-                      {row.output_tokens ?? "—"}
-                    </td>
+                    <td aria-label="输出 Token">{row.output_tokens ?? "—"}</td>
                     <td aria-label="耗时">{duration(row)}</td>
                     <td>
                       <span

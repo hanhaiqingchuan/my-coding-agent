@@ -31,18 +31,20 @@ test("renders the evidence-based percentage from the builder estimate", () => {
 });
 
 test("the level steps up at the compaction thresholds", () => {
-  const { rerender } = render(<ContextGauge context={context(45_000, 60_000)} />);
+  const { rerender } = render(
+    <ContextGauge context={context(45_000, 60_000)} />,
+  );
   expect(
-    screen.getByRole("status", { name: "上下文占用" }).querySelector(
-      ".context-gauge-warn",
-    ),
+    screen
+      .getByRole("status", { name: "上下文占用" })
+      .querySelector(".context-gauge-warn"),
   ).not.toBeNull();
 
   rerender(<ContextGauge context={context(55_000, 60_000)} />);
   expect(
-    screen.getByRole("status", { name: "上下文占用" }).querySelector(
-      ".context-gauge-high",
-    ),
+    screen
+      .getByRole("status", { name: "上下文占用" })
+      .querySelector(".context-gauge-high"),
   ).not.toBeNull();
 });
 
@@ -52,9 +54,7 @@ test("renders nothing without a recorded estimate rather than inventing a figure
 });
 
 test("renders nothing when the backend reports a degenerate window", () => {
-  const { container } = render(
-    <ContextGauge context={context(0, 0)} />,
-  );
+  const { container } = render(<ContextGauge context={context(0, 0)} />);
   expect(container.textContent).toBe("");
 });
 

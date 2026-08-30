@@ -5,14 +5,15 @@ import type { ApprovalDecision, SessionDto } from "./api/types";
 import { connectionLabel } from "./api/labels";
 import { ApprovalDock } from "./components/ApprovalDock";
 import { AppShell } from "./components/AppShell";
+import { BrandArt } from "./components/BrandArt";
 import { Composer } from "./components/Composer";
 import { CompactionChip } from "./components/CompactionChip";
 import { ContextGauge } from "./components/ContextGauge";
 import { ConversationTimeline } from "./components/ConversationTimeline";
+import { NewSessionDialog } from "./components/NewSessionDialog";
 import { RunDetailsPanel } from "./components/RunDetailsPanel";
 import { SessionSidebar } from "./components/SessionSidebar";
 import { ViewSwitcher, type AppView } from "./components/ViewSwitcher";
-import { WorkspacePicker } from "./components/WorkspacePicker";
 import { EvaluationsPanel } from "./features/evaluation/EvaluationsPanel";
 import { EvaluationClient } from "./features/evaluation/evaluationApi";
 import { useSession } from "./features/sessions/useSession";
@@ -50,6 +51,7 @@ export default function App() {
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(
     null,
   );
+  const [newSessionOpen, setNewSessionOpen] = useState(false);
   const { state, dispatch, send } = useSession(api, selectedSessionId);
 
   useEffect(() => {
@@ -68,7 +70,8 @@ export default function App() {
   async function deleteSession(sessionId: string) {
     const target = sessions.find((session) => session.id === sessionId);
     const label = target?.title ?? "未命名会话";
-    if (!window.confirm(`删除会话「${label}」？该会话的全部记录将被移除。`)) return;
+    if (!window.confirm(`删除会话「${label}」？该会话的全部记录将被移除。`))
+      return;
     try {
       await api.deleteSession(sessionId);
     } catch {
@@ -202,6 +205,9 @@ export default function App() {
       <div className="app-shell evaluations-shell">
         <nav className="session-sidebar" aria-label="会话与工作区">
           <ViewSwitcher view={route.view} onViewChange={switchView} />
+          <div className="rail-brand">
+            <h1 className="rail-brand-name">Make Code Great Again</h1>
+          </div>
         </nav>
         <main className="conversation-panel" aria-label="评测记录">
           <EvaluationsPanel
@@ -215,89 +221,110 @@ export default function App() {
   }
 
   return (
-    <AppShell
-      sidebar={
-        <>
-          <ViewSwitcher view={route.view} onViewChange={switchView} />
-          <WorkspacePicker onCreate={createSession} />
-          <SessionSidebar
-            sessions={sessions}
-            selectedSessionId={selectedSessionId}
-            onSelect={setSelectedSessionId}
-            onDelete={deleteSession}
-          />
-        </>
-      }
-      conversation={
-        <div className="conversation-workbench">
-          <header className="conversation-heading">
-            <div>
-              <p>会话</p>
-              <h1>{snapshot?.session.title ?? "对话"}</h1>
+    <>
+      <AppShell
+        sidebar={
+          <>
+            <ViewSwitcher view={route.view} onViewChange={switchView} />
+            <div className="rail-brand">
+              <h1 className="rail-brand-name">Make Code Great Again</h1>
+              <button
+                type="button"
+                className="new-session-open"
+                onClick={() => setNewSessionOpen(true)}
+              >
+                创建新会话
+              </button>
             </div>
-            <span
-              className={`connection-status connection-${state.connection}`}
-            >
-              {connectionLabel(state.connection)}
-            </span>
-          </header>
-          {snapshot === null ? (
-            <section className="conversation-empty">
-              <p>先打开一个工作区开始。</p>
-            </section>
-          ) : timelineEmpty ? (
-            <section className="conversation-empty">
-              <p className="conversation-empty-title">给智能体下达第一个任务</p>
-              <p>
-                描述要读写的文件和要达成的目标；写文件、执行命令都会先经过你批准。
-                输入 / 查看可用命令。
-              </p>
-            </section>
-          ) : (
-            <ConversationTimeline
-              messages={snapshot.messages}
-              tools={snapshot.tools}
-              assistantDrafts={state.assistantDrafts}
-              thinkingDrafts={state.thinkingDrafts}
-              toolOutputDrafts={state.toolOutputDrafts}
-              interruptedBanner={snapshot.interrupted_banner}
-              lastFinishedRun={snapshot.last_finished_run}
-              onAcknowledgeRecovery={acknowledgeRecovery}
+            <SessionSidebar
+              sessions={sessions}
+              selectedSessionId={selectedSessionId}
+              onSelect={setSelectedSessionId}
+              onDelete={deleteSession}
             />
-          )}
-          <div className="conversation-controls">
-            <ApprovalDock
-              pendingApproval={snapshot?.pending_approval ?? null}
-              onResolve={resolveApproval}
-            />
-            <Composer
-              activeRun={snapshot?.active_run ?? null}
-              draft={state.draftText}
-              autoApprove={snapshot?.session.auto_approve ?? false}
-              isRecoveryBlocked={recoveryBlocked}
-              onDraftChange={(draftText) =>
-                dispatch({ type: "draft.changed", draftText })
-              }
-              onSend={startRun}
-              onStop={stopRun}
-              onApprovalModeChange={setApprovalMode}
-              onAcknowledgeRecovery={acknowledgeRecovery}
-            />
-            {/* The focus run is the active one, else the last finished one: the
-                gauge keeps reporting the context the model actually saw. */}
-            <div className="composer-status">
-              <ContextGauge
-                context={
-                  (snapshot?.active_run ?? snapshot?.last_finished_run)?.context ??
-                  null
-                }
+          </>
+        }
+        conversation={
+          <div className="conversation-workbench">
+            <header className="conversation-heading">
+              <div>
+                <p>会话</p>
+                <h1>{snapshot?.session.title ?? "对话"}</h1>
+              </div>
+              <span
+                className={`connection-status connection-${state.connection}`}
+              >
+                {connectionLabel(state.connection)}
+              </span>
+            </header>
+            {snapshot === null ? (
+              <section className="conversation-empty">
+                <p>先打开一个工作区开始。</p>
+              </section>
+            ) : timelineEmpty ? (
+              <section className="conversation-empty">
+                <BrandArt />
+                <p className="conversation-empty-title">
+                  给 Make Code Great Again 下达第一个任务
+                </p>
+                <p>
+                  描述要读写的文件和要达成的目标；写文件、执行命令都会先经过你批准。
+                  输入 / 查看可用命令。
+                </p>
+              </section>
+            ) : (
+              <ConversationTimeline
+                messages={snapshot.messages}
+                tools={snapshot.tools}
+                assistantDrafts={state.assistantDrafts}
+                thinkingDrafts={state.thinkingDrafts}
+                toolOutputDrafts={state.toolOutputDrafts}
+                interruptedBanner={snapshot.interrupted_banner}
+                lastFinishedRun={snapshot.last_finished_run}
+                onAcknowledgeRecovery={acknowledgeRecovery}
               />
-              <CompactionChip status={state.compaction} />
+            )}
+            <div className="conversation-controls">
+              <ApprovalDock
+                pendingApproval={snapshot?.pending_approval ?? null}
+                onResolve={resolveApproval}
+              />
+              <Composer
+                activeRun={snapshot?.active_run ?? null}
+                draft={state.draftText}
+                autoApprove={snapshot?.session.auto_approve ?? false}
+                isRecoveryBlocked={recoveryBlocked}
+                onDraftChange={(draftText) =>
+                  dispatch({ type: "draft.changed", draftText })
+                }
+                onSend={startRun}
+                onStop={stopRun}
+                onApprovalModeChange={setApprovalMode}
+                onAcknowledgeRecovery={acknowledgeRecovery}
+              />
+              {/* The focus run is the active one, else the last finished one: the
+                gauge keeps reporting the context the model actually saw. */}
+              <div className="composer-status">
+                <ContextGauge
+                  context={
+                    (snapshot?.active_run ?? snapshot?.last_finished_run)
+                      ?.context ?? null
+                  }
+                />
+                <CompactionChip status={state.compaction} />
+              </div>
             </div>
           </div>
-        </div>
-      }
-      runDetails={<RunDetailsPanel snapshot={snapshot} />}
-    />
+        }
+        runDetails={<RunDetailsPanel snapshot={snapshot} />}
+      />
+      <NewSessionDialog
+        api={api}
+        open={newSessionOpen}
+        startPath={snapshot?.session.workspace_realpath ?? null}
+        onClose={() => setNewSessionOpen(false)}
+        onCreate={createSession}
+      />
+    </>
   );
 }

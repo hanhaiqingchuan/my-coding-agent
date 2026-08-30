@@ -147,5 +147,7 @@ test("truncates oversized write content and says how much it is showing", async 
 
   const card = screen.getByRole("article", { name: "write_file 成功" });
   expect(card.textContent).not.toContain(content);
-  expect(card.textContent).toContain("已截断：仅显示前 2000 字符（共 5000 字符）");
+  expect(card.textContent).toContain(
+    "已截断：仅显示前 2000 字符（共 5000 字符）",
+  );
 });

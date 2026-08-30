@@ -34,8 +34,12 @@ test("renders the supported block subset of an assistant message", () => {
   );
 
   // `#` renders as h2 (one level down from the timeline's own headings), `##` as h3.
-  expect(screen.getByRole("heading", { level: 2, name: "标题一" })).not.toBeNull();
-  expect(screen.getByRole("heading", { level: 3, name: "小节" })).not.toBeNull();
+  expect(
+    screen.getByRole("heading", { level: 2, name: "标题一" }),
+  ).not.toBeNull();
+  expect(
+    screen.getByRole("heading", { level: 3, name: "小节" }),
+  ).not.toBeNull();
   expect(screen.getByText("加粗").tagName).toBe("STRONG");
   expect(screen.getByText("斜体").tagName).toBe("EM");
   expect(screen.getByText("行内代码").tagName).toBe("CODE");
@@ -60,9 +64,7 @@ test("renders an http link and a copy button on fenced code blocks", async () =>
     writable: true,
   });
 
-  render(
-    <Markdown text={"```\nconst answer = 42;\n```"} />,
-  );
+  render(<Markdown text={"```\nconst answer = 42;\n```"} />);
 
   await user.click(screen.getByRole("button", { name: "复制" }));
   expect(writeText).toHaveBeenCalledWith("const answer = 42;");
@@ -128,7 +130,12 @@ test("emphasis markers without a pair stay literal text", () => {
 test("renders a GFM pipe table as a real table", () => {
   render(
     <Markdown
-      text={["| 能力 | 触发场景 |", "| --- | --- |", "| 搜索 | 找资料时 |", "| 写文件 | 改代码时 |"].join("\n")}
+      text={[
+        "| 能力 | 触发场景 |",
+        "| --- | --- |",
+        "| 搜索 | 找资料时 |",
+        "| 写文件 | 改代码时 |",
+      ].join("\n")}
     />,
   );
 

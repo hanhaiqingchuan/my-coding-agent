@@ -1,4 +1,9 @@
-import type { BootstrapDto, SessionDto, SessionSnapshotDto } from "./types";
+import type {
+  BootstrapDto,
+  DirectoryListingDto,
+  SessionDto,
+  SessionSnapshotDto,
+} from "./types";
 
 export class ApiError extends Error {
   constructor(
@@ -34,6 +39,15 @@ export class ApiClient {
   async listSessions(): Promise<SessionDto[]> {
     return this.request<SessionDto[]>(
       "/api/sessions",
+      { method: "GET" },
+      false,
+    );
+  }
+
+  /** Read-only directory listing for the visual workspace picker. */
+  async browseDirectories(path: string): Promise<DirectoryListingDto> {
+    return this.request<DirectoryListingDto>(
+      `/api/directories?path=${encodeURIComponent(path)}`,
       { method: "GET" },
       false,
     );

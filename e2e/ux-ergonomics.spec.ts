@@ -14,6 +14,7 @@ async function createSession(
   const title = `${name} ${Date.now()}`;
 
   await page.goto("/");
+  await page.getByRole("button", { name: "创建新会话" }).click();
   await page.getByRole("textbox", { name: "工作区" }).fill(state.workspace);
   await page.getByLabel(/会话名称/).fill(title);
   await page.getByRole("button", { name: "打开工作区" }).click();

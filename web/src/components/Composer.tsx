@@ -102,7 +102,7 @@ export function Composer({
         placeholder={
           isRecoveryBlocked
             ? "请先确认已检查工作区/进程，再发送消息"
-            : "给智能体发消息，或输入 / 使用命令"
+            : "给 Make Code Great Again 发消息，或输入 / 使用命令"
         }
         onChange={(event) => onDraftChange(event.target.value)}
         onKeyDown={(event) => {
@@ -140,7 +140,11 @@ export function Composer({
                 type="button"
                 role="option"
                 aria-selected={index === highlighted}
-                className={index === highlighted ? "slash-item slash-item-active" : "slash-item"}
+                className={
+                  index === highlighted
+                    ? "slash-item slash-item-active"
+                    : "slash-item"
+                }
                 onMouseEnter={() => setHighlighted(index)}
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => pick(index)}

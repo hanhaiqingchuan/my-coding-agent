@@ -159,14 +159,10 @@ test("renders the fixed approval dock and sends only backend commands for approv
   await waitFor(() =>
     expect(screen.getByRole("button", { name: "批准" })).not.toBeNull(),
   );
-  expect(
-    screen.getByRole("region", { name: "待审批" }),
-  ).not.toBeNull();
+  expect(screen.getByRole("region", { name: "待审批" })).not.toBeNull();
 
   await user.click(screen.getByRole("button", { name: "批准" }));
-  await user.click(
-    screen.getByRole("button", { name: "我已检查工作区/进程" }),
-  );
+  await user.click(screen.getByRole("button", { name: "我已检查工作区/进程" }));
 
   expect(mocks.send).toHaveBeenCalledWith(
     expect.objectContaining({
@@ -203,9 +199,7 @@ test("the left rail switches views by writing the location hash", async () => {
     ).toBe("page"),
   );
   expect(window.location.hash).toBe("#/evaluations");
-  await waitFor(() =>
-    expect(screen.getByText(/尚无评测记录/)).toBeTruthy(),
-  );
+  await waitFor(() => expect(screen.getByText(/尚无评测记录/)).toBeTruthy());
   expect(screen.queryByRole("button", { name: "停止" })).toBeNull();
 
   await user.click(screen.getByRole("button", { name: "会话" }));
@@ -224,18 +218,14 @@ test("restores the evaluations view when the hash is set before mount", async ()
   window.location.hash = "#/evaluations";
   render(<App />);
 
-  await waitFor(() =>
-    expect(screen.getByText(/尚无评测记录/)).toBeTruthy(),
-  );
+  await waitFor(() => expect(screen.getByText(/尚无评测记录/)).toBeTruthy());
   expect(
     screen
       .getByRole("button", { name: "评测记录" })
       .getAttribute("aria-current"),
   ).toBe("page");
   expect(
-    screen
-      .getByRole("button", { name: "会话" })
-      .getAttribute("aria-current"),
+    screen.getByRole("button", { name: "会话" }).getAttribute("aria-current"),
   ).toBeNull();
   expect(screen.queryByRole("button", { name: "停止" })).toBeNull();
 });
@@ -247,9 +237,7 @@ test("follows hashchange events so refresh, back and pasted links restore the vi
   );
 
   window.location.hash = "#/evaluations";
-  await waitFor(() =>
-    expect(screen.getByText(/尚无评测记录/)).toBeTruthy(),
-  );
+  await waitFor(() => expect(screen.getByText(/尚无评测记录/)).toBeTruthy());
   expect(screen.queryByRole("button", { name: "停止" })).toBeNull();
 
   window.location.hash = "";
@@ -369,8 +357,8 @@ test("the context gauge under the composer reports the focus run estimate", asyn
   const activeRun = snapshot.active_run;
   if (activeRun !== null) {
     activeRun.context = {
-    estimated_tokens: 12_000,
-    available_tokens: 60_000,
+      estimated_tokens: 12_000,
+      available_tokens: 60_000,
       window_tokens: 64_000,
     };
   }
@@ -379,9 +367,9 @@ test("the context gauge under the composer reports the focus run estimate", asyn
   await waitFor(() =>
     expect(screen.getByRole("status", { name: "上下文占用" })).toBeTruthy(),
   );
-  expect(screen.getByRole("status", { name: "上下文占用" }).textContent).toContain(
-    "20%",
-  );
+  expect(
+    screen.getByRole("status", { name: "上下文占用" }).textContent,
+  ).toContain("20%");
 });
 
 test("the compaction chip renders the finished compaction next to the gauge", async () => {
@@ -393,6 +381,8 @@ test("the compaction chip renders the finished compaction next to the gauge", as
   render(<App />);
 
   await waitFor(() =>
-    expect(screen.getByText("上下文已压缩：61,440 → 33,200 tokens")).toBeTruthy(),
+    expect(
+      screen.getByText("上下文已压缩：61,440 → 33,200 tokens"),
+    ).toBeTruthy(),
   );
 });

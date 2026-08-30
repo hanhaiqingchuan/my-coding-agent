@@ -192,9 +192,7 @@ test("removes a handled approval dock while its tool card remains in the timelin
       <ApprovalDock pendingApproval={pendingCommand} onResolve={vi.fn()} />
     </>,
   );
-  expect(
-    screen.getByRole("region", { name: "待审批" }),
-  ).not.toBeNull();
+  expect(screen.getByRole("region", { name: "待审批" })).not.toBeNull();
 
   rerender(
     <>

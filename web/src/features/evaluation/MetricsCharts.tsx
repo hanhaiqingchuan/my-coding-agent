@@ -64,7 +64,8 @@ const METRICS: Metric[] = [
     key: "duration",
     label: "平均耗时",
     hint: "秒",
-    extract: (s) => (s.avg_duration_ms === null ? null : s.avg_duration_ms / 1000),
+    extract: (s) =>
+      s.avg_duration_ms === null ? null : s.avg_duration_ms / 1000,
     format: (v) => `${v.toFixed(1)}s`,
   },
   {
@@ -78,7 +79,9 @@ const METRICS: Metric[] = [
 
 /** campaign-20260830-184647 → 08-30 18:46; anything else passes through. */
 function shortLabel(directory: string): string {
-  const match = /^campaign-(?:\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})/.exec(directory);
+  const match = /^campaign-(?:\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})/.exec(
+    directory,
+  );
   return match === null
     ? directory
     : `${match[1]}-${match[2]} ${match[3]}:${match[4]}`;
@@ -101,6 +104,15 @@ function MetricChart({
   const peak = present.length > 0 ? Math.max(...present) : 0;
   const slot = CHART_W / campaigns.length;
   const barWidth = Math.min(44, slot * 0.56);
+  const heightOf = (value: number) =>
+    peak === 0 ? 0 : Math.max(2, (value / peak) * MAX_BAR_H);
+  const trend = campaigns
+    .map((campaign, index) => {
+      const value = values[index];
+      if (value == null) return null;
+      return { x: slot * index + slot / 2, y: BASE_Y - heightOf(value) };
+    })
+    .filter((point): point is { x: number; y: number } => point !== null);
 
   return (
     <figure className="metric-chart">
@@ -138,8 +150,7 @@ function MetricChart({
                 </text>
               );
             }
-            const height =
-              peak === 0 ? 0 : Math.max(2, (value / peak) * MAX_BAR_H);
+            const height = heightOf(value);
             return (
               <g key={campaign.directory}>
                 <title>{`${shortLabel(campaign.directory)}：${metric.format(value)}`}</title>
@@ -152,11 +163,7 @@ function MetricChart({
                   rx={3}
                   style={{ animationDelay: `${index * 70}ms` }}
                 />
-                <text
-                  className="metric-value"
-                  x={cx}
-                  y={BASE_Y - height - 5}
-                >
+                <text className="metric-value" x={cx} y={BASE_Y - height - 5}>
                   {metric.format(value)}
                 </text>
                 <text className="metric-label" x={cx} y={BASE_Y + 14}>
@@ -165,6 +172,21 @@ function MetricChart({
               </g>
             );
           })}
+          {trend.length > 1 ? (
+            <polyline
+              className="metric-trend"
+              points={trend.map((point) => `${point.x},${point.y}`).join(" ")}
+            />
+          ) : null}
+          {trend.map((point, index) => (
+            <circle
+              key={index}
+              className="metric-trend-dot"
+              cx={point.x}
+              cy={point.y}
+              r={3}
+            />
+          ))}
         </svg>
       )}
     </figure>

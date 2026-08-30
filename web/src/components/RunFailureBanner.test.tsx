@@ -55,9 +55,7 @@ test("shows the banner again when a different run fails", async () => {
   const { rerender } = render(<RunFailureBanner failure={EXHAUSTED} />);
 
   await user.click(screen.getByRole("button", { name: "关闭提示" }));
-  rerender(
-    <RunFailureBanner failure={{ ...EXHAUSTED, runId: "run-2" }} />,
-  );
+  rerender(<RunFailureBanner failure={{ ...EXHAUSTED, runId: "run-2" }} />);
 
   expect(screen.getByText("请求重试用尽")).not.toBeNull();
 });

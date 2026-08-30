@@ -339,9 +339,7 @@ test("requires recovery acknowledgement before continuing after a server restart
   expect(screen.getByRole("alert").textContent).toContain(
     "上一轮运行因服务重启而中断",
   );
-  await user.click(
-    screen.getByRole("button", { name: "我已检查工作区/进程" }),
-  );
+  await user.click(screen.getByRole("button", { name: "我已检查工作区/进程" }));
   expect(onAcknowledgeRecovery).toHaveBeenCalledTimes(1);
 });
 

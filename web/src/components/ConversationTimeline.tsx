@@ -80,10 +80,7 @@ export function ConversationTimeline({
   };
 
   return (
-    <section
-      className="conversation-timeline"
-      aria-label="对话时间线"
-    >
+    <section className="conversation-timeline" aria-label="对话时间线">
       {interruptedBanner !== null ? (
         <InterruptedBanner
           banner={interruptedBanner}

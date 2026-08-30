@@ -2,10 +2,12 @@ import { motion } from "motion/react";
 
 import { riseIn } from "../motion";
 import type { MessageDto, MessagePartDto } from "../api/types";
-import { roleLabel } from "../api/labels";
 import type { ThinkingDraft } from "../features/sessions/sessionReducer";
 import { Markdown } from "./markdown";
 import { ThinkingDisclosure } from "./ThinkingDisclosure";
+
+/** The assistant speaks under the product's name; the user's cards need none. */
+const ASSISTANT_LABEL = "Make Code Great Again";
 
 type MessageBubbleProps = {
   message: MessageDto;
@@ -61,7 +63,7 @@ export function MessageBubble({
         initial="initial"
         animate="animate"
       >
-        <header>助手 · 生成中</header>
+        <header>{ASSISTANT_LABEL} · 生成中</header>
         {hasThinking ? (
           <ThinkingDisclosure
             text={thinking.text}
@@ -94,7 +96,7 @@ export function MessageBubble({
       initial="initial"
       animate="animate"
     >
-      <header>{roleLabel(message.role)}</header>
+      {message.role === "assistant" ? <header>{ASSISTANT_LABEL}</header> : null}
       {segments.map((segment, index) =>
         segment.kind === "thinking" ? (
           <ThinkingDisclosure key={index} text={segment.text} />

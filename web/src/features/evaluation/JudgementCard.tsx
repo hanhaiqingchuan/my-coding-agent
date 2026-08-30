@@ -28,10 +28,7 @@ export function JudgementCard({ judgement, note = null }: JudgementCardProps) {
       );
     }
     return (
-      <section
-        className="judgement-card judgement-empty"
-        aria-label="裁判"
-      >
+      <section className="judgement-card judgement-empty" aria-label="裁判">
         <p>该运行没有裁判记录。</p>
       </section>
     );

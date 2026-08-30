@@ -191,8 +191,9 @@ function SessionTotalsCard({ totals }: { totals: SessionTotalsDto }) {
         {totals.output_tokens.toLocaleString()}
       </p>
       <p className="run-details-note">
-        缓存写入 {totals.cache_creation_input_tokens.toLocaleString()} · 缓存读取{" "}
-        {totals.cache_read_input_tokens.toLocaleString()}，跨全部运行累计。
+        缓存写入 {totals.cache_creation_input_tokens.toLocaleString()} ·
+        缓存读取 {totals.cache_read_input_tokens.toLocaleString()}
+        ，跨全部运行累计。
       </p>
     </section>
   );

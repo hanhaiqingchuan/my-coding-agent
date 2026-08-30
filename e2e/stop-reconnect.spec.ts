@@ -19,6 +19,7 @@ async function scriptedState(request: APIRequestContext) {
 
 async function createSession(page: Page, workspace: string, title: string) {
   await page.goto("/");
+  await page.getByRole("button", { name: "创建新会话" }).click();
   await page.getByRole("textbox", { name: "工作区" }).fill(workspace);
   await page.getByLabel(/会话名称/).fill(title);
   await page.getByRole("button", { name: "打开工作区" }).click();
