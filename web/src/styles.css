@@ -1,84 +1,87 @@
 /* ---------------------------------------------------------------------------
-   Design tokens: one typographic scale, one spacing scale, one state palette.
-   Every colour pair below was checked against WCAG AA (>= 4.5:1) on the
-   surface it is used on.
+   Lit Console — 明室暗井
+
+   You supervise from a lit desk; the machine's artifacts (commands, diffs,
+   output, reasoning) live in dark wells. Light chrome, dark data: the material
+   contrast is the signature. Colour pairs are chosen for WCAG AA (>= 4.5:1)
+   on the surface they sit on; wells keep their own on-dark tokens.
    --------------------------------------------------------------------------- */
 :root {
-  /* Surfaces */
-  --bg-app: #0e1217;
-  --bg-panel: #141a21;
-  --bg-raised: #19212a;
-  --bg-button: #212b36;
-  --bg-button-hover: #2a3745;
-  --bg-sunken: #0b0f14;
-  --bg-user: #1a2836;
-  --bg-selected: #1e2937;
+  /* Lit chrome */
+  --paper: #edeff2;
+  --card: #fafbfc;
+  --sunken: #e4e7ec;
+  --ink: #1b2430;
+  --ink-soft: #4d5966;
+  --ink-faint: #66727f;
+  --line: #d5dbe2;
+  --line-strong: #b7c0ca;
 
-  /* Lines */
-  --border-subtle: #232c36;
-  --border-strong: #33404e;
-  --border-user: #3a5570;
+  /* Dark wells: machine output only */
+  --well: #161c24;
+  --well-edge: #2a3442;
+  --well-fg: #d8e1ea;
+  --well-muted: #9aa7b4;
+  --well-accent: #8fa6ff;
 
-  /* Text */
-  --text-primary: #e6edf5;
-  --text-secondary: #b6c3d1;
-  --text-muted: #93a1b1;
-  --code-fg: #cfdae6;
+  /* Action accent (indigo) */
+  --accent: #2e4fd7;
+  --accent-strong: #2440b8;
+  --accent-soft-bg: #e4e9fa;
+  --accent-on: #ffffff;
 
-  /* Accent and focus */
-  --accent: #7cc4ff;
-  --accent-soft: #9ad0ff;
+  /* State palette (light-tuned; fg on its bg >= 4.5:1) */
+  --amber-fg: #92580a;
+  --amber-strong: #7a4906;
+  --amber-bg: #fdf3e0;
+  --amber-border: #e3c98f;
+  --amber-line: #d99b2b;
 
-  /* State palette: pending / running / success / failure / refusal /
-     cancelled / skipped / indeterminate / compacting */
-  --amber-fg: #f2c879;
-  --amber-fg-strong: #f5cd7d;
-  --amber-bg: #2a2114;
-  --amber-border: #6b5424;
-  --amber-line: #d9a740;
+  --info-fg: #1d5fa8;
+  --info-bg: #e5effa;
+  --info-border: #a9c6e6;
+  --info-line: #4e8ccf;
 
-  --info-fg: #8ec7f5;
-  --info-bg: #14212e;
-  --info-border: #2b4a68;
-  --info-line: #5aa3e0;
+  --success-fg: #1c7a4d;
+  --success-bg: #e4f4ea;
+  --success-border: #9ed3b6;
+  --success-line: #3e9e6b;
+  --success-solid: #1c7a4d;
 
-  --success-fg: #8fdcae;
-  --success-bg: #12241a;
-  --success-border: #2c5b3f;
-  --success-line: #4fa878;
+  --danger-fg: #b33737;
+  --danger-strong: #8f2626;
+  --danger-bg: #fbe9e7;
+  --danger-border: #ecb3ad;
+  --danger-line: #ce5e57;
+  --danger-solid: #a93232;
 
-  --danger-fg: #f4a7a7;
-  --danger-fg-strong: #ffbdbd;
-  --danger-bg: #2a1618;
-  --danger-border: #6d3437;
-  --danger-line: #d06a6a;
-  --danger-solid: #6d2f33;
+  --refusal-fg: #9a4a1f;
+  --refusal-bg: #fbede3;
+  --refusal-border: #e8c3a8;
+  --refusal-line: #ce7a45;
 
-  --refusal-fg: #f2b68f;
-  --refusal-bg: #2a1d14;
-  --refusal-border: #6d4a2f;
-  --refusal-line: #d08c56;
+  --neutral-fg: #5b6878;
+  --neutral-bg: #eceff3;
+  --neutral-border: #c3ccd5;
+  --neutral-line: #9aa6b2;
 
-  --neutral-fg: #b4c0cd;
-  --neutral-bg: #1b222a;
-  --neutral-border: #3a4653;
-  --neutral-line: #77879a;
+  --muted-fg: #66727f;
+  --muted-line: #9aa6b2;
 
-  --muted-fg: #9dabb9;
-  --muted-line: #5b6875;
+  --indeterminate-fg: #8a4f8f;
+  --indeterminate-bg: #f3e8f4;
+  --indeterminate-border: #d9bedd;
+  --indeterminate-line: #b57eba;
 
-  --indeterminate-fg: #e4b6da;
-  --indeterminate-bg: #291b26;
-  --indeterminate-border: #6b3f60;
-  --indeterminate-line: #b878ab;
+  --compact-fg: #5b3ea8;
+  --compact-bg: #ece6f8;
+  --compact-border: #c4b3e8;
+  --compact-line: #8a6fd0;
 
-  --compact-fg: #bcaaf7;
-  --compact-bg: #1d1830;
-  --compact-border: #4d3a75;
-  --compact-line: #8f78d8;
-
-  /* Typography */
-  --font-sans: Inter, ui-sans-serif, system-ui, sans-serif;
+  /* Typography: sans for the desk, mono as the instrument voice */
+  --font-sans:
+    Inter, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei",
+    "Noto Sans CJK SC", system-ui, sans-serif;
   --font-mono:
     ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
   --text-2xs: 0.6875rem;
@@ -87,12 +90,12 @@
   --text-base: 0.875rem;
   --text-md: 0.9375rem;
   --text-lg: 1.0625rem;
-  --text-xl: 1.1875rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
   --leading-tight: 1.3;
   --leading-normal: 1.55;
-  --tracking-label: 0.09em;
+  --tracking-label: 0.1em;
 
-  /* Spacing */
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -101,16 +104,19 @@
   --space-6: 24px;
   --space-7: 32px;
 
-  /* Radii and elevation */
   --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
   --radius-pill: 999px;
-  --shadow-card: 0 1px 2px rgb(0 0 0 / 30%);
-  --shadow-dock: 0 -8px 26px rgb(0 0 0 / 45%);
+  /* Light chrome wants elevation you feel more than see */
+  --shadow-card:
+    0 1px 2px rgb(27 36 48 / 6%), 0 1px 3px rgb(27 36 48 / 4%);
+  --shadow-dock:
+    0 -12px 32px rgb(27 36 48 / 12%), 0 -2px 8px rgb(27 36 48 / 8%);
+  --shadow-menu: 0 8px 24px rgb(27 36 48 / 16%);
 
-  color: var(--text-primary);
-  background: var(--bg-app);
+  color: var(--ink);
+  background: var(--paper);
   font-family: var(--font-sans);
   font-size: var(--text-base);
   line-height: var(--leading-normal);
@@ -122,7 +128,7 @@ body {
   min-width: 320px;
   min-height: 100vh;
   margin: 0;
-  background: var(--bg-app);
+  background: var(--paper);
 }
 button,
 input {
@@ -136,37 +142,38 @@ button {
 input {
   width: 100%;
   padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--border-strong);
+  border: 1px solid var(--line-strong);
   border-radius: var(--radius-sm);
-  color: var(--text-primary);
-  background: var(--bg-sunken);
+  color: var(--ink);
+  background: var(--card);
   font-size: var(--text-sm);
 }
 input::placeholder,
 textarea::placeholder {
-  color: #8a97a5;
+  color: var(--ink-faint);
 }
 button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
-  border: 1px solid var(--border-strong);
+  border: 1px solid var(--line-strong);
   border-radius: var(--radius-sm);
   padding: 7px 12px;
-  color: var(--text-primary);
-  background: var(--bg-button);
+  color: var(--ink);
+  background: var(--card);
   font-size: var(--text-sm);
   font-weight: 600;
   line-height: var(--leading-tight);
   transition:
     background-color 120ms ease,
     border-color 120ms ease,
-    color 120ms ease;
+    color 120ms ease,
+    box-shadow 120ms ease;
 }
 button:hover {
-  border-color: var(--border-strong);
-  background: var(--bg-button-hover);
+  border-color: var(--ink-faint);
+  background: var(--sunken);
 }
 button:focus-visible,
 input:focus-visible,
@@ -177,10 +184,15 @@ a:focus-visible,
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+/* Inside a dark well the accent outline is too dim; use the on-dark accent. */
+.md-code-block button:focus-visible,
+.thinking-box button:focus-visible {
+  outline-color: var(--well-accent);
+}
 button:disabled,
 button:disabled:hover {
-  border-color: var(--border-subtle);
-  color: var(--text-muted);
+  border-color: var(--line);
+  color: var(--ink-faint);
   background: var(--neutral-bg);
   box-shadow: none;
   cursor: not-allowed;
@@ -194,6 +206,8 @@ button:disabled:hover {
     /* A delayed flip (the thinking collapse hides its text once the height has
        settled) would otherwise linger as motionless dead time. */
     transition-delay: 0ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
   }
 }
 
@@ -214,17 +228,17 @@ button:disabled:hover {
   position: relative;
   min-width: 0;
   padding: var(--space-5) var(--space-4);
-  background: var(--bg-panel);
-  border-color: var(--border-subtle);
+  background: var(--card);
+  border-color: var(--line);
 }
 .session-sidebar {
   display: grid;
   align-content: start;
   gap: var(--space-6);
-  border-right: 1px solid var(--border-subtle);
+  border-right: 1px solid var(--line);
 }
 .run-details-panel {
-  border-left: 1px solid var(--border-subtle);
+  border-left: 1px solid var(--line);
 }
 /* A collapsed rail keeps only its expand control, so the strip sheds its
    content padding and centers the affordance. */
@@ -239,16 +253,16 @@ button:disabled:hover {
   width: 34px;
   height: 26px;
   padding: 0;
-  border: 1px solid var(--border-strong);
+  border: 1px solid var(--line-strong);
   border-radius: var(--radius-sm);
-  color: var(--text-secondary);
-  background: var(--bg-button);
+  color: var(--ink-soft);
+  background: var(--card);
   font-size: var(--text-sm);
   line-height: 1;
 }
 .rail-toggle:hover {
   border-color: var(--accent);
-  color: var(--text-primary);
+  color: var(--accent);
 }
 .session-sidebar[data-collapsed="true"] .rail-toggle,
 .run-details-panel[data-collapsed="true"] .rail-toggle {
@@ -275,7 +289,7 @@ button:disabled:hover {
   outline-offset: -2px;
 }
 .rail-resize-dragging {
-  background: rgb(124 196 255 / 25%);
+  background: rgb(46 79 215 / 20%);
 }
 .conversation-panel {
   position: relative;
@@ -284,13 +298,13 @@ button:disabled:hover {
   padding: var(--space-5) var(--space-6);
 }
 
-/* Section labels: the sidebar and run panel headings are signposts, not
-   titles, so they sit one step below the content they introduce. */
+/* Section labels: mono eyebrows — the instrument voice marking each region. */
 .session-sidebar h2,
 .run-details-panel h2,
 .run-details-drawer h2 {
   margin: 0 0 var(--space-3);
-  color: var(--text-muted);
+  color: var(--ink-faint);
+  font-family: var(--font-mono);
   font-size: var(--text-2xs);
   font-weight: 700;
   letter-spacing: var(--tracking-label);
@@ -299,7 +313,7 @@ button:disabled:hover {
 .session-sidebar > section {
   min-width: 0;
   padding-top: var(--space-5);
-  border-top: 1px solid var(--border-subtle);
+  border-top: 1px solid var(--line);
 }
 
 /* --- Workspace picker ---------------------------------------------------- */
@@ -308,21 +322,24 @@ button:disabled:hover {
   gap: var(--space-3);
   min-width: 0;
 }
+/* The brand mark: product name set as an instrument label, not a logo. */
 .workspace-picker h1 {
   margin: 0 0 var(--space-1);
-  color: var(--text-primary);
+  color: var(--ink);
+  font-family: var(--font-mono);
   font-size: var(--text-md);
   font-weight: 700;
-  letter-spacing: 0.01em;
+  letter-spacing: 0.04em;
 }
 .workspace-picker label {
   display: grid;
   gap: var(--space-1);
   min-width: 0;
-  color: var(--text-muted);
+  color: var(--ink-faint);
+  font-family: var(--font-mono);
   font-size: var(--text-2xs);
-  font-weight: 650;
-  letter-spacing: 0.05em;
+  font-weight: 700;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 /* The first field is the workspace path; paths read better in monospace. */
@@ -336,21 +353,29 @@ button:disabled:hover {
   border: 1px solid var(--danger-border);
   border-left: 3px solid var(--danger-line);
   border-radius: var(--radius-sm);
-  color: var(--danger-fg-strong);
+  color: var(--danger-strong);
   background: var(--danger-bg);
   font-size: var(--text-xs);
 }
 .workspace-picker button {
   justify-self: start;
+  border-color: var(--accent);
+  color: var(--accent-on);
+  background: var(--accent);
+}
+.workspace-picker button:hover {
+  border-color: var(--accent-strong);
+  background: var(--accent-strong);
 }
 
-/* --- Session list ------------------------------------------------------- */
+/* --- Session list: ledger rows, not floating cards ---------------------- */
 .session-list {
   display: grid;
-  gap: var(--space-1);
+  gap: 0;
   min-width: 0;
   padding: 0;
   list-style: none;
+  border-top: 1px solid var(--line);
 }
 .session-list li {
   min-width: 0;
@@ -359,25 +384,26 @@ button:disabled:hover {
   position: relative;
   display: flex;
   align-items: stretch;
+  border-bottom: 1px solid var(--line);
 }
 .session-row {
   display: grid;
   gap: 2px;
   flex: 1;
   min-width: 0;
-  padding: var(--space-2) var(--space-3);
+  padding: var(--space-2) var(--space-2);
   border-color: transparent;
-  border-radius: var(--radius-md);
+  border-radius: 0;
   background: transparent;
   text-align: left;
 }
 .session-row:hover {
-  border-color: var(--border-subtle);
-  background: var(--bg-raised);
+  border-color: transparent;
+  background: var(--sunken);
 }
 .session-row > span {
   overflow: hidden;
-  color: var(--text-secondary);
+  color: var(--ink-soft);
   font-size: var(--text-sm);
   font-weight: 600;
   text-overflow: ellipsis;
@@ -386,20 +412,21 @@ button:disabled:hover {
 .session-row small {
   display: block;
   overflow: hidden;
-  color: var(--text-muted);
+  color: var(--ink-faint);
   font-family: var(--font-mono);
   font-size: var(--text-2xs);
   font-weight: 400;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* The selected row is a ledger marker: indigo edge, tinted wash, no card. */
 .session-row[aria-current="page"] {
-  border-color: var(--border-strong);
-  background: var(--bg-selected);
+  border-color: transparent;
+  background: var(--accent-soft-bg);
   box-shadow: inset 3px 0 0 var(--accent);
 }
 .session-row[aria-current="page"] > span {
-  color: var(--text-primary);
+  color: var(--ink);
 }
 /* The delete affordance stays quiet until the row is hovered. */
 .session-delete {
@@ -409,7 +436,7 @@ button:disabled:hover {
   border-color: transparent;
   border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--text-muted);
+  color: var(--ink-faint);
   font-size: var(--text-lg);
   line-height: 1;
   visibility: hidden;
@@ -421,7 +448,7 @@ button:disabled:hover {
 .session-delete:hover {
   border-color: var(--danger-line);
   color: var(--danger-fg);
-  background: var(--bg-raised);
+  background: var(--danger-bg);
 }
 
 /* --- Conversation column ------------------------------------------------ */
@@ -430,7 +457,7 @@ button:disabled:hover {
   grid-template-rows: auto minmax(0, 1fr) auto;
   min-width: 0;
   height: calc(100vh - 40px);
-  max-width: 960px;
+  max-width: 880px;
   margin: 0 auto;
 }
 .conversation-heading {
@@ -441,14 +468,15 @@ button:disabled:hover {
   gap: var(--space-4);
   min-width: 0;
   padding: 0 0 var(--space-4);
-  border-bottom: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--line-strong);
 }
 .conversation-heading > div {
   min-width: 0;
 }
 .conversation-heading p {
   margin: 0 0 var(--space-1);
-  color: var(--text-muted);
+  color: var(--ink-faint);
+  font-family: var(--font-mono);
   font-size: var(--text-2xs);
   font-weight: 700;
   letter-spacing: var(--tracking-label);
@@ -457,22 +485,35 @@ button:disabled:hover {
 .conversation-heading h1 {
   margin: 0;
   overflow-wrap: anywhere;
-  color: var(--text-primary);
+  color: var(--ink);
   font-size: var(--text-xl);
-  font-weight: 650;
+  font-weight: 700;
+  letter-spacing: 0.01em;
   line-height: var(--leading-tight);
 }
+/* Connection pill: a status lamp plus its label. */
 .connection-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
   flex: none;
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--line);
   border-radius: var(--radius-pill);
   padding: 3px 10px;
-  color: var(--text-secondary);
-  background: var(--bg-panel);
+  color: var(--ink-soft);
+  background: var(--card);
+  font-family: var(--font-mono);
   font-size: var(--text-2xs);
-  font-weight: 650;
+  font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+}
+.connection-status::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentcolor;
 }
 .connection-connected {
   border-color: var(--success-border);
@@ -496,7 +537,7 @@ button:disabled:hover {
 .timeline-scroll {
   display: grid;
   align-content: start;
-  gap: var(--space-4);
+  gap: var(--space-5);
   min-width: 0;
   height: 100%;
   overflow-y: auto;
@@ -506,23 +547,24 @@ button:disabled:hover {
 .conversation-empty {
   display: grid;
   place-items: center;
-  color: var(--text-muted);
+  color: var(--ink-faint);
   font-size: var(--text-sm);
 }
 
-/* --- Messages ----------------------------------------------------------- */
+/* --- Messages: a transcript, not chat bubbles ---------------------------- */
+/* Your own message is a solid ink card — an issued instruction. */
 .message-bubble {
   min-width: 0;
   max-width: min(680px, 92%);
   padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--border-subtle);
+  border: 1px solid transparent;
   border-radius: var(--radius-lg);
-  background: var(--bg-raised);
-  box-shadow: var(--shadow-card);
+  background: transparent;
 }
 .message-bubble header {
   margin-bottom: var(--space-2);
-  color: var(--text-muted);
+  color: var(--ink-faint);
+  font-family: var(--font-mono);
   font-size: var(--text-2xs);
   font-weight: 700;
   letter-spacing: var(--tracking-label);
@@ -531,30 +573,52 @@ button:disabled:hover {
 .message-bubble p {
   margin: 0;
   overflow-wrap: anywhere;
-  color: var(--text-primary);
+  color: var(--ink);
   font-size: var(--text-md);
   line-height: var(--leading-normal);
   white-space: pre-wrap;
 }
 .message-user {
   justify-self: end;
-  border-color: var(--border-user);
+  border-color: var(--ink);
   border-bottom-right-radius: var(--radius-sm);
-  background: var(--bg-user);
+  background: var(--ink);
+  box-shadow: var(--shadow-card);
 }
 .message-user header {
-  color: var(--accent-soft);
+  color: rgb(255 255 255 / 65%);
 }
+.message-user p {
+  color: #f4f7fa;
+}
+/* The assistant speaks as an open transcript block on the paper. */
 .message-assistant {
-  justify-self: start;
-  border-bottom-left-radius: var(--radius-sm);
+  justify-self: stretch;
+  max-width: none;
+  padding: 0 var(--space-1);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 .message-bubble[data-transient="true"] {
-  border-color: var(--info-border);
-  border-style: dashed;
+  border: 0;
+  border-left: 2px dashed var(--info-line);
+  padding-left: var(--space-3);
 }
 .message-bubble[data-transient="true"] header {
   color: var(--info-fg);
+}
+/* The streaming draft ends in a caret so "still writing" reads at a glance. */
+.message-bubble[data-transient="true"] > p::after {
+  content: "▍";
+  color: var(--info-line);
+  animation: caret-blink 1s steps(2) infinite;
+}
+@keyframes caret-blink {
+  50% {
+    opacity: 0;
+  }
 }
 
 /* --- Markdown subset inside assistant bubbles --------------------------- */
@@ -576,7 +640,7 @@ button:disabled:hover {
 .markdown h5,
 .markdown h6 {
   margin: var(--space-4) 0 var(--space-2);
-  color: var(--text-primary);
+  color: var(--ink);
   font-size: var(--text-md);
   font-weight: 700;
 }
@@ -594,25 +658,27 @@ button:disabled:hover {
 .markdown blockquote {
   margin: 0 0 var(--space-3);
   padding: var(--space-1) var(--space-3);
-  border-left: 3px solid var(--muted-line);
+  border-left: 3px solid var(--neutral-line);
   border-radius: var(--radius-sm);
-  color: var(--text-secondary);
-  background: var(--bg-sunken);
+  color: var(--ink-soft);
+  background: var(--sunken);
 }
 .markdown code {
   padding: 1px 5px;
   border-radius: var(--radius-sm);
-  color: var(--code-fg);
-  background: var(--bg-sunken);
+  color: var(--ink);
+  background: var(--sunken);
   font-family: var(--font-mono);
   font-size: var(--text-xs);
 }
+/* Code is machine output: it renders in a dark well. */
 .markdown .md-code-block {
   min-width: 0;
   margin: 0 0 var(--space-3);
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--well-edge);
   border-radius: var(--radius-md);
-  background: var(--bg-sunken);
+  background: var(--well);
+  box-shadow: inset 0 1px 2px rgb(0 0 0 / 30%);
   overflow: hidden;
 }
 .markdown .md-code-head {
@@ -620,31 +686,32 @@ button:disabled:hover {
   align-items: center;
   justify-content: space-between;
   padding: var(--space-2) var(--space-3);
-  border-bottom: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--well-edge);
 }
 .markdown .md-code-lang {
-  color: var(--text-muted);
+  color: var(--well-muted);
   font-family: var(--font-mono);
   font-size: var(--text-2xs);
   letter-spacing: 0.05em;
 }
 .markdown .md-code-copy {
-  border: 1px solid var(--border-strong);
+  border: 1px solid var(--well-edge);
   border-radius: var(--radius-sm);
   padding: 2px 10px;
-  color: var(--text-secondary);
-  background: var(--bg-button);
+  color: var(--well-fg);
+  background: transparent;
   font-size: var(--text-2xs);
 }
 .markdown .md-code-copy:hover {
-  border-color: var(--accent);
-  color: var(--text-primary);
+  border-color: var(--well-accent);
+  color: #ffffff;
+  background: var(--well-edge);
 }
 .markdown .md-code-block pre {
   margin: 0;
   padding: var(--space-3);
   overflow-x: auto;
-  color: var(--code-fg);
+  color: var(--well-fg);
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   line-height: 1.5;
@@ -657,9 +724,9 @@ button:disabled:hover {
 }
 
 /* --- Thinking disclosures ---------------------------------------------- */
-/* Provider reasoning is display-only: quieter than assistant text (muted,
-   monospace, one size down) and collapsed in history. The pill mirrors the
-   tool-card summary so both disclosures read as the same control. */
+/* Provider reasoning is display-only: a dark well one size down, collapsed in
+   history. The pill mirrors the tool-card summary so both disclosures read as
+   the same control. */
 .thinking-box {
   min-width: 0;
   margin: 0 0 var(--space-3);
@@ -673,17 +740,18 @@ button:disabled:hover {
   gap: var(--space-2);
   width: fit-content;
   padding: 3px 10px;
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--line);
   border-radius: var(--radius-pill);
-  color: var(--text-secondary);
-  background: var(--bg-sunken);
+  color: var(--ink-soft);
+  background: var(--card);
+  font-family: var(--font-mono);
   font-size: var(--text-xs);
   font-weight: 600;
   letter-spacing: 0.02em;
 }
 .thinking-toggle:hover {
-  color: var(--text-primary);
-  background: var(--bg-button);
+  color: var(--ink);
+  background: var(--sunken);
 }
 .thinking-chevron {
   width: 5px;
@@ -719,27 +787,27 @@ button:disabled:hover {
   max-height: 280px;
   margin: var(--space-2) 0 0;
   padding: var(--space-3);
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--well-edge);
   border-radius: var(--radius-sm);
-  color: var(--text-muted);
-  background: var(--bg-sunken);
+  color: var(--well-muted);
+  background: var(--well);
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   line-height: 1.5;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
 }
-/* A live block is still arriving, so it carries the streaming accent the
-   transient bubble and running tools already use. */
+/* A live block is still arriving, so it carries the streaming accent. */
 .thinking-live .thinking-toggle {
   border-color: var(--info-border);
   color: var(--info-fg);
+  background: var(--info-bg);
 }
 .thinking-live .thinking-text {
   border-left: 3px solid var(--info-line);
 }
 
-/* --- Tool cards --------------------------------------------------------- */
+/* --- Tool cards ---------------------------------------------------------- */
 /* Each execution state gets its own hue *and* its own line style, so the
    states stay distinguishable without relying on colour alone. */
 .tool-card {
@@ -749,10 +817,10 @@ button:disabled:hover {
   --state-line: var(--neutral-line);
 
   min-width: 0;
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--line);
   border-left: 4px solid var(--state-line);
   border-radius: var(--radius-md);
-  background: var(--bg-raised);
+  background: var(--card);
   box-shadow: var(--shadow-card);
 }
 .tool-card > header {
@@ -766,27 +834,39 @@ button:disabled:hover {
 .tool-card > header strong {
   min-width: 0;
   overflow-wrap: anywhere;
-  color: var(--text-primary);
+  color: var(--ink);
   font-family: var(--font-mono);
   font-size: var(--text-sm);
-  font-weight: 650;
+  font-weight: 700;
 }
+/* State pill: a lamp dot plus the label. */
 .tool-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   flex: none;
   border: 1px solid var(--state-border);
   border-radius: var(--radius-pill);
   padding: 2px 9px;
   color: var(--state-fg);
   background: var(--state-bg);
+  font-family: var(--font-mono);
   font-size: var(--text-2xs);
   font-weight: 700;
   letter-spacing: 0.07em;
   text-transform: uppercase;
 }
+.tool-status::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentcolor;
+}
 .tool-queued {
   --state-fg: var(--muted-fg);
   --state-bg: transparent;
-  --state-border: var(--border-subtle);
+  --state-border: var(--line);
   --state-line: var(--muted-line);
 
   border-left-style: dotted;
@@ -799,8 +879,8 @@ button:disabled:hover {
 
   background: linear-gradient(
     90deg,
-    rgb(217 167 64 / 8%),
-    rgb(217 167 64 / 0%) 220px
+    rgb(217 155 43 / 10%),
+    rgb(217 155 43 / 0%) 220px
   );
 }
 .tool-running {
@@ -816,12 +896,15 @@ button:disabled:hover {
   --state-line: var(--success-line);
 }
 .tool-failed {
-  --state-fg: #ffe9ea;
+  --state-fg: #ffffff;
   --state-bg: var(--danger-solid);
-  --state-border: #8c4247;
+  --state-border: var(--danger-solid);
   --state-line: var(--danger-line);
 
-  border-color: var(--danger-border);
+  border-color: var(--danger-line);
+}
+.tool-failed > header strong {
+  color: var(--danger-strong);
 }
 .tool-rejected {
   --state-fg: var(--refusal-fg);
@@ -842,13 +925,13 @@ button:disabled:hover {
 .tool-skipped {
   --state-fg: var(--muted-fg);
   --state-bg: transparent;
-  --state-border: var(--border-subtle);
+  --state-border: var(--line);
   --state-line: var(--muted-line);
 
   border-left-style: dotted;
 }
 .tool-skipped > header strong {
-  color: var(--text-secondary);
+  color: var(--ink-soft);
 }
 .tool-unknown {
   --state-fg: var(--indeterminate-fg);
@@ -867,10 +950,11 @@ button:disabled:hover {
   gap: var(--space-2);
   width: fit-content;
   padding: 3px 10px;
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--line);
   border-radius: var(--radius-pill);
-  color: var(--text-secondary);
-  background: var(--bg-app);
+  color: var(--ink-soft);
+  background: var(--card);
+  font-family: var(--font-mono);
   font-size: var(--text-xs);
   font-weight: 600;
   list-style: none;
@@ -897,18 +981,19 @@ button:disabled:hover {
   transform: rotate(45deg);
 }
 .tool-card summary:hover {
-  color: var(--text-primary);
-  background: var(--bg-button);
+  color: var(--ink);
+  background: var(--sunken);
 }
+/* Tool payloads and output are machine artifacts: dark wells. */
 .tool-card pre,
 .approval-dock pre {
   overflow-x: auto;
   margin: var(--space-3) 0 0;
   padding: var(--space-3);
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--well-edge);
   border-radius: var(--radius-sm);
-  color: var(--code-fg);
-  background: var(--bg-sunken);
+  color: var(--well-fg);
+  background: var(--well);
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   line-height: 1.5;
@@ -946,9 +1031,10 @@ button:disabled:hover {
 }
 .tool-command-details dt,
 .tool-write-details dt {
-  color: var(--text-muted);
+  color: var(--ink-faint);
+  font-family: var(--font-mono);
   font-size: var(--text-2xs);
-  font-weight: 650;
+  font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
 }
@@ -957,7 +1043,7 @@ button:disabled:hover {
   margin: 0;
   min-width: 0;
   overflow-wrap: anywhere;
-  color: var(--text-primary);
+  color: var(--ink);
   font-size: var(--text-sm);
 }
 /* CommandDetails renders a fixed row order: command, cwd, reason, timeout.
@@ -967,14 +1053,12 @@ button:disabled:hover {
 .tool-command-details div:nth-child(4) dd {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
-  color: var(--code-fg);
 }
 /* WriteDetails lists only frozen write_file arguments, so every value is a machine
    value; its text arguments stack under their label instead of sharing its column. */
 .tool-write-details dd {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
-  color: var(--code-fg);
 }
 .tool-write-details .tool-text-row {
   grid-template-columns: minmax(0, 1fr);
@@ -985,17 +1069,20 @@ button:disabled:hover {
 }
 .tool-truncation {
   margin: var(--space-1) 0 0;
-  color: var(--text-muted);
+  color: var(--ink-faint);
   font-family: var(--font-sans);
   font-size: var(--text-2xs);
 }
 
-/* --- Fixed approval dock ------------------------------------------------ */
+/* --- The amber gate: fixed approval dock --------------------------------- */
+/* The one bold moment. A pending approval is an amber-lit instrument panel:
+   it rises in once, its frozen facts sit in dark wells, and its two decisions
+   are the biggest buttons on the screen. */
 .conversation-controls {
   align-self: end;
   min-width: 0;
   padding-top: var(--space-3);
-  background: var(--bg-app);
+  background: var(--paper);
 }
 .approval-dock {
   position: relative;
@@ -1006,31 +1093,60 @@ button:disabled:hover {
   border: 1px solid var(--amber-border);
   border-top: 3px solid var(--amber-line);
   border-radius: var(--radius-lg);
-  background: #241d12;
+  background: var(--amber-bg);
   box-shadow: var(--shadow-dock);
+  animation: gate-rise 220ms ease-out;
+}
+@keyframes gate-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
 }
 .approval-dock header {
   padding-bottom: var(--space-3);
-  border-bottom: 1px solid rgb(217 167 64 / 22%);
+  border-bottom: 1px solid var(--amber-border);
 }
 .approval-dock header p {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   margin: 0 0 var(--space-1);
-  color: var(--amber-fg-strong);
+  color: var(--amber-strong);
+  font-family: var(--font-mono);
   font-size: var(--text-2xs);
   font-weight: 700;
   letter-spacing: 0.11em;
   text-transform: uppercase;
 }
+/* The gate's lamp blinks while it waits: this decision blocks the run. */
+.approval-dock header p::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--amber-line);
+  animation: gate-lamp 1.6s ease-in-out infinite;
+}
+@keyframes gate-lamp {
+  50% {
+    opacity: 0.35;
+  }
+}
 .approval-dock h2 {
   margin: 0;
   overflow-wrap: anywhere;
-  color: var(--text-primary);
+  color: var(--ink);
   font-family: var(--font-mono);
   font-size: var(--text-lg);
-  font-weight: 650;
+  font-weight: 700;
 }
 .approval-dock .tool-command-details {
   margin-top: var(--space-3);
+}
+.approval-dock .tool-command-details dt,
+.approval-dock .tool-write-details dt {
+  color: var(--amber-fg);
 }
 .approval-dock .tool-diff {
   max-height: 40vh;
@@ -1043,11 +1159,12 @@ button:disabled:hover {
   gap: var(--space-3);
   margin-top: var(--space-4);
   padding-top: var(--space-3);
-  border-top: 1px solid rgb(217 167 64 / 22%);
+  border-top: 1px solid var(--amber-border);
 }
 .approval-actions button {
-  min-width: 104px;
-  padding: 8px 16px;
+  min-width: 120px;
+  padding: 9px 18px;
+  font-size: var(--text-md);
 }
 .composer-actions {
   display: flex;
@@ -1055,49 +1172,59 @@ button:disabled:hover {
   justify-content: flex-end;
   gap: var(--space-2);
   padding-top: var(--space-2);
-  border-top: 1px solid var(--border-subtle);
+  border-top: 1px solid var(--line);
 }
-.approval-approve,
-.composer-send {
-  border-color: #2f8a61;
-  color: #f2fff7;
-  background: #22684a;
+/* Decisions: 批准 commits the machine's write — solid success; 拒绝 refuses. */
+.approval-approve {
+  border-color: var(--success-solid);
+  color: #ffffff;
+  background: var(--success-solid);
 }
-.approval-approve:hover,
-.composer-send:hover {
-  border-color: #3aa273;
-  background: #2a7d59;
+.approval-approve:hover {
+  border-color: #145e3b;
+  background: #145e3b;
 }
 .approval-reject {
-  border-color: #7d3f42;
+  border-color: var(--danger-line);
   color: var(--danger-fg);
-  background: #1f1416;
+  background: var(--card);
 }
 .approval-reject:hover {
-  border-color: #9c4d52;
-  color: var(--danger-fg-strong);
-  background: #2c1b1d;
+  border-color: var(--danger-solid);
+  color: #ffffff;
+  background: var(--danger-solid);
+}
+/* Send is the desk's primary action: solid ink. Stop is solid danger. */
+.composer-send {
+  border-color: var(--ink);
+  color: #f4f7fa;
+  background: var(--ink);
+}
+.composer-send:hover {
+  border-color: #000000;
+  background: #000000;
 }
 .composer-stop {
-  border-color: #8c4247;
-  color: #ffeced;
-  background: #6e2f33;
+  border-color: var(--danger-solid);
+  color: #ffffff;
+  background: var(--danger-solid);
 }
 .composer-stop:hover {
-  border-color: #a54f55;
-  background: #83383d;
+  border-color: var(--danger-strong);
+  background: var(--danger-strong);
 }
 
-/* --- Composer ----------------------------------------------------------- */
+/* --- Composer ------------------------------------------------------------ */
 .composer {
   position: relative;
   display: grid;
   gap: var(--space-2);
   min-width: 0;
   padding: var(--space-3) var(--space-3) var(--space-2);
-  border: 1px solid var(--border-strong);
+  border: 1.5px solid var(--line-strong);
   border-radius: var(--radius-lg);
-  background: var(--bg-raised);
+  background: var(--card);
+  box-shadow: var(--shadow-card);
 }
 .composer textarea {
   display: block;
@@ -1107,7 +1234,7 @@ button:disabled:hover {
   border: 0;
   outline: 0;
   padding: 0 var(--space-1);
-  color: var(--text-primary);
+  color: var(--ink);
   background: transparent;
   font-family: var(--font-sans);
   font-size: var(--text-md);
@@ -1124,7 +1251,7 @@ button:disabled:hover {
 /* Spec 13.3 keeps the input disabled until the user confirms the workspace was
    inspected, so the dead control and its reason read as one statement. */
 .composer textarea:disabled {
-  color: var(--text-muted);
+  color: var(--ink-faint);
   cursor: not-allowed;
 }
 .composer-note {
@@ -1146,22 +1273,24 @@ button:disabled:hover {
 .approval-mode-btn {
   margin-right: auto;
   padding: 5px 12px;
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--text-secondary);
+  color: var(--ink-soft);
+  font-family: var(--font-mono);
   font-size: var(--text-xs);
   cursor: pointer;
 }
 .approval-mode-btn:hover {
-  border-color: var(--border-strong);
-  color: var(--text-primary);
+  border-color: var(--line-strong);
+  color: var(--ink);
 }
 /* Auto-approve skips the human gate, so the ON state reads as a live warning. */
 .approval-mode-btn.approval-mode-on {
   border-color: var(--amber-line);
-  color: var(--amber-fg-strong);
-  font-weight: 650;
+  color: var(--amber-strong);
+  background: var(--amber-bg);
+  font-weight: 700;
 }
 
 /* --- Slash command menu -------------------------------------------------- */
@@ -1174,10 +1303,10 @@ button:disabled:hover {
   min-width: 260px;
   padding: 4px;
   list-style: none;
-  border: 1px solid var(--border-strong);
+  border: 1px solid var(--line-strong);
   border-radius: var(--radius-md);
-  background: var(--bg-raised);
-  box-shadow: 0 8px 24px rgb(0 0 0 / 45%);
+  background: var(--card);
+  box-shadow: var(--shadow-menu);
 }
 .slash-item {
   display: flex;
@@ -1194,20 +1323,20 @@ button:disabled:hover {
 }
 .slash-item-active,
 .slash-item:hover {
-  background: var(--bg-selected);
+  background: var(--accent-soft-bg);
 }
 .slash-name {
-  color: var(--text-primary);
+  color: var(--ink);
   font-family: var(--font-mono);
   font-size: var(--text-sm);
-  font-weight: 650;
+  font-weight: 700;
 }
 .slash-desc {
-  color: var(--text-muted);
+  color: var(--ink-faint);
   font-size: var(--text-xs);
 }
 
-/* --- Status row under the composer: context gauge + compaction chip ----- */
+/* --- Status row under the composer: context gauge + compaction chip ------ */
 .composer-status {
   display: flex;
   flex-wrap: wrap;
@@ -1215,7 +1344,8 @@ button:disabled:hover {
   gap: var(--space-2) var(--space-4);
   min-height: 18px;
   padding: 0 var(--space-1);
-  color: var(--text-muted);
+  color: var(--ink-faint);
+  font-family: var(--font-mono);
   font-size: var(--text-2xs);
 }
 .context-gauge {
@@ -1226,38 +1356,38 @@ button:disabled:hover {
   min-width: 0;
 }
 .context-gauge-label {
-  color: var(--text-muted);
-  font-weight: 650;
+  color: var(--ink-faint);
+  font-weight: 700;
   letter-spacing: var(--tracking-label);
 }
 .context-gauge-bar {
   display: inline-block;
   width: 96px;
-  height: 5px;
+  height: 6px;
   overflow: hidden;
   border-radius: var(--radius-pill);
-  background: var(--bg-sunken);
-  border: 1px solid var(--border-subtle);
+  background: var(--sunken);
+  border: 1px solid var(--line);
 }
 .context-gauge-fill {
   display: block;
   height: 100%;
   border-radius: var(--radius-pill);
-  background: #2f5e44;
+  background: var(--success-line);
 }
 .context-gauge-warn {
-  background: #6b5320;
+  background: var(--amber-line);
 }
 .context-gauge-high {
-  background: #6e3434;
+  background: var(--danger-line);
 }
 .context-gauge-value {
-  color: var(--text-secondary);
-  font-weight: 650;
+  color: var(--ink-soft);
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 .context-gauge-detail {
-  color: var(--text-muted);
+  color: var(--ink-faint);
   font-variant-numeric: tabular-nums;
 }
 .compaction-chip {
@@ -1268,7 +1398,7 @@ button:disabled:hover {
   color: var(--compact-fg);
   background: var(--compact-bg);
   font-size: var(--text-2xs);
-  font-weight: 650;
+  font-weight: 700;
 }
 .compaction-running {
   animation: chip-pulse 1.2s ease-in-out infinite;
@@ -1279,7 +1409,7 @@ button:disabled:hover {
   }
 }
 
-/* --- Recovery banner ---------------------------------------------------- */
+/* --- Recovery banner ----------------------------------------------------- */
 .recovery-banner {
   min-width: 0;
   margin: var(--space-5) var(--space-1) 0;
@@ -1292,24 +1422,25 @@ button:disabled:hover {
 }
 .recovery-banner p {
   margin: 0;
-  color: var(--text-primary);
+  color: var(--ink);
   font-size: var(--text-sm);
 }
 .recovery-banner p + p {
   margin-top: var(--space-1);
-  color: var(--text-secondary);
+  color: var(--ink-soft);
 }
 .recovery-banner button {
   margin-top: var(--space-3);
   border-color: var(--amber-border);
-  color: var(--amber-fg-strong);
-  background: #2f2415;
+  color: var(--amber-strong);
+  background: var(--card);
 }
 .recovery-banner button:hover {
   border-color: var(--amber-line);
-  background: #3b2d19;
+  background: var(--amber-bg);
 }
-/* --- Run failure banner -------------------------------------------------- */
+
+/* --- Run failure banner --------------------------------------------------- */
 /* The timeline's compact summary of a failed run: the run-details panel keeps
    the raw facts, this puts the cause and the next step beside the conversation. */
 .run-failure-banner {
@@ -1330,16 +1461,16 @@ button:disabled:hover {
   min-width: 0;
 }
 .run-failure-copy strong {
-  color: var(--danger-fg-strong);
+  color: var(--danger-strong);
   font-size: var(--text-sm);
 }
 .run-failure-copy p {
   margin: 0;
-  color: var(--text-primary);
+  color: var(--ink);
   font-size: var(--text-sm);
 }
 .run-failure-retries {
-  color: var(--text-secondary);
+  color: var(--ink-soft);
 }
 .run-failure-hint {
   color: var(--danger-fg);
@@ -1356,7 +1487,7 @@ button:disabled:hover {
 }
 .run-failure-dismiss:hover {
   border-color: var(--danger-line);
-  color: var(--danger-fg-strong);
+  color: var(--danger-strong);
 }
 .sr-only {
   position: absolute;
@@ -1369,34 +1500,38 @@ button:disabled:hover {
   border: 0;
 }
 
-/* --- View switch -------------------------------------------------------- */
-/* The left rail's top-level navigation: two tabs styled as quiet signposts,
-   visually one step above the session and campaign lists they introduce. */
+/* --- View switch: a segmented control over the two workspaces ------------ */
 .view-switch {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: var(--space-2);
+  gap: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  background: var(--sunken);
+  padding: 2px;
 }
 .view-tab {
   padding: 6px 10px;
-  border-radius: var(--radius-md);
-  color: var(--text-secondary);
+  border: 0;
+  border-radius: calc(var(--radius-md) - 3px);
+  color: var(--ink-soft);
   background: transparent;
   font-size: var(--text-sm);
-  font-weight: 650;
+  font-weight: 600;
 }
 .view-tab:hover {
-  border-color: var(--border-subtle);
-  background: var(--bg-raised);
+  border-color: transparent;
+  color: var(--ink);
+  background: transparent;
 }
 .view-tab[aria-current="page"] {
-  border-color: var(--border-strong);
-  color: var(--text-primary);
-  background: var(--bg-selected);
-  box-shadow: inset 0 -2px 0 var(--accent);
+  border-color: transparent;
+  color: var(--ink);
+  background: var(--card);
+  box-shadow: var(--shadow-card);
 }
 
-/* --- Evaluations -------------------------------------------------------- */
+/* --- Evaluations ---------------------------------------------------------- */
 /* The results dashboard reuses the workbench surfaces but widens the content
    column: one extra rail would starve the metric table. */
 .evaluations-shell {
@@ -1414,7 +1549,7 @@ button:disabled:hover {
 }
 .eval-muted {
   margin: 0;
-  color: var(--text-muted);
+  color: var(--ink-faint);
   font-size: var(--text-sm);
 }
 .eval-note {
@@ -1433,10 +1568,11 @@ button:disabled:hover {
   border: 1px solid var(--danger-border);
   border-left: 3px solid var(--danger-line);
   border-radius: var(--radius-sm);
-  color: var(--danger-fg-strong);
+  color: var(--danger-strong);
   background: var(--danger-bg);
   font-size: var(--text-sm);
 }
+/* Verdicts are stamped labels: bordered, tracked, mono. */
 .eval-badge {
   display: inline-block;
   border: 1px solid var(--neutral-border);
@@ -1444,6 +1580,7 @@ button:disabled:hover {
   padding: 1px 8px;
   color: var(--neutral-fg);
   background: var(--neutral-bg);
+  font-family: var(--font-mono);
   font-size: var(--text-2xs);
   font-weight: 700;
   letter-spacing: 0.06em;
@@ -1460,40 +1597,48 @@ button:disabled:hover {
   background: var(--danger-bg);
 }
 
-/* Campaign list: each row mirrors the session row's stacked identity block. */
+/* Campaign list: ledger rows under hairlines, mirroring the session list. */
 .eval-list ul {
   display: grid;
-  gap: var(--space-2);
+  gap: 0;
   min-width: 0;
   padding: 0;
   list-style: none;
+  border-top: 1px solid var(--line);
 }
+.eval-list li {
+  border-bottom: 1px solid var(--line);
+}
+/* Campaign rows are flex columns, not grids: the base button's centered
+   justification must never reach the ledger lines. */
 .eval-campaign-row {
-  display: grid;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
   gap: 3px;
   width: 100%;
   min-width: 0;
-  padding: var(--space-3);
-  border-color: var(--border-subtle);
-  border-radius: var(--radius-md);
-  background: var(--bg-raised);
+  padding: var(--space-3) var(--space-2);
+  border-color: transparent;
+  border-radius: 0;
+  background: transparent;
   text-align: left;
 }
 .eval-campaign-row:hover {
-  border-color: var(--border-strong);
-  background: var(--bg-button-hover);
+  border-color: transparent;
+  background: var(--card);
 }
 .eval-campaign-name {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  color: var(--text-primary);
+  color: var(--accent);
   font-family: var(--font-mono);
   font-size: var(--text-sm);
-  font-weight: 650;
+  font-weight: 700;
 }
 .eval-campaign-window {
-  color: var(--text-muted);
+  color: var(--ink-faint);
   font-family: var(--font-mono);
   font-size: var(--text-2xs);
 }
@@ -1501,19 +1646,20 @@ button:disabled:hover {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-1) var(--space-3);
-  color: var(--text-secondary);
+  color: var(--ink-soft);
   font-size: var(--text-xs);
 }
 .eval-campaign-metrics b {
-  color: var(--text-primary);
-  font-weight: 650;
+  color: var(--ink);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 .eval-campaign-note {
   color: var(--amber-fg);
   font-size: var(--text-2xs);
 }
 
-/* Aggregate strip: three compact cards above the task table. */
+/* Aggregate strip: instrument cards with mono numerals. */
 .eval-aggregates {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -1526,29 +1672,33 @@ button:disabled:hover {
   align-content: start;
   min-width: 0;
   padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--line);
   border-radius: var(--radius-md);
-  background: var(--bg-raised);
+  background: var(--card);
+  box-shadow: var(--shadow-card);
 }
 .eval-aggregates span {
-  color: var(--text-muted);
+  color: var(--ink-faint);
+  font-family: var(--font-mono);
   font-size: var(--text-2xs);
   font-weight: 700;
   letter-spacing: var(--tracking-label);
   text-transform: uppercase;
 }
 .eval-aggregates strong {
-  color: var(--text-primary);
-  font-size: var(--text-lg);
-  font-weight: 650;
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: var(--text-xl);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 .eval-aggregates p {
   margin: 0;
-  color: var(--text-secondary);
+  color: var(--ink-soft);
   font-size: var(--text-xs);
 }
 
-/* Task table: machine values in monospace, badges in the state palette. */
+/* Task table: hairline rows, mono machine values, stamped badges. */
 .eval-task-table {
   width: 100%;
   min-width: 0;
@@ -1557,8 +1707,9 @@ button:disabled:hover {
 }
 .eval-task-table th {
   padding: var(--space-2) var(--space-2);
-  border-bottom: 1px solid var(--border-strong);
-  color: var(--text-muted);
+  border-bottom: 1px solid var(--line-strong);
+  color: var(--ink-faint);
+  font-family: var(--font-mono);
   font-size: var(--text-2xs);
   font-weight: 700;
   letter-spacing: 0.05em;
@@ -1568,13 +1719,13 @@ button:disabled:hover {
 }
 .eval-task-table td {
   padding: var(--space-2);
-  border-bottom: 1px solid var(--border-subtle);
-  color: var(--text-secondary);
+  border-bottom: 1px solid var(--line);
+  color: var(--ink-soft);
   font-family: var(--font-mono);
   white-space: nowrap;
 }
 .eval-task-table tbody tr:hover {
-  background: var(--bg-raised);
+  background: var(--card);
 }
 .eval-run-link {
   display: inline-flex;
@@ -1585,22 +1736,23 @@ button:disabled:hover {
   background: transparent;
 }
 .eval-run-link:hover {
-  border-color: var(--border-subtle);
-  background: var(--bg-button);
+  border-color: transparent;
+  background: var(--accent-soft-bg);
 }
 .eval-run-link span {
-  color: var(--accent-soft);
+  color: var(--accent);
   font-family: var(--font-mono);
   font-size: var(--text-sm);
-  font-weight: 650;
+  font-weight: 700;
 }
 .eval-run-link small {
-  color: var(--text-muted);
+  color: var(--ink-faint);
   font-size: var(--text-2xs);
 }
 .eval-judge-scores {
-  color: var(--text-primary);
-  font-weight: 650;
+  color: var(--ink);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Run detail: the facts reuse the run-details list; the judgement card sits
@@ -1610,9 +1762,21 @@ button:disabled:hover {
   gap: var(--space-5);
   min-width: 0;
 }
+/* The run detail page is wide, so its facts read as an instrument card grid
+   instead of the rail's single column. */
+.eval-run-detail .run-details-list {
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: var(--space-4) var(--space-5);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--card);
+  box-shadow: var(--shadow-card);
+}
 .eval-run-heading p {
   margin: 0 0 var(--space-1);
-  color: var(--text-muted);
+  color: var(--ink-faint);
+  font-family: var(--font-mono);
   font-size: var(--text-2xs);
   font-weight: 700;
   letter-spacing: var(--tracking-label);
@@ -1621,22 +1785,23 @@ button:disabled:hover {
 .eval-run-heading h2 {
   margin: 0;
   overflow-wrap: anywhere;
-  color: var(--text-primary);
+  color: var(--ink);
   font-family: var(--font-mono);
   font-size: var(--text-xl);
-  font-weight: 650;
+  font-weight: 700;
 }
 .eval-final-message {
   min-width: 0;
   padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--line);
   border-left: 3px solid var(--info-line);
   border-radius: var(--radius-md);
-  background: var(--bg-raised);
+  background: var(--card);
 }
 .eval-final-message h3 {
   margin: 0 0 var(--space-2);
-  color: var(--text-muted);
+  color: var(--ink-faint);
+  font-family: var(--font-mono);
   font-size: var(--text-2xs);
   font-weight: 700;
   letter-spacing: var(--tracking-label);
@@ -1644,7 +1809,7 @@ button:disabled:hover {
 }
 .eval-final-message p {
   margin: 0;
-  color: var(--text-primary);
+  color: var(--ink);
   font-size: var(--text-sm);
   line-height: var(--leading-normal);
   white-space: pre-wrap;
@@ -1652,17 +1817,19 @@ button:disabled:hover {
 .judgement-card {
   min-width: 0;
   padding: var(--space-4) var(--space-5);
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--line);
   border-left: 4px solid var(--compact-line);
   border-radius: var(--radius-md);
-  background: var(--bg-raised);
+  background: var(--card);
+  box-shadow: var(--shadow-card);
 }
 .judgement-card header {
   margin-bottom: var(--space-3);
 }
 .judgement-card h2 {
   margin: 0 0 var(--space-1);
-  color: var(--text-muted);
+  color: var(--ink-faint);
+  font-family: var(--font-mono);
   font-size: var(--text-2xs);
   font-weight: 700;
   letter-spacing: var(--tracking-label);
@@ -1670,11 +1837,11 @@ button:disabled:hover {
 }
 .judgement-card header p {
   margin: 0;
-  color: var(--text-secondary);
+  color: var(--ink-soft);
   font-size: var(--text-xs);
 }
 .judgement-card header code {
-  color: var(--code-fg);
+  color: var(--ink);
   font-family: var(--font-mono);
 }
 .judgement-scores {
@@ -1687,22 +1854,24 @@ button:disabled:hover {
   display: grid;
   gap: 2px;
   padding: var(--space-3);
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--line);
   border-radius: var(--radius-sm);
-  background: var(--bg-sunken);
+  background: var(--paper);
 }
 .judgement-score span {
-  color: var(--text-muted);
+  color: var(--ink-faint);
+  font-family: var(--font-mono);
   font-size: var(--text-2xs);
-  font-weight: 650;
+  font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
 }
 .judgement-score strong {
-  color: var(--text-primary);
+  color: var(--ink);
   font-family: var(--font-mono);
   font-size: var(--text-xl);
-  font-weight: 650;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 .judgement-error {
   display: grid;
@@ -1714,7 +1883,7 @@ button:disabled:hover {
   background: var(--danger-bg);
 }
 .judgement-error strong {
-  color: var(--danger-fg-strong);
+  color: var(--danger-strong);
   font-size: var(--text-sm);
 }
 .judgement-error p {
@@ -1724,7 +1893,7 @@ button:disabled:hover {
 }
 .judgement-empty p {
   margin: 0;
-  color: var(--text-muted);
+  color: var(--ink-faint);
   font-size: var(--text-sm);
 }
 .judgement-unreadable header h2 {
@@ -1739,22 +1908,22 @@ button:disabled:hover {
   align-items: center;
   gap: var(--space-2);
   margin: 0;
-  color: var(--text-secondary);
+  color: var(--ink-soft);
   font-size: var(--text-sm);
 }
 
-/* --- Run details -------------------------------------------------------- */
+/* --- Run details: the instrument rail ------------------------------------ */
 .run-details-panel p,
 .run-details-drawer p {
   margin: 0;
-  color: var(--text-muted);
+  color: var(--ink-faint);
   font-size: var(--text-sm);
 }
 /* The panel falls back to the last finished run, so the rows always state which
    run they describe. Typed with an element to outrank the margin reset above. */
 p.run-details-scope {
   margin-bottom: var(--space-4);
-  color: var(--text-secondary);
+  color: var(--ink-soft);
 }
 .run-details-list {
   display: grid;
@@ -1768,9 +1937,10 @@ p.run-details-scope {
   min-width: 0;
 }
 .run-details-list dt {
-  color: var(--text-muted);
+  color: var(--ink-faint);
+  font-family: var(--font-mono);
   font-size: var(--text-2xs);
-  font-weight: 650;
+  font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
 }
@@ -1778,7 +1948,7 @@ p.run-details-scope {
   margin: 0;
   min-width: 0;
   overflow-wrap: anywhere;
-  color: var(--text-primary);
+  color: var(--ink);
   font-size: var(--text-sm);
 }
 /* The token counters are sums across rounds, so the caveat travels with them. */
@@ -1787,7 +1957,7 @@ p.run-details-scope {
   gap: var(--space-1);
 }
 .run-details-note {
-  color: var(--text-muted);
+  color: var(--ink-faint);
   font-size: var(--text-2xs);
   line-height: 1.45;
 }
@@ -1797,20 +1967,21 @@ p.run-details-scope {
   gap: var(--space-1);
   margin-top: var(--space-4);
   padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--line);
   border-left: 3px solid var(--neutral-line);
   border-radius: var(--radius-md);
+  background: var(--card);
 }
 .run-stop-detail p {
   margin: 0;
-  color: var(--text-secondary);
+  color: var(--ink-soft);
   font-size: var(--text-sm);
 }
 .run-stop-detail .run-stop-hint {
-  color: var(--text-primary);
+  color: var(--ink);
 }
 .run-details-mono {
-  color: var(--code-fg);
+  color: var(--ink-soft);
   font-family: var(--font-mono);
   font-size: var(--text-xs);
 }
@@ -1825,20 +1996,21 @@ p.run-details-scope {
 .run-context-load {
   margin-top: var(--space-5);
   padding-top: var(--space-4);
-  border-top: 1px solid var(--border-subtle);
+  border-top: 1px solid var(--line);
 }
 .run-context-load h3 {
   margin: 0 0 var(--space-2);
-  color: var(--text-muted);
+  color: var(--ink-faint);
+  font-family: var(--font-mono);
   font-size: var(--text-2xs);
-  font-weight: 650;
+  font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
 }
 .run-context-load p {
   margin: 0;
   overflow-wrap: anywhere;
-  color: var(--text-secondary);
+  color: var(--ink-soft);
   font-size: var(--text-xs);
 }
 .run-context-skills {
@@ -1846,7 +2018,7 @@ p.run-details-scope {
   padding: 0 0 0 var(--space-4);
   display: grid;
   gap: 2px;
-  color: var(--code-fg);
+  color: var(--ink-soft);
   font-family: var(--font-mono);
   font-size: var(--text-2xs);
   list-style: square;
@@ -1855,18 +2027,29 @@ p.run-details-scope {
   overflow-wrap: anywhere;
 }
 /* Model-layer states: streaming, compacting, retry wait, stopped and
-   unrecoverable failure each read differently. */
+   unrecoverable failure each read differently — a lamp plus a pill. */
 .run-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   justify-self: start;
   border: 1px solid var(--neutral-border);
   border-radius: var(--radius-pill);
   padding: 2px 9px;
   color: var(--neutral-fg);
   background: var(--neutral-bg);
+  font-family: var(--font-mono);
   font-size: var(--text-2xs);
   font-weight: 700;
   letter-spacing: 0.07em;
   text-transform: uppercase;
+}
+.run-state::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentcolor;
 }
 .run-state-starting,
 .run-state-building_context,
@@ -1900,8 +2083,7 @@ p.run-details-scope {
 /* Spec 13.3 needs 已停止 told apart from an unrecoverable failure, and a user
    cancellation apart from a restart interruption. `.run-details-list dd` owns the
    pill text colour, so the fill and the border style carry the difference and it
-   survives greyscale; the panel text keeps 13.9:1 or better on each fill. The
-   per-state colour mirrors the matching tool-card state for when it applies. */
+   survives greyscale; the per-state colour mirrors the matching tool-card state. */
 .run-state-stopped {
   border-color: var(--refusal-border);
   color: var(--refusal-fg);
@@ -1911,7 +2093,7 @@ p.run-details-scope {
   border-color: var(--neutral-line);
   border-style: dashed;
   color: var(--neutral-fg);
-  background: var(--bg-sunken);
+  background: var(--sunken);
 }
 .run-state-interrupted {
   border-color: var(--indeterminate-border);
@@ -1920,8 +2102,8 @@ p.run-details-scope {
   background: var(--indeterminate-bg);
 }
 .run-state-failed {
-  border-color: #8c4247;
-  color: #ffe9ea;
+  border-color: var(--danger-solid);
+  color: #ffffff;
   background: var(--danger-solid);
 }
 .run-details-toggle,
@@ -1929,7 +2111,7 @@ p.run-details-scope {
   display: none;
 }
 
-/* --- Narrow layout: the right column becomes the existing drawer -------- */
+/* --- Narrow layout: the right column becomes the existing drawer --------- */
 @media (max-width: 900px) {
   .app-shell {
     grid-template-columns: minmax(200px, 250px) minmax(0, 1fr);
@@ -1965,11 +2147,11 @@ p.run-details-scope {
     overflow-y: auto;
     width: min(380px, 92vw);
     padding: var(--space-5) var(--space-4);
-    border-left: 1px solid var(--border-strong);
-    background: var(--bg-panel);
+    border-left: 1px solid var(--line-strong);
+    background: var(--card);
     box-shadow:
-      -18px 0 36px rgb(0 0 0 / 55%),
-      0 0 0 100vmax rgb(6 9 12 / 55%);
+      -18px 0 36px rgb(27 36 48 / 20%),
+      0 0 0 100vmax rgb(27 36 48 / 35%);
   }
   .drawer-close {
     float: right;
@@ -1982,7 +2164,7 @@ p.run-details-scope {
   }
   .session-sidebar {
     border-right: 0;
-    border-bottom: 1px solid var(--border-subtle);
+    border-bottom: 1px solid var(--line);
   }
   .conversation-panel {
     min-height: 78vh;
