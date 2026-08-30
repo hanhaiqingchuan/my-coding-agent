@@ -13,8 +13,8 @@ import remarkGfm from "remark-gfm";
  * the literal source text. The fenced-code card keeps its copy button.
  */
 
-/** The timeline's own heading row sits one level above message content. */
-const HEADING_SHIFT = { h1: "h2", h2: "h3", h3: "h4", h4: "h5", h5: "h6", h6: "h6" } as const;
+/* The timeline's own heading row sits one level above message content, so every
+   heading in model output shifts one level down (h1 renders as h2, and so on). */
 
 export function Markdown({ text }: { text: string }) {
   return (
