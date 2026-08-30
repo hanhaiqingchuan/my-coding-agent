@@ -144,6 +144,6 @@ test("/compact force-compacts the transcript and surfaces the compaction chip", 
   await page.getByRole("button", { name: "发送" }).click();
 
   await expect(
-    page.getByText(/上下文已压缩：[\d,]+ → [\d,]+ tokens/),
+    page.getByText(/上下文压缩完成：[\d,]+ → [\d,]+ tokens/),
   ).toBeVisible({ timeout: 15_000 });
 });

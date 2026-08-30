@@ -26,7 +26,7 @@ export function CompactionChip({ status }: CompactionChipProps) {
         initial="initial"
         animate="animate"
       >
-        正在压缩上下文…
+        上下文压缩中…
       </motion.p>
     );
   }
@@ -52,7 +52,7 @@ export function CompactionChip({ status }: CompactionChipProps) {
       initial="initial"
       animate="animate"
     >
-      上下文已压缩：{tokenCount(status.beforeTokens)} →{" "}
+      上下文压缩完成：{tokenCount(status.beforeTokens)} →{" "}
       {tokenCount(status.afterTokens)} tokens
     </motion.p>
   );

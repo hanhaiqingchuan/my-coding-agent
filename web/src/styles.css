@@ -1767,6 +1767,28 @@ input:focus-visible {
     border-color: var(--compact-line);
   }
 }
+/* A rejected slash command reads as a quiet dismissible note beside the gauge. */
+.command-error {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  border: 1px solid var(--danger-border);
+  border-radius: var(--radius-pill);
+  padding: 1px 6px 1px 10px;
+  color: var(--danger-fg);
+  background: var(--danger-bg);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+}
+.command-error button {
+  padding: 0 4px;
+  border: 0;
+  background: transparent;
+  color: var(--danger-fg);
+  font-size: var(--text-xs);
+  line-height: 1;
+}
 
 /* --- Recovery banner ----------------------------------------------------- */
 .recovery-banner {

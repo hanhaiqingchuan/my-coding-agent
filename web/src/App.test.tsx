@@ -382,7 +382,7 @@ test("the compaction chip renders the finished compaction next to the gauge", as
 
   await waitFor(() =>
     expect(
-      screen.getByText("上下文已压缩：61,440 → 33,200 tokens"),
+      screen.getByText("上下文压缩完成：61,440 → 33,200 tokens"),
     ).toBeTruthy(),
   );
 });

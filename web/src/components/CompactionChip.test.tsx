@@ -7,7 +7,7 @@ afterEach(cleanup);
 
 test("shows the running statement while the compactor works", () => {
   render(<CompactionChip status={{ phase: "running" }} />);
-  expect(screen.getByRole("status").textContent).toBe("正在压缩上下文…");
+  expect(screen.getByRole("status").textContent).toBe("上下文压缩中…");
 });
 
 test("reports the before and after estimates once compaction finishes", () => {
@@ -17,7 +17,7 @@ test("reports the before and after estimates once compaction finishes", () => {
     />,
   );
   expect(screen.getByRole("status").textContent).toBe(
-    "上下文已压缩：61,440 → 33,200 tokens",
+    "上下文压缩完成：61,440 → 33,200 tokens",
   );
 });
 
@@ -41,5 +41,5 @@ test("a failed compaction reports the failure instead of a success line", () => 
   expect(screen.getByRole("status").textContent).toContain(
     "INVALID_SUMMARY_STRUCTURE",
   );
-  expect(screen.getByRole("status").textContent).not.toContain("上下文已压缩");
+  expect(screen.getByRole("status").textContent).not.toContain("上下文压缩完成");
 });

@@ -130,6 +130,24 @@ test("ignores an already-applied durable event", () => {
   expect(twice).toEqual(once);
 });
 
+test("a command rejection lands in state and dismisses cleanly", () => {
+  const initial = createInitialSessionViewState();
+  const withError = reduceServerMessage(initial, {
+    type: "command_error",
+    client_command_id: "cmd-1",
+    session_id: "session-1",
+    code: "COMPACTION_NOT_POSSIBLE",
+    message: "nothing to compact",
+  });
+  expect(withError.commandError).toEqual({
+    code: "COMPACTION_NOT_POSSIBLE",
+    message: "nothing to compact",
+  });
+
+  const cleared = sessionViewReducer(withError, { type: "commandError.dismissed" });
+  expect(cleared.commandError).toBeNull();
+});
+
 test("a transient assistant delta leaves the durable cursor unchanged", () => {
   const initial = { ...createInitialSessionViewState(), lastSeq: 7 };
 

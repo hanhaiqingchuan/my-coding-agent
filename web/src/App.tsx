@@ -43,6 +43,17 @@ function useHashRoute(): AppRoute {
   return route;
 }
 
+/** Command rejections read as guidance, not as transport noise. */
+function friendlyCommandError(error: { code: string; message: string }): string {
+  if (error.code === "COMPACTION_NOT_POSSIBLE") {
+    return "当前对话还没有可压缩的内容，再聊几轮后再试 /compact。";
+  }
+  if (error.code === "RUN_ALREADY_ACTIVE") {
+    return "当前任务还在运行中，请先停止或等待完成。";
+  }
+  return error.message;
+}
+
 export default function App() {
   const api = useMemo(() => new ApiClient(), []);
   const evaluations = useMemo(() => new EvaluationClient(), []);
@@ -312,6 +323,18 @@ export default function App() {
                   }
                 />
                 <CompactionChip status={state.compaction} />
+                {state.commandError != null ? (
+                  <p className="command-error" role="alert">
+                    {friendlyCommandError(state.commandError)}
+                    <button
+                      type="button"
+                      aria-label="关闭提示"
+                      onClick={() => dispatch({ type: "commandError.dismissed" })}
+                    >
+                      ×
+                    </button>
+                  </p>
+                ) : null}
               </div>
             </div>
           </div>

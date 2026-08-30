@@ -47,6 +47,8 @@ export type SessionViewState = {
   thinkingDrafts: Record<string, ThinkingDraft>;
   toolOutputDrafts: Record<string, string>;
   compaction: CompactionStatus | null;
+  /** The last rejected command (e.g. a /compact with nothing to compact), shown until dismissed. */
+  commandError: { code: string; message: string } | null;
 };
 
 export type SessionViewAction =
@@ -55,6 +57,7 @@ export type SessionViewAction =
   | { type: "connection.changed"; connection: ConnectionState }
   | { type: "csrf.changed"; csrfToken: string | null }
   | { type: "draft.changed"; draftText: string }
+  | { type: "commandError.dismissed" }
   | { type: "session.selected" };
 
 export function createInitialSessionViewState(): SessionViewState {
@@ -68,6 +71,7 @@ export function createInitialSessionViewState(): SessionViewState {
     thinkingDrafts: {},
     toolOutputDrafts: {},
     compaction: null,
+    commandError: null,
   };
 }
 
@@ -104,6 +108,13 @@ export function reduceServerMessage(
         : { ...state, lastSeq: message.event.seq };
     const compaction = compactionFromEvent(message.event);
     return compaction === null ? base : { ...base, compaction };
+  }
+
+  if (message.type === "command_error") {
+    return {
+      ...state,
+      commandError: { code: message.code, message: message.message },
+    };
   }
 
   if (message.type === "assistant.delta") {
@@ -187,6 +198,8 @@ export function sessionViewReducer(
       return { ...state, csrfToken: action.csrfToken };
     case "draft.changed":
       return { ...state, draftText: action.draftText };
+    case "commandError.dismissed":
+      return { ...state, commandError: null };
     case "session.selected":
       return createInitialSessionViewState();
   }
