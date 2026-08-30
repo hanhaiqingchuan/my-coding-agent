@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sqlite3
 
 import pytest
@@ -12,6 +13,7 @@ from coding_agent.core.models import (
     ErrorKind,
     MessageStatus,
     ModelStopReason,
+    RunContextEstimate,
     RunState,
     RunTotals,
     StopReason,
@@ -92,7 +94,7 @@ def tool_envelope_result(tool_call_id: str, *, duration_ms: int) -> ToolResult:
     )
 
 
-def test_initialize_creates_v1_schema_and_configures_connections(tmp_path) -> None:
+def test_initialize_creates_the_current_schema_and_configures_connections(tmp_path) -> None:
     database = tmp_path / "state.db"
     store = SQLiteStore(database, busy_timeout_ms=3210)
 
@@ -115,7 +117,7 @@ def test_initialize_creates_v1_schema_and_configures_connections(tmp_path) -> No
             "events",
             "client_commands",
         }
-        assert connection.execute("PRAGMA user_version").fetchone()[0] == 1
+        assert connection.execute("PRAGMA user_version").fetchone()[0] == 2
         assert connection.execute("PRAGMA journal_mode").fetchone()[0] == "wal"
         assert {row[1] for row in connection.execute("PRAGMA table_info(tool_executions)")} >= {
             "tool_call_id",
@@ -133,6 +135,7 @@ def test_initialize_creates_v1_schema_and_configures_connections(tmp_path) -> No
             "cache_read_input_tokens",
             "round_count",
             "retry_count",
+            "context_json",
         }
         assert {
             (row[2], row[3]) for row in connection.execute("PRAGMA foreign_key_list(runs)")
@@ -141,6 +144,28 @@ def test_initialize_creates_v1_schema_and_configures_connections(tmp_path) -> No
     with store.connection() as configured:
         assert configured.execute("PRAGMA foreign_keys").fetchone()[0] == 1
         assert configured.execute("PRAGMA busy_timeout").fetchone()[0] == 3210
+
+
+def test_initialize_upgrades_a_v1_database_keeping_its_runs(tmp_path) -> None:
+    """A database created before user_version 2 must gain the context column, not lose data."""
+    database = tmp_path / "state.db"
+    store = SQLiteStore(database)
+    store.initialize()
+    session = store.create_session("/tmp/workspace", "Legacy")
+    legacy_run = store.begin_run(session.id, "kept task", {}, "legacy-cmd", "legacy-hash")
+    with store.connection() as connection:
+        connection.execute("ALTER TABLE runs DROP COLUMN context_json")
+        connection.execute("PRAGMA user_version = 1")
+
+    store.initialize()
+
+    with sqlite3.connect(database) as connection:
+        assert "context_json" in {row[1] for row in connection.execute("PRAGMA table_info(runs)")}
+        assert connection.execute("PRAGMA user_version").fetchone()[0] == 2
+    assert store.get_run(legacy_run.id).context is None
+    estimate = _context_estimate(estimated_tokens=4321)
+    store.record_context_estimate(legacy_run.id, estimate)
+    assert store.get_run(legacy_run.id).context == estimate
 
 
 def test_create_and_list_sessions_round_trip_domain_values(store: SQLiteStore) -> None:
@@ -589,6 +614,64 @@ def test_a_run_without_model_requests_reports_zeroed_totals(store: SQLiteStore, 
     assert active_run.totals == RunTotals()
 
 
+def test_context_estimate_round_trips_and_the_latest_build_wins(
+    store: SQLiteStore, session
+) -> None:
+    """The run's read-only context projection persists the latest build's estimate."""
+    run = store.begin_run(session.id, "task", {}, "cmd-start", "hash-start")
+
+    assert store.get_run(run.id).context is None
+    assert store.load_snapshot(session.id).active_run is not None
+    assert store.load_snapshot(session.id).active_run.context is None
+
+    first = _context_estimate(estimated_tokens=1_200)
+    store.record_context_estimate(run.id, first)
+    second = _context_estimate(estimated_tokens=2_500)
+
+    store.record_context_estimate(run.id, second)
+
+    assert store.get_run(run.id).context == second
+    snapshot = store.load_snapshot(session.id)
+    assert snapshot.active_run is not None
+    assert snapshot.active_run.context == second
+    with store.connection() as connection:
+        stored = json.loads(
+            connection.execute("SELECT context_json FROM runs WHERE id = ?", (run.id,)).fetchone()[
+                0
+            ]
+        )
+    assert stored == {
+        "estimated_tokens": 2_500,
+        "available_tokens": 53_760,
+        "window_tokens": 64_000,
+        "max_output_tokens": 8_192,
+        "safety_margin_tokens": 2_048,
+    }
+    assert first != second
+
+
+def test_context_estimate_requires_an_active_run(store: SQLiteStore, session) -> None:
+    """A terminal run's projection is frozen; late estimates must not rewrite history."""
+    run = store.begin_run(session.id, "task", {}, "cmd-start", "hash-start")
+    store.transition_run(run.id, {RunState.STARTING}, RunState.STOPPED, StopReason.MAX_ROUNDS, None)
+
+    with pytest.raises(StoreError) as raised:
+        store.record_context_estimate(run.id, _context_estimate(estimated_tokens=1))
+
+    assert raised.value.code == "RUN_NOT_ACTIVE"
+    assert store.get_run(run.id).context is None
+
+
+def _context_estimate(*, estimated_tokens: int) -> RunContextEstimate:
+    return RunContextEstimate(
+        estimated_tokens=estimated_tokens,
+        available_tokens=53_760,
+        window_tokens=64_000,
+        max_output_tokens=8_192,
+        safety_margin_tokens=2_048,
+    )
+
+
 def test_events_are_monotonic_per_session_and_snapshot_uses_latest_cut(
     store: SQLiteStore, session
 ) -> None:
@@ -629,3 +712,123 @@ def test_record_diagnostic_appends_a_run_scoped_event_without_state_changes(
         "message": "nope",
     }
     assert store.get_run(run.id).state is RunState.BUILDING_CONTEXT
+
+
+def test_begin_session_compaction_claims_receipt_and_emits_started_atomically(
+    store: SQLiteStore, session
+) -> None:
+    """session.compact owes the same one-transaction receipt, check and event as run.start."""
+    initiated = store.begin_session_compaction(
+        session.id, "compact-1", "compact-hash-1", before_estimated_tokens=4_200
+    )
+
+    assert initiated is not None
+    assert initiated.id == session.id
+    events = store.events_after(session.id, 0)
+    started = events[-1]
+    assert started.type == "compaction.started"
+    assert started.run_id is None
+    assert started.payload == {"before_estimated_tokens": 4_200, "forced": True}
+    with store.connection() as connection:
+        receipt = connection.execute(
+            """
+            SELECT command_type, status, resource_id, event_seq
+            FROM client_commands WHERE session_id = ? AND client_command_id = ?
+            """,
+            (session.id, "compact-1"),
+        ).fetchone()
+    assert tuple(receipt) == ("session.compact", "completed", session.id, started.seq)
+
+
+def test_duplicate_session_compact_replays_without_a_second_event(
+    store: SQLiteStore, session
+) -> None:
+    """Retrying the same command id must not compact twice."""
+    store.begin_session_compaction(
+        session.id, "compact-1", "compact-hash-1", before_estimated_tokens=4_200
+    )
+    before = store.events_after(session.id, 0)
+
+    replay = store.begin_session_compaction(
+        session.id, "compact-1", "compact-hash-1", before_estimated_tokens=9_999
+    )
+
+    assert replay is None
+    assert store.events_after(session.id, 0) == before
+
+
+def test_session_compact_conflicting_payload_is_rejected(store: SQLiteStore, session) -> None:
+    store.begin_session_compaction(
+        session.id, "compact-1", "compact-hash-1", before_estimated_tokens=4_200
+    )
+
+    with pytest.raises(CommandIdConflict) as raised:
+        store.begin_session_compaction(
+            session.id, "compact-1", "different-hash", before_estimated_tokens=4_200
+        )
+
+    assert raised.value.code == "COMMAND_ID_CONFLICT"
+
+
+def test_session_compact_is_rejected_while_any_run_is_active(store: SQLiteStore, session) -> None:
+    """The running loop owns compaction; a maintenance compact must not race it."""
+    store.begin_run(session.id, "task", {}, "cmd-start", "hash-start")
+
+    with pytest.raises(StoreError) as raised:
+        store.begin_session_compaction(
+            session.id, "compact-1", "compact-hash-1", before_estimated_tokens=4_200
+        )
+
+    assert raised.value.code == "RUN_ALREADY_ACTIVE"
+    with store.connection() as connection:
+        assert (
+            connection.execute(
+                "SELECT count(*) FROM client_commands WHERE command_type = 'session.compact'"
+            ).fetchone()[0]
+            == 0
+        )
+    assert all(event.type != "compaction.started" for event in store.events_after(session.id, 0))
+
+
+def test_finish_session_compaction_appends_the_finished_event(store: SQLiteStore, session) -> None:
+    store.begin_session_compaction(
+        session.id, "compact-1", "compact-hash-1", before_estimated_tokens=4_200
+    )
+
+    store.finish_session_compaction(
+        session.id,
+        before_estimated_tokens=4_200,
+        after_estimated_tokens=1_500,
+    )
+
+    finished = store.events_after(session.id, 0)[-1]
+    assert finished.type == "compaction.finished"
+    assert finished.run_id is None
+    assert finished.payload == {
+        "before_estimated_tokens": 4_200,
+        "after_estimated_tokens": 1_500,
+        "forced": True,
+    }
+
+
+def test_finish_session_compaction_reports_a_failure_without_changing_the_shape(
+    store: SQLiteStore, session
+) -> None:
+    store.begin_session_compaction(
+        session.id, "compact-1", "compact-hash-1", before_estimated_tokens=4_200
+    )
+
+    store.finish_session_compaction(
+        session.id,
+        before_estimated_tokens=4_200,
+        after_estimated_tokens=4_200,
+        error_code="MODEL_API_ERROR",
+    )
+
+    finished = store.events_after(session.id, 0)[-1]
+    assert finished.payload == {
+        "before_estimated_tokens": 4_200,
+        "after_estimated_tokens": 4_200,
+        "forced": True,
+        "error": {"code": "MODEL_API_ERROR"},
+    }

@@ -385,6 +385,7 @@ const failedRun: RunDto = {
     round_count: 1,
     retry_count: 3,
   },
+  context: null,
 };
 
 test("summarizes a failed run as a dismissible banner with the retry fact and hint", async () => {

@@ -643,6 +643,192 @@ def test_exactly_eighty_percent_triggers_compaction() -> None:
     assert result.estimated_tokens == result.trigger_tokens == 137
 
 
+def test_real_session_scale_thinking_heavy_transcript_builds_without_overflow() -> None:
+    """Regression proof from session df0e628d (run 960e5652, CONTEXT_OVERFLOW).
+
+    The real transcript held ~74 KiB of display-only ThinkingPart (~24k tokens if
+    it were counted) next to ~108 KiB of genuine tool_use arguments, on a 64k
+    window (available = 64k - 8k output - 2k margin = 53,760). Thinking is
+    display-only by design (spec 7.4, 8.2): the model view never carries it, so
+    no accounting path may count it either. A synthetic transcript sized like the
+    real one must therefore complete the build instead of overflowing, and the
+    accounting must be identical to the same transcript with thinking stripped.
+    """
+    transcript = _real_session_scale_transcript()
+    request = _real_session_scale_request()
+
+    result = ContextBuilder().build(transcript, None, request)
+
+    assert not isinstance(result, ContextOverflow)
+    assert isinstance(result, ReadyContext | CompactionRequired)
+    assert result.estimated_tokens <= result.available_tokens
+
+    stripped = tuple(
+        replace(
+            message,
+            parts=tuple(part for part in message.parts if not isinstance(part, ThinkingPart)),
+        )
+        for message in transcript
+    )
+    stripped_result = ContextBuilder().build(stripped, None, request)
+
+    assert type(stripped_result) is type(result)
+    assert stripped_result.estimated_tokens == result.estimated_tokens
+    assert stripped_result.mandatory_tokens == result.mandatory_tokens
+    assert stripped_result.available_tokens == result.available_tokens
+
+
+def _real_session_scale_transcript() -> tuple[Message, ...]:
+    """Shape and size the failing session: 3 runs, ~46 thinking parts, 49 tool calls.
+
+    The committed history mirrors df0e628d: one short first run, one long completed
+    run of read/plan exchanges, and the current run whose rounds are all mandatory.
+    Byte targets: 74 KiB of thinking text, ~108 KiB of tool_use input payloads and
+    ~22 KiB of tool-result content, all UTF-8 (CJK characters are 3 bytes each).
+    """
+    thinking_per_turn = (74 * 1_024) // 46
+    args_per_call = (108 * 1_024) // 49
+    result_per_call = (22 * 1_024) // 49
+
+    messages: list[Message] = []
+    seq = 0
+
+    def add(role: str, *parts: object, run_id: str, tool_call_id: str | None = None) -> None:
+        nonlocal seq
+        seq += 1
+        messages.append(
+            _message(  # type: ignore[arg-type]
+                seq,
+                role,
+                *parts,
+                run_id=run_id,
+                tool_call_id=tool_call_id,
+            )
+        )
+
+    add("user", TextPart("你好，你是谁"), run_id="run-a")
+    add("assistant", TextPart("我是你的编码助手。"), run_id="run-a")
+
+    add("user", TextPart("帮我查看项目结构并整理 tmp 目录"), run_id="run-b")
+    for index in range(24):
+        call_id = f"call-b-{index}"
+        args = {
+            "command": "ls -la",
+            "reason": "查看目录结构 " + "条目" * ((args_per_call - 120) // 6),
+        }
+        add(
+            "assistant",
+            ThinkingPart("思考" * (thinking_per_turn // 6)),
+            TextPart(f"第{index + 1}步：先查看目录。"),
+            ToolUsePart(ToolCall(call_id, "run_command", args)),
+            run_id="run-b",
+        )
+        add(
+            "tool",
+            ToolResult(
+                call_id,
+                "总用量 4\ndrwxr-xr-x tmp\n" + "行数据" * (result_per_call // 9),
+                True,
+            ),
+            run_id="run-b",
+            tool_call_id=call_id,
+        )
+    add("assistant", TextPart("目录已确认，继续下一步。"), run_id="run-b")
+
+    add("user", TextPart("继续整理，把临时文件归类"), run_id="run-c")
+    for index in range(25):
+        call_id = f"call-c-{index}"
+        args = {
+            "path": "tmp/notes.txt",
+            "reason": "读取文件内容 " + "片段" * ((args_per_call - 120) // 6),
+        }
+        add(
+            "assistant",
+            ThinkingPart("推理" * (thinking_per_turn // 6)),
+            TextPart(f"读取第{index + 1}个文件。"),
+            ToolUsePart(ToolCall(call_id, "read_file", args)),
+            run_id="run-c",
+        )
+        add(
+            "tool",
+            ToolResult(call_id, "第一行内容\n第二行内容\n" + "数据" * (result_per_call // 9), True),
+            run_id="run-c",
+            tool_call_id=call_id,
+        )
+    return tuple(messages)
+
+
+def _real_session_scale_request() -> ContextRequest:
+    """The failing run's configured budget: 64k window, 8k output, 2k margin."""
+    return ContextRequest(
+        system=(
+            "system instructions\n\nCurrent environment:\n"
+            "- workspace root: /Users/hhc/Desktop/codes/my-agent/tmp\n"
+            "- platform: darwin\n"
+            "- read_file returns at most 800 lines or 40960 bytes per call\n"
+            "- run_command times out after 120s and truncates output at 40960 bytes"
+        ),
+        context_window=64_000,
+        max_output_tokens=8_192,
+        safety_margin_tokens=2_048,
+        compact_trigger_ratio=0.80,
+        compact_target_ratio=0.60,
+        summary_max_tokens=2_048,
+        recent_user_turns=2,
+        current_run_id="run-c",
+        tool_schemas=(
+            {
+                "name": "read_file",
+                "description": "Read a UTF-8 text file with line and byte limits",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "path": {"type": "string"},
+                        "offset": {"type": "integer"},
+                        "limit": {"type": "integer"},
+                    },
+                    "required": ["path"],
+                },
+            },
+            {
+                "name": "write_file",
+                "description": "Write or replace a UTF-8 text file after approval",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "operation": {"type": "string"},
+                        "path": {"type": "string"},
+                        "content": {"type": "string"},
+                    },
+                    "required": ["operation", "path"],
+                },
+            },
+            {
+                "name": "run_command",
+                "description": "Run a non-interactive shell command after approval",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "command": {"type": "string"},
+                        "cwd": {"type": "string"},
+                        "reason": {"type": "string"},
+                        "timeout_seconds": {"type": "integer"},
+                    },
+                    "required": ["command"],
+                },
+            },
+            {
+                "name": "skill",
+                "description": "Read or list on-demand workspace skills",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {"name": {"type": "string"}, "mode": {"type": "string"}},
+                },
+            },
+        ),
+    )
+
+
 def test_request_rejects_an_invalid_budget_before_building_context() -> None:
     with pytest.raises(ValueError, match="context window must exceed"):
         _request(context_window=200, max_output_tokens=100, safety_margin_tokens=100)

@@ -35,8 +35,16 @@
       "model_protocol_error",
       "internal_error"
     ],
-    "ApprovalStatus": ["pending", "approved", "rejected", "cancelled"],
-    "ApprovalDecision": ["approve", "reject"],
+    "ApprovalStatus": [
+      "pending",
+      "approved",
+      "rejected",
+      "cancelled"
+    ],
+    "ApprovalDecision": [
+      "approve",
+      "reject"
+    ],
     "ToolExecutionState": [
       "queued",
       "awaiting_approval",
@@ -60,7 +68,8 @@
       "config_snapshot",
       "started_at",
       "finished_at",
-      "totals"
+      "totals",
+      "context"
     ],
     "RunTotalsDto": [
       "input_tokens",
@@ -128,7 +137,8 @@
     "run.start",
     "run.stop",
     "approval.resolve",
-    "session.ack_recovery"
+    "session.ack_recovery",
+    "session.compact"
   ],
   "serverMessageTypes": [
     "ack",

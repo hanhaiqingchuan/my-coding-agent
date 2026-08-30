@@ -212,6 +212,7 @@ def build_run_coordinator(
         runner=loop,
         config_snapshot=asdict(settings),
         approval_gate=runtime.approval_gate,
+        session_compactor=loop,
     )
 
 

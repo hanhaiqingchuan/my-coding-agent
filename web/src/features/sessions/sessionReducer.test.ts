@@ -41,6 +41,7 @@ const activeRun = {
     round_count: 0,
     retry_count: 0,
   },
+  context: null,
 } as const;
 
 function snapshot(

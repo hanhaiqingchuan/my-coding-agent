@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
+from types import MappingProxyType
 
 from coding_agent.core.cancellation import CancellationToken
 from coding_agent.core.models import ToolError, ToolResult
@@ -28,6 +29,13 @@ class ToolContext:
     workspace: "WorkspaceBoundary"
     cancellation: CancellationToken
     emit_output: OutputSink
+    content_fingerprints: Mapping[str, str] = MappingProxyType({})
+    """Absolute target path -> sha256 of the bytes this session last read or wrote.
+
+    The loop owns this per-session view so ``write_file`` can refuse to execute
+    against content the model has never seen in its current form (spec 10.3's
+    freshness gate). An empty mapping means no session reads are known.
+    """
 
 
 def result(

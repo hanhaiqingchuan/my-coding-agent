@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import hashlib
 import os
 import stat
+from collections.abc import Mapping
 from pathlib import Path
+from types import MappingProxyType
 
 import pytest
 
@@ -18,16 +21,34 @@ async def _discard_output(_: str) -> None:
     return None
 
 
-def tool_context(workspace: Path) -> ToolContext:
-    return ToolContext(WorkspaceBoundary(workspace), CancellationToken(), _discard_output)
+def tool_context(
+    workspace: Path, content_fingerprints: Mapping[str, str] | None = None
+) -> ToolContext:
+    return ToolContext(
+        WorkspaceBoundary(workspace),
+        CancellationToken(),
+        _discard_output,
+        content_fingerprints=MappingProxyType(dict(content_fingerprints or {})),
+    )
 
 
-async def execute_write(workspace: Path, input_value: dict[str, object]):
+def read_state(workspace: Path, relative: str) -> dict[str, str]:
+    """Fingerprints a session would hold after read_file returned the current content."""
+    target = (workspace / relative).resolve()
+    return {str(target): hashlib.sha256(target.read_bytes()).hexdigest()}
+
+
+async def execute_write(
+    workspace: Path,
+    input_value: dict[str, object],
+    *,
+    content_fingerprints: Mapping[str, str] | None = None,
+):
     tool = WriteFileTool()
     prepared = tool.prepare(
         ToolCall("write-1", "write_file", input_value), WorkspaceBoundary(workspace)
     )
-    return prepared, await tool.execute(prepared, tool_context(workspace))
+    return prepared, await tool.execute(prepared, tool_context(workspace, content_fingerprints))
 
 
 @pytest.mark.asyncio
@@ -63,7 +84,9 @@ async def test_write_replaces_the_entire_existing_file(tmp_path: Path) -> None:
     target.write_text("old\n", encoding="utf-8")
 
     prepared, result = await execute_write(
-        tmp_path, {"operation": "write", "path": "notes.txt", "content": "new\n"}
+        tmp_path,
+        {"operation": "write", "path": "notes.txt", "content": "new\n"},
+        content_fingerprints=read_state(tmp_path, "notes.txt"),
     )
 
     assert "-old\n+new\n" in prepared.preview
@@ -85,6 +108,7 @@ async def test_replace_updates_a_unique_match(tmp_path: Path) -> None:
             "old_text": "target",
             "new_text": "changed",
         },
+        content_fingerprints=read_state(tmp_path, "notes.txt"),
     )
 
     assert result.ok is True
@@ -158,6 +182,7 @@ async def test_replace_all_updates_every_match_only_when_requested(tmp_path: Pat
             "new_text": "changed",
             "replace_all": True,
         },
+        content_fingerprints=read_state(tmp_path, "notes.txt"),
     )
 
     assert result.ok is True
@@ -270,7 +295,7 @@ async def test_atomic_replace_failure_keeps_existing_contents(
         raise OSError("replace failed")
 
     monkeypatch.setattr("coding_agent.tools.write_file.os.replace", fail_replace)
-    result = await tool.execute(prepared, tool_context(tmp_path))
+    result = await tool.execute(prepared, tool_context(tmp_path, read_state(tmp_path, "notes.txt")))
 
     assert result.ok is False
     assert result.error is not None
@@ -286,8 +311,89 @@ async def test_overwrite_preserves_existing_file_permissions(tmp_path: Path) -> 
     target.chmod(0o740)
 
     _, result = await execute_write(
-        tmp_path, {"operation": "write", "path": "script.sh", "content": "new"}
+        tmp_path,
+        {"operation": "write", "path": "script.sh", "content": "new"},
+        content_fingerprints=read_state(tmp_path, "script.sh"),
     )
 
     assert result.ok is True
     assert stat.S_IMODE(target.stat().st_mode) == 0o740
+
+
+@pytest.mark.asyncio
+async def test_write_without_a_prior_read_requires_fresh_read(tmp_path: Path) -> None:
+    """Overwriting content the model never read this session risks blind destructive writes.
+
+    The freshness gate returns a stable, model-correctable error instead of executing,
+    and leaves the target untouched so the model can read_file and retry.
+    """
+    target = tmp_path / "notes.txt"
+    target.write_text("precious", encoding="utf-8")
+
+    _, result = await execute_write(
+        tmp_path, {"operation": "write", "path": "notes.txt", "content": "blind overwrite"}
+    )
+
+    assert result.ok is False
+    assert result.error is not None
+    assert result.error.code == "READ_FRESH_REQUIRED"
+    assert "read_file" in result.error.message
+    assert target.read_text(encoding="utf-8") == "precious"
+
+
+@pytest.mark.asyncio
+async def test_write_after_a_session_read_executes(tmp_path: Path) -> None:
+    """A current read establishes freshness, so the approved write proceeds normally."""
+    target = tmp_path / "notes.txt"
+    target.write_text("read content", encoding="utf-8")
+
+    _, result = await execute_write(
+        tmp_path,
+        {"operation": "write", "path": "notes.txt", "content": "replaced\n"},
+        content_fingerprints=read_state(tmp_path, "notes.txt"),
+    )
+
+    assert result.ok is True
+    assert target.read_text(encoding="utf-8") == "replaced\n"
+
+
+@pytest.mark.asyncio
+async def test_write_after_read_then_external_change_conflicts(tmp_path: Path) -> None:
+    """An external edit after the session's last read must not be silently overwritten."""
+    target = tmp_path / "notes.txt"
+    target.write_text("read content", encoding="utf-8")
+    fingerprints = read_state(tmp_path, "notes.txt")
+    target.write_text("external edit", encoding="utf-8")
+
+    _, result = await execute_write(
+        tmp_path,
+        {"operation": "write", "path": "notes.txt", "content": "stale write"},
+        content_fingerprints=fingerprints,
+    )
+
+    assert result.ok is False
+    assert result.error is not None
+    assert result.error.code == "WRITE_CONFLICT"
+    assert target.read_text(encoding="utf-8") == "external edit"
+
+
+@pytest.mark.asyncio
+async def test_write_of_a_new_file_needs_no_prior_read(tmp_path: Path) -> None:
+    """Creating a target that does not exist yet cannot have been read first."""
+    _, result = await execute_write(
+        tmp_path, {"operation": "write", "path": "brand-new.txt", "content": "fresh"}
+    )
+
+    assert result.ok is True
+    assert (tmp_path / "brand-new.txt").read_text(encoding="utf-8") == "fresh"
+
+
+@pytest.mark.asyncio
+async def test_write_result_reports_the_written_content_hash(tmp_path: Path) -> None:
+    """The loop records the written hash so the model's own write stays fresh afterwards."""
+    _, result = await execute_write(
+        tmp_path, {"operation": "write", "path": "hashed.txt", "content": "payload"}
+    )
+
+    assert result.ok is True
+    assert result.data["sha256"] == hashlib.sha256(b"payload").hexdigest()

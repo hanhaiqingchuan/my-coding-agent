@@ -29,7 +29,10 @@ from coding_agent.core.models import (
     EffectStartResult,
     ErrorKind,
     ModelStopReason,
+    PreparedToolCall,
+    RunContextEstimate,
     RunState,
+    Session,
     StopReason,
     TextPart,
     ToolError,
@@ -46,7 +49,7 @@ from coding_agent.model import (
     ThinkingBlockClosed,
     ThinkingDelta,
 )
-from coding_agent.model.retry import RetryingInvoker
+from coding_agent.model.retry import RetryingInvoker, RetryNotice
 from coding_agent.runtime.approval import ApprovalGate
 from coding_agent.runtime.coordinator import RunMutationGate
 from coding_agent.runtime.metrics import model_config_hash
@@ -98,6 +101,10 @@ class AgentLoop:
         self._publisher = publisher
         self._mutation_gate = mutation_gate
         self._settings = settings
+        # Session-id -> {absolute target path -> sha256 of the bytes this session last
+        # read or wrote}. Spec 10.3's freshness gate consults this view so write_file
+        # never executes against content the model has not seen in its current form.
+        self._content_fingerprints: dict[str, dict[str, str]] = {}
         self._system_prompt = (
             files("coding_agent.prompts").joinpath("system.md").read_text(encoding="utf-8")
         )
@@ -371,8 +378,11 @@ class AgentLoop:
                                 workspace=workspace,
                                 cancellation=cancellation,
                                 emit_output=emit_tool_output,
+                                content_fingerprints=self._session_fingerprints(session_id),
                             ),
                         )
+                        if result.ok:
+                            self._record_content_fingerprint(session_id, prepared, result)
                     except CancellationRequested:
                         message = "tool execution was cancelled"
                         cancelled_result = ToolResult(
@@ -447,10 +457,135 @@ class AgentLoop:
             RunOutcome.fail(StopReason.INTERNAL_ERROR, ErrorKind.INTERNAL_ERROR),
         )
 
+    async def compact_session(
+        self,
+        session_id: str,
+        client_command_id: str,
+        payload_hash: str,
+        cancellation: CancellationToken,
+    ) -> Session:
+        """Run one forced maintenance compaction with no run active (spec 7.4, 14).
+
+        There is no run, so no run record or run state is touched: the command receipt,
+        the active-run rejection and the session-level ``compaction.started`` event
+        commit in one transaction, the compactor then runs against the committed
+        transcript regardless of the 80% threshold, and ``compaction.finished`` closes
+        the lifecycle with the before/after estimates (plus an error code when the
+        compactor kept the previous snapshot).
+        """
+        duplicate = self._store.completed_command_resource(
+            session_id, client_command_id, payload_hash, "session.compact"
+        )
+        if duplicate is not None:
+            # An idempotent replay answers with the first command's outcome; a fresh
+            # plan build could now find nothing left to compact and misreport it.
+            return self._store.load_snapshot(session_id).session
+        active_run = self._store.load_snapshot(session_id).active_run
+        if active_run is not None:
+            raise StoreError(
+                "RUN_ALREADY_ACTIVE",
+                "cannot compact while a run is active; the running loop owns compaction",
+            )
+        scan = self._scan_workspace(session_id)
+        self._tools.configure_skills(scan.skills)
+        base_request = self._context_request(session_id, scan, current_run_id=None)
+        forced = replace(
+            base_request,
+            compact_trigger_ratio=0.000_001,
+            compact_target_ratio=0.000_001,
+        )
+        result = self._context_builder.build(
+            self._store.load_committed_transcript(session_id),
+            self._store.load_context_snapshot(session_id),
+            forced,
+        )
+        if isinstance(result, ContextOverflow):
+            raise StoreError(
+                "CONTEXT_OVERFLOW",
+                "mandatory content exceeds the available input budget; compaction cannot reduce it",
+            )
+        if not isinstance(result, CompactionRequired):
+            raise StoreError(
+                "COMPACTION_NOT_POSSIBLE",
+                "the transcript has no replaceable assistant/tool groups to compact yet",
+            )
+        before_estimated_tokens = result.estimated_tokens
+        initiated = await self._mutate(
+            session_id,
+            lambda: self._store.begin_session_compaction(
+                session_id,
+                client_command_id,
+                payload_hash,
+                before_estimated_tokens=before_estimated_tokens,
+            ),
+        )
+        if initiated is None:
+            return self._store.load_snapshot(session_id).session
+        compaction = await self._compactor.compact(
+            result.plan,
+            cancellation,
+            invoke=self._invoke_maintenance_compaction,
+        )
+        after_estimated_tokens = before_estimated_tokens
+        error_code: str | None = None
+        if compaction.error is not None:
+            error_code = compaction.error.code
+        else:
+            rebuilt = self._context_builder.build(
+                self._store.load_committed_transcript(session_id),
+                compaction.snapshot,
+                base_request,
+            )
+            after_estimated_tokens = (
+                rebuilt.required_tokens
+                if isinstance(rebuilt, ContextOverflow)
+                else rebuilt.estimated_tokens
+            )
+        await self._mutate(
+            session_id,
+            lambda: self._store.finish_session_compaction(
+                session_id,
+                before_estimated_tokens=before_estimated_tokens,
+                after_estimated_tokens=after_estimated_tokens,
+                error_code=error_code,
+            ),
+        )
+        return self._store.load_snapshot(session_id).session
+
+    async def _invoke_maintenance_compaction(
+        self, request: ModelRequest, cancellation: CancellationToken
+    ) -> AssistantTurn:
+        """Serve a run-less compaction request with the run loop's retry policy."""
+
+        async def operation() -> AssistantTurn:
+            return await self._model.complete(request, _ignore_delta, cancellation)
+
+        async def on_retry(_: RetryNotice) -> None:
+            return None
+
+        return await self._invoker.invoke(operation, cancellation, on_retry)
+
     def _workspace_boundary(self, session_id: str) -> WorkspaceBoundary:
         return WorkspaceBoundary(
             Path(self._store.load_snapshot(session_id).session.workspace_realpath)
         )
+
+    def _session_fingerprints(self, session_id: str) -> dict[str, str]:
+        """Return the live per-session read/write fingerprint view for the tools."""
+        return self._content_fingerprints.setdefault(session_id, {})
+
+    def _record_content_fingerprint(
+        self, session_id: str, prepared: PreparedToolCall, result: ToolResult
+    ) -> None:
+        """Track the freshest content the session has seen for the freshness gate.
+
+        read_file reports the hash of the file's full bytes and write_file the hash
+        of what it wrote, so a later write in the same session can prove it targets
+        content the model has already seen in its current form.
+        """
+        sha256 = result.data.get("sha256")
+        if prepared.target and isinstance(sha256, str):
+            self._session_fingerprints(session_id)[prepared.target] = sha256
 
     def _scan_workspace(self, session_id: str) -> WorkspaceScan:
         """Freeze the workspace's instructions and skill index for this run.
@@ -498,18 +633,7 @@ class AgentLoop:
         scan: WorkspaceScan,
         force_compaction: bool = False,
     ) -> ReadyContext | RunOutcome:
-        base_request = ContextRequest(
-            system=self._compiled_system(session_id, scan),
-            context_window=self._settings.model.context_window,
-            max_output_tokens=self._settings.model.max_output_tokens,
-            safety_margin_tokens=self._settings.context.safety_margin_tokens,
-            compact_trigger_ratio=self._settings.context.compact_trigger_ratio,
-            compact_target_ratio=self._settings.context.compact_target_ratio,
-            summary_max_tokens=self._settings.context.summary_max_tokens,
-            recent_user_turns=self._settings.context.recent_turns_min,
-            current_run_id=run_id,
-            tool_schemas=tuple(self._tools.schemas()),
-        )
+        base_request = self._context_request(session_id, scan, current_run_id=run_id)
         request = (
             replace(
                 base_request,
@@ -533,6 +657,18 @@ class AgentLoop:
         if isinstance(result, CompactionRequired):
             await self._transition(
                 run_id, session_id, {RunState.BUILDING_CONTEXT}, RunState.COMPACTING
+            )
+            before_estimated_tokens = result.estimated_tokens
+            await self._mutate(
+                session_id,
+                lambda: self._store.record_diagnostic(
+                    run_id,
+                    "compaction.started",
+                    {
+                        "before_estimated_tokens": before_estimated_tokens,
+                        "forced": force_compaction,
+                    },
+                ),
             )
             compacted = await self._compactor.compact(
                 result.plan,
@@ -567,8 +703,56 @@ class AgentLoop:
                     session_id,
                     RunOutcome.fail(StopReason.CONTEXT_OVERFLOW, ErrorKind.CONTEXT_OVERFLOW),
                 )
+            await self._mutate(
+                session_id,
+                lambda: self._store.record_diagnostic(
+                    run_id,
+                    "compaction.finished",
+                    {
+                        "before_estimated_tokens": before_estimated_tokens,
+                        "after_estimated_tokens": rebuilt.estimated_tokens,
+                        "forced": force_compaction,
+                    },
+                ),
+            )
+            self._record_context_estimate(run_id, rebuilt)
             return rebuilt
+        self._record_context_estimate(run_id, result)
         return result
+
+    def _context_request(
+        self,
+        session_id: str,
+        scan: WorkspaceScan,
+        *,
+        current_run_id: str | None,
+    ) -> ContextRequest:
+        """Assemble the budget request every build — run and maintenance alike — shares."""
+        return ContextRequest(
+            system=self._compiled_system(session_id, scan),
+            context_window=self._settings.model.context_window,
+            max_output_tokens=self._settings.model.max_output_tokens,
+            safety_margin_tokens=self._settings.context.safety_margin_tokens,
+            compact_trigger_ratio=self._settings.context.compact_trigger_ratio,
+            compact_target_ratio=self._settings.context.compact_target_ratio,
+            summary_max_tokens=self._settings.context.summary_max_tokens,
+            recent_user_turns=self._settings.context.recent_turns_min,
+            current_run_id=current_run_id,
+            tool_schemas=tuple(self._tools.schemas()),
+        )
+
+    def _record_context_estimate(self, run_id: str, ready: ReadyContext) -> None:
+        """Publish the build's estimate as the run's read-only context projection."""
+        self._store.record_context_estimate(
+            run_id,
+            RunContextEstimate(
+                estimated_tokens=ready.estimated_tokens,
+                available_tokens=ready.available_tokens,
+                window_tokens=self._settings.model.context_window,
+                max_output_tokens=self._settings.model.max_output_tokens,
+                safety_margin_tokens=self._settings.context.safety_margin_tokens,
+            ),
+        )
 
     async def _complete(
         self,
@@ -777,6 +961,10 @@ class AgentLoop:
 
 def _has_nonempty_text(turn: AssistantTurn) -> bool:
     return any(isinstance(part, TextPart) and part.text.strip() for part in turn.parts)
+
+
+async def _ignore_delta(_: TextDelta) -> None:
+    """Consume streamed text the maintenance compaction never displays."""
 
 
 def _tool_fingerprint(turn: AssistantTurn) -> str:

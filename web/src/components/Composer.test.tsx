@@ -28,6 +28,7 @@ function run(state: RunState): RunDto {
       round_count: 0,
       retry_count: 0,
     },
+    context: null,
   };
 }
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import socket
 import threading
 import time
@@ -22,6 +23,8 @@ from coding_agent.api.websocket import (
     WS_CLOSE_FORBIDDEN,
     WS_CLOSE_SUBSCRIBER_OVERFLOW,
 )
+from coding_agent.config import AppSettings
+from coding_agent.context import Compactor, ContextBuilder
 from coding_agent.core.cancellation import CancellationToken
 from coding_agent.core.events import RunOutcome
 from coding_agent.core.models import (
@@ -31,12 +34,16 @@ from coding_agent.core.models import (
     ModelStopReason,
     PreparedToolCall,
     RunState,
+    StopReason,
     TextPart,
     ToolCall,
     ToolUsePart,
     Usage,
 )
+from coding_agent.model.retry import RetryingInvoker
+from coding_agent.runtime.approval import ApprovalGate
 from coding_agent.runtime.coordinator import RunCoordinator, RunMutationGate
+from coding_agent.runtime.loop import AgentLoop
 from coding_agent.runtime.publisher import (
     AssistantDelta,
     AssistantThinkingClosed,
@@ -45,6 +52,8 @@ from coding_agent.runtime.publisher import (
     ToolOutputDelta,
 )
 from coding_agent.storage.sqlite import SQLiteStore
+from tests.fakes.model import ScriptedModel
+from tests.fakes.tools import RecordingTools
 
 SERVER_PORT = 8123
 BASE_URL = f"http://127.0.0.1:{SERVER_PORT}"
@@ -73,6 +82,15 @@ class _Runtime:
     runner: _ImmediateRunner
 
 
+@dataclass(slots=True)
+class _CompactRuntime:
+    app: object
+    store: SQLiteStore
+    publisher: EventPublisher
+    model: ScriptedModel
+    session_id: str
+
+
 def _runtime(
     tmp_path: Path,
     *,
@@ -99,6 +117,82 @@ def _runtime(
         recover_on_startup=False,
     )
     return _Runtime(app, actual_store, publisher, runner)
+
+
+def _seed_history_round(store: SQLiteStore, session_id: str, answer: str, index: int) -> None:
+    run = store.begin_run(
+        session_id, f"history request {index}", {}, f"history-{index}", f"history-hash-{index}"
+    )
+    store.transition_run(run.id, {RunState.STARTING}, RunState.BUILDING_CONTEXT, None, None)
+    store.transition_run(run.id, {RunState.BUILDING_CONTEXT}, RunState.MODEL_STREAMING, None, None)
+    store.commit_final_turn(
+        run.id,
+        AssistantTurn(
+            f"history-turn-{index}",
+            (TextPart(answer),),
+            ModelStopReason.END_TURN,
+            Usage(),
+        ),
+    )
+    store.transition_run(
+        run.id, {RunState.MODEL_STREAMING}, RunState.COMPLETED, StopReason.COMPLETED, None
+    )
+
+
+def _compact_runtime(
+    tmp_path: Path,
+    settings: AppSettings,
+    script: list[AssistantTurn | Exception],
+) -> _CompactRuntime:
+    """Wire the real AgentLoop so session.compact compacts end-to-end."""
+    workspace = tmp_path / "workspace"
+    workspace.mkdir(parents=True, exist_ok=True)
+    store = SQLiteStore(tmp_path / "state.db")
+    store.initialize()
+    session = store.create_session(str(workspace), "compact")
+    for index, answer in enumerate(
+        ("first big answer " * 400, "second answer", "third answer"), start=1
+    ):
+        _seed_history_round(store, session.id, answer, index)
+    model = ScriptedModel(script)
+    publisher = EventPublisher()
+    mutation_gate = RunMutationGate(store, publisher)
+    loop = AgentLoop(
+        store=store,
+        context_builder=ContextBuilder(),
+        compactor=Compactor(ScriptedModel([]), store, model="scripted-compactor"),
+        model=model,
+        invoker=RetryingInvoker(),
+        tools=RecordingTools(),
+        approval_gate=ApprovalGate(auto_approve=True),
+        publisher=publisher,
+        mutation_gate=mutation_gate,
+        settings=settings,
+    )
+    coordinator = RunCoordinator(
+        store=store,
+        mutation_gate=mutation_gate,
+        runner=loop,
+        config_snapshot={"model": "test"},
+        session_compactor=loop,
+    )
+    app = create_app(
+        store,
+        coordinator,
+        {"model": "test"},
+        server_port=SERVER_PORT,
+        recover_on_startup=False,
+    )
+    return _CompactRuntime(app, store, publisher, model, session.id)
+
+
+def _compact_command(session_id: str, command_id: str) -> dict:
+    return {
+        "type": "session.compact",
+        "client_command_id": command_id,
+        "session_id": session_id,
+        "payload": {},
+    }
 
 
 @contextmanager
@@ -480,6 +574,168 @@ def test_recovery_gate_allows_only_subscribe_and_idempotent_ack(tmp_path: Path) 
             "SELECT count(*) FROM events WHERE type = 'session.recovery_acknowledged'"
         ).fetchone()[0]
     assert count == 1
+
+
+def _summary_turn() -> AssistantTurn:
+    fields = (
+        "completed_work_and_evidence",
+        "important_files_and_symbols",
+        "tool_findings",
+        "commands_and_tests",
+        "failed_attempts",
+        "remaining_work",
+        "blockers",
+        "next_steps",
+    )
+    summary = {field: [] for field in fields}
+    summary["completed_work_and_evidence"] = ["older work summarized"]
+    return AssistantTurn(
+        "compaction-summary",
+        (TextPart(json.dumps(summary)),),
+        ModelStopReason.END_TURN,
+        Usage(),
+    )
+
+
+def test_session_compact_runs_maintenance_compaction_end_to_end(
+    tmp_path: Path, valid_settings: AppSettings
+) -> None:
+    """session.compact compacts now and reports the lifecycle through durable events."""
+    runtime = _compact_runtime(tmp_path, valid_settings, [_summary_turn()])
+    transcript_before = runtime.store.load_committed_transcript(runtime.session_id)
+
+    with TestClient(runtime.app, base_url=BASE_URL) as client:
+        with _connect(client, _token(client)) as websocket:
+            _subscribe(websocket, runtime.session_id)
+            websocket.send_json(_compact_command(runtime.session_id, "compact-1"))
+            # The receipt, the events and the ACK all commit before the handler
+            # returns, but their wire order relative to the ACK is not promised.
+            delivered = [websocket.receive_json() for _ in range(3)]
+            started = next(
+                message["event"]
+                for message in delivered
+                if message["type"] == "durable" and message["event"]["type"] == "compaction.started"
+            )
+            finished = next(
+                message["event"]
+                for message in delivered
+                if message["type"] == "durable"
+                and message["event"]["type"] == "compaction.finished"
+            )
+            ack = next(message for message in delivered if message["type"] == "ack")
+            assert started["run_id"] is None
+            assert started["payload"] == {
+                "before_estimated_tokens": started["payload"]["before_estimated_tokens"],
+                "forced": True,
+            }
+            assert finished["payload"]["forced"] is True
+            assert (
+                finished["payload"]["after_estimated_tokens"]
+                < finished["payload"]["before_estimated_tokens"]
+            )
+            assert ack == {
+                "type": "ack",
+                "client_command_id": "compact-1",
+                "session_id": runtime.session_id,
+                "command_type": "session.compact",
+                "status": "completed",
+                "resource_id": runtime.session_id,
+            }
+
+            websocket.send_json(_compact_command(runtime.session_id, "compact-1"))
+            replay, preceding = _receive_command_result(websocket, "compact-1")
+
+    assert replay["type"] == "ack"
+    assert replay["resource_id"] == runtime.session_id
+    assert preceding == []
+    assert runtime.model.call_count == 1
+    snapshot = runtime.store.load_context_snapshot(runtime.session_id)
+    assert snapshot is not None
+    assert snapshot.version == 1
+    assert runtime.store.load_committed_transcript(runtime.session_id) == transcript_before
+
+
+def test_session_compact_rejects_an_active_run(tmp_path: Path, valid_settings: AppSettings) -> None:
+    """The running loop's own builder owns compaction while a run is active."""
+    runtime = _compact_runtime(tmp_path, valid_settings, [_summary_turn()])
+    runtime.store.begin_run(runtime.session_id, "active task", {}, "active-start", "active-hash")
+
+    with TestClient(runtime.app, base_url=BASE_URL) as client:
+        with _connect(client, _token(client)) as websocket:
+            _subscribe(websocket, runtime.session_id)
+            websocket.send_json(_compact_command(runtime.session_id, "compact-1"))
+            rejected, _ = _receive_command_result(websocket, "compact-1")
+
+    assert rejected["type"] == "command_error"
+    assert rejected["code"] == "RUN_ALREADY_ACTIVE"
+    assert runtime.store.load_context_snapshot(runtime.session_id) is None
+
+
+def test_session_compact_follows_the_command_envelope_rules(tmp_path: Path) -> None:
+    """session.compact owes subscription, strict payload validation and recovery gating."""
+    runtime = _runtime(tmp_path)
+    session = runtime.store.create_session(str(tmp_path), "envelope")
+    interrupted, prepared = _pending_approval(runtime.store, session.id)
+    runtime.store.resolve_approval(
+        interrupted.id,
+        prepared.call.id,
+        ApprovalDecision.APPROVE,
+        "seed-approve",
+        "seed-approve-hash",
+    )
+    runtime.store.begin_effect(interrupted.id, prepared.call.id)
+    runtime.store.recover_interrupted_runs()
+
+    with TestClient(runtime.app, base_url=BASE_URL) as client:
+        with _connect(client, _token(client)) as websocket:
+            websocket.send_json(_compact_command(session.id, "no-subscription"))
+            unsubscribed = websocket.receive_json()
+            websocket.send_json(
+                {
+                    "type": "session.compact",
+                    "client_command_id": "bad-payload",
+                    "session_id": session.id,
+                    "payload": {"unexpected": True},
+                }
+            )
+            invalid = websocket.receive_json()
+            _subscribe(websocket, session.id)
+            websocket.send_json(_compact_command(session.id, "gated"))
+            gated = websocket.receive_json()
+
+    assert unsubscribed["type"] == "command_error"
+    assert unsubscribed["code"] == "SESSION_NOT_SUBSCRIBED"
+    assert invalid["type"] == "command_error"
+    assert invalid["code"] == "INVALID_COMMAND"
+    assert gated["type"] == "command_error"
+    assert gated["code"] == "RECOVERY_ACK_REQUIRED"
+
+
+def test_session_compact_is_unreachable_without_a_valid_token_and_origin(
+    tmp_path: Path, valid_settings: AppSettings
+) -> None:
+    """The compact command inherits the connection-level CSRF/origin enforcement."""
+    runtime = _compact_runtime(tmp_path, valid_settings, [_summary_turn()])
+    with TestClient(runtime.app, base_url=BASE_URL) as client:
+        token = _token(client)
+        with pytest.raises(WebSocketDisconnect) as malicious_origin:
+            with _connect(
+                client, token, headers={"Origin": "https://attacker.invalid"}
+            ) as websocket:
+                websocket.send_json(_compact_command(runtime.session_id, "compact-1"))
+                websocket.receive_json()
+
+    assert malicious_origin.value.code == WS_CLOSE_FORBIDDEN
+
+    restarted = _compact_runtime(tmp_path / "restarted", valid_settings, [_summary_turn()])
+    with TestClient(restarted.app, base_url=BASE_URL) as client:
+        with pytest.raises(WebSocketDisconnect) as expired:
+            with _connect(client, token) as websocket:
+                websocket.send_json(_compact_command(restarted.session_id, "compact-1"))
+                websocket.receive_json()
+
+    assert expired.value.code == WS_CLOSE_AUTH_EXPIRED
+    assert restarted.store.load_context_snapshot(restarted.session_id) is None
 
 
 def test_invalid_commands_and_unknown_sessions_return_command_errors(tmp_path: Path) -> None:

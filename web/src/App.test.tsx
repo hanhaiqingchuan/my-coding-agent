@@ -63,6 +63,7 @@ const snapshot: SessionSnapshotDto = {
       round_count: 1,
       retry_count: 0,
     },
+    context: null,
   },
   last_finished_run: null,
   messages: [],

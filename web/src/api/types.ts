@@ -94,6 +94,13 @@ export type RunTotalsDto = {
   retry_count: number;
 };
 
+/** The run's latest context estimate; `estimated_tokens / available_tokens` drives the bar. */
+export type RunContextDto = {
+  estimated_tokens: number;
+  available_tokens: number;
+  window_tokens: number;
+};
+
 export type RunDto = {
   id: string;
   session_id: string;
@@ -105,6 +112,7 @@ export type RunDto = {
   started_at: string;
   finished_at: string | null;
   totals: RunTotalsDto;
+  context: RunContextDto | null;
 };
 
 export type TextPartDto = { type: "text"; text: string };
@@ -204,6 +212,7 @@ export const REQUIRED_DTO_FIELDS = {
     "started_at",
     "finished_at",
     "totals",
+    "context",
   ],
   RunTotalsDto: [
     "input_tokens",
@@ -331,6 +340,13 @@ export type ClientCommand =
     }
   | {
       type: "session.ack_recovery";
+      client_command_id: string;
+      session_id: string;
+      payload: Record<string, never>;
+    }
+  | {
+      /** Maintenance compaction with no active run; outcome via compaction.* events. */
+      type: "session.compact";
       client_command_id: string;
       session_id: string;
       payload: Record<string, never>;

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import os
 import socket
 from pathlib import Path
@@ -69,6 +70,7 @@ async def test_read_file_uses_one_based_offset_and_preserves_original_text(tmp_p
         "end_line": 2,
         "total_lines": 3,
         "next_offset": 3,
+        "sha256": hashlib.sha256(b"one\r\ntwo\nthree\n").hexdigest(),
     }
     assert result.truncated is True
 
@@ -141,3 +143,17 @@ async def test_read_file_rejects_binary_and_invalid_utf8(
     assert result.ok is False
     assert result.error is not None
     assert result.error.code == code
+
+
+@pytest.mark.asyncio
+async def test_read_file_reports_sha256_of_the_full_file_bytes(tmp_path: Path) -> None:
+    """The freshness gate hashes the whole file, even when the view is truncated."""
+    settings = ToolSettings(read_max_lines=2)
+    target = tmp_path / "partial.txt"
+    target.write_text("line one\nline two\nline three\n", encoding="utf-8")
+
+    result = await execute_read(tmp_path, {"path": "partial.txt"}, settings=settings)
+
+    assert result.ok is True
+    assert result.truncated is True
+    assert result.data["sha256"] == hashlib.sha256(target.read_bytes()).hexdigest()

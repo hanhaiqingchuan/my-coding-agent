@@ -31,6 +31,7 @@ from coding_agent.core.models import (
     PendingToolGroup,
     PreparedToolCall,
     Run,
+    RunContextEstimate,
     RunState,
     RunTotals,
     Session,
@@ -46,6 +47,9 @@ from coding_agent.core.models import (
     ToolUsePart,
     Usage,
 )
+
+SCHEMA_VERSION = 2
+"""The schema level ``initialize`` brings every database to, whatever it started at."""
 
 
 class SQLiteStore:
@@ -71,6 +75,23 @@ class SQLiteStore:
         with self.connection() as connection:
             connection.execute("PRAGMA journal_mode = WAL")
             connection.executescript(schema)
+            self._upgrade_schema(connection)
+
+    @staticmethod
+    def _upgrade_schema(connection: sqlite3.Connection) -> None:
+        """Bring a database created at an earlier user_version up to ``SCHEMA_VERSION``.
+
+        ``CREATE TABLE IF NOT EXISTS`` cannot extend an existing ``runs`` table, so the
+        presence of each versioned column is the real migration guard and user_version is
+        the bookkeeping that records it.
+        """
+        columns = {row[1] for row in connection.execute("PRAGMA table_info(runs)")}
+        version = connection.execute("PRAGMA user_version").fetchone()[0]
+        if "context_json" not in columns:
+            # v1 -> v2: the run's latest context estimate projection.
+            connection.execute("ALTER TABLE runs ADD COLUMN context_json TEXT")
+        if version < SCHEMA_VERSION:
+            connection.execute(f"PRAGMA user_version = {SCHEMA_VERSION:d}")
 
     @contextmanager
     def _transaction(self) -> Iterator[sqlite3.Connection]:
@@ -761,6 +782,23 @@ class SQLiteStore:
                 ),
             )
 
+    def record_context_estimate(self, run_id: str, estimate: RunContextEstimate) -> None:
+        """Persist the latest context estimate as one run's read-only projection.
+
+        The loop overwrites this after every context build, exactly like it rolls usage
+        into ``totals``; a terminal run rejects the write so a finished run's projection
+        stays the estimate of the view it actually used. No durable event is appended
+        because the value is a projection of the run row itself (spec 13), not a state
+        transition.
+        """
+        with self._transaction() as connection:
+            run = self._get_run_from(connection, run_id)
+            self._require_active_run(run)
+            connection.execute(
+                "UPDATE runs SET context_json = ? WHERE id = ?",
+                (_json(_context_estimate_value(estimate)), run.id),
+            )
+
     def request_cancellation(
         self,
         run_id: str,
@@ -1043,6 +1081,108 @@ class SQLiteStore:
             )
             self._complete_command(connection, session_id, client_command_id, event_seq)
             return self._require_session(connection, session_id)
+
+    def completed_command_resource(
+        self,
+        session_id: str,
+        client_command_id: str,
+        payload_hash: str,
+        command_type: str,
+    ) -> str | None:
+        """Probe whether a client command id already completed, without claiming it.
+
+        Callers whose command spans more than one transaction — the maintenance
+        compaction builds its plan before claiming the receipt — use this to answer a
+        duplicate replay idempotently before any feasibility rejection can fire.
+        """
+        with self.connection() as connection:
+            return self._existing_command(
+                connection, session_id, client_command_id, payload_hash, command_type
+            )
+
+    def begin_session_compaction(
+        self,
+        session_id: str,
+        client_command_id: str,
+        payload_hash: str,
+        *,
+        before_estimated_tokens: int,
+    ) -> Session | None:
+        """Claim session.compact and emit ``compaction.started`` in one transaction.
+
+        The maintenance flow has no run, so the compaction lifecycle lives on
+        session-level durable events (spec 7.4 as amended, 14). Like ``begin_run``, the
+        command receipt, the active-run rejection and the domain change commit together;
+        a replayed command id returns ``None`` so the caller does not compact twice.
+        """
+        with self._transaction() as connection:
+            duplicate = self._existing_command(
+                connection,
+                session_id,
+                client_command_id,
+                payload_hash,
+                "session.compact",
+            )
+            if duplicate is not None:
+                return None
+            session = self._require_session(connection, session_id)
+            if session.requires_recovery_ack:
+                raise StoreError(
+                    "RECOVERY_ACK_REQUIRED",
+                    "recovery risk must be acknowledged before compacting",
+                )
+            active = connection.execute(
+                f"SELECT id FROM runs WHERE state NOT IN ({_TERMINAL_PLACEHOLDERS}) LIMIT 1",
+                tuple(state.value for state in _TERMINAL_STATES),
+            ).fetchone()
+            if active is not None:
+                raise StoreError(
+                    "RUN_ALREADY_ACTIVE",
+                    "cannot compact while a run is active; the running loop owns compaction",
+                )
+            now = _now()
+            self._claim_command(
+                connection,
+                session_id,
+                client_command_id,
+                "session.compact",
+                payload_hash,
+                session_id,
+                now,
+            )
+            event_seq = self._append_event(
+                connection,
+                session_id,
+                None,
+                "compaction.started",
+                {"before_estimated_tokens": before_estimated_tokens, "forced": True},
+            )
+            self._complete_command(connection, session_id, client_command_id, event_seq)
+            connection.execute("UPDATE sessions SET updated_at = ? WHERE id = ?", (now, session_id))
+            return session
+
+    def finish_session_compaction(
+        self,
+        session_id: str,
+        *,
+        before_estimated_tokens: int,
+        after_estimated_tokens: int,
+        error_code: str | None = None,
+    ) -> None:
+        """Close the maintenance compaction lifecycle with ``compaction.finished``."""
+        with self._transaction() as connection:
+            self._require_session(connection, session_id)
+            payload: dict[str, object] = {
+                "before_estimated_tokens": before_estimated_tokens,
+                "after_estimated_tokens": after_estimated_tokens,
+                "forced": True,
+            }
+            if error_code is not None:
+                payload["error"] = {"code": error_code}
+            self._append_event(connection, session_id, None, "compaction.finished", payload)
+            connection.execute(
+                "UPDATE sessions SET updated_at = ? WHERE id = ?", (_now(), session_id)
+            )
 
     def begin_effect(self, run_id: str, tool_call_id: str) -> EffectStartResult:
         with self._transaction() as connection:
@@ -1707,6 +1847,32 @@ def _run_from_row(row: sqlite3.Row) -> Run:
             round_count=row["round_count"],
             retry_count=row["retry_count"],
         ),
+        context=(
+            _context_estimate_from_json(row["context_json"])
+            if row["context_json"] is not None
+            else None
+        ),
+    )
+
+
+def _context_estimate_value(estimate: RunContextEstimate) -> dict[str, int]:
+    return {
+        "estimated_tokens": estimate.estimated_tokens,
+        "available_tokens": estimate.available_tokens,
+        "window_tokens": estimate.window_tokens,
+        "max_output_tokens": estimate.max_output_tokens,
+        "safety_margin_tokens": estimate.safety_margin_tokens,
+    }
+
+
+def _context_estimate_from_json(value: str) -> RunContextEstimate:
+    data = json.loads(value)
+    return RunContextEstimate(
+        estimated_tokens=data["estimated_tokens"],
+        available_tokens=data["available_tokens"],
+        window_tokens=data["window_tokens"],
+        max_output_tokens=data["max_output_tokens"],
+        safety_margin_tokens=data["safety_margin_tokens"],
     )
 
 

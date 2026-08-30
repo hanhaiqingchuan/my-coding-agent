@@ -10,6 +10,7 @@ from collections.abc import Callable, Mapping
 from typing import Protocol
 
 from coding_agent.core.cancellation import CancellationToken
+from coding_agent.core.errors import StoreError
 from coding_agent.core.events import RunOutcome
 from coding_agent.core.models import (
     ApprovalDecision,
@@ -35,6 +36,18 @@ class RunExecutor(Protocol):
         session_id: str,
         cancellation: CancellationToken,
     ) -> RunOutcome: ...
+
+
+class SessionCompactor(Protocol):
+    """The AgentLoop surface that runs run-less maintenance compaction."""
+
+    async def compact_session(
+        self,
+        session_id: str,
+        client_command_id: str,
+        payload_hash: str,
+        cancellation: CancellationToken,
+    ) -> Session: ...
 
 
 class ApprovalResolver(Protocol):
@@ -230,12 +243,14 @@ class RunCoordinator:
         runner: RunExecutor,
         config_snapshot: Mapping[str, object],
         approval_gate: ApprovalResolver | None = None,
+        session_compactor: SessionCompactor | None = None,
     ) -> None:
         self._store = store
         self._mutation_gate = mutation_gate
         self._runner = runner
         self._config_snapshot = dict(config_snapshot)
         self._approval_gate = approval_gate
+        self._session_compactor = session_compactor
         self._ownership_lock = asyncio.Lock()
         self._tasks: dict[str, asyncio.Task[RunOutcome]] = {}
 
@@ -274,6 +289,24 @@ class RunCoordinator:
     async def stop_run(self, run_id: str, client_command_id: str) -> Run:
         """Persist Stop before the mutation gate signals the registered token."""
         return await self._mutation_gate.request_stop(run_id, client_command_id)
+
+    async def compact_session(self, session_id: str, client_command_id: str) -> Session:
+        """Run one forced maintenance compaction serialized against run starts.
+
+        The ownership lock is what keeps a maintenance compaction and a new run from
+        interleaving: while the compactor holds it, ``start_run`` waits, and a run that
+        already committed its row makes the store's active-run check reject the compact.
+        """
+        if self._session_compactor is None:
+            raise StoreError("SERVICE_UNAVAILABLE", "session compaction is not configured")
+        async with self._ownership_lock:
+            digest = hashlib.sha256(f"session.compact\0{session_id}".encode()).hexdigest()
+            return await self._session_compactor.compact_session(
+                session_id,
+                client_command_id,
+                digest,
+                CancellationToken(),
+            )
 
     async def wait_for_run(self, run_id: str) -> Run:
         """Wait for this process-owned run, then return its persisted terminal record."""
@@ -316,4 +349,10 @@ def _latest_seq(store: SQLiteStore, session_id: str) -> int:
     return events[-1].seq if events else 0
 
 
-__all__ = ["ApprovalResolver", "RunCoordinator", "RunExecutor", "RunMutationGate"]
+__all__ = [
+    "ApprovalResolver",
+    "RunCoordinator",
+    "RunExecutor",
+    "RunMutationGate",
+    "SessionCompactor",
+]

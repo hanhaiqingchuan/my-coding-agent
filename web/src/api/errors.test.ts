@@ -188,6 +188,7 @@ function liveRun(overrides: Partial<RunDto> = {}): RunDto {
     started_at: "2026-08-28T00:00:00Z",
     finished_at: null,
     totals: ZERO_TOTALS,
+    context: null,
     ...overrides,
   };
 }

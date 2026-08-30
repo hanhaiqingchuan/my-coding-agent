@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import inspect
 import json
 import logging
@@ -17,6 +18,7 @@ from coding_agent.config import AppSettings, ConfigurationError
 from coding_agent.context import Compactor, ContextBuilder
 from coding_agent.context.estimator import ESTIMATOR_ID, estimate_input_tokens
 from coding_agent.core.cancellation import CancellationToken
+from coding_agent.core.errors import StoreError
 from coding_agent.core.events import RunOutcome
 from coding_agent.core.models import (
     ApprovalDecision,
@@ -31,6 +33,7 @@ from coding_agent.core.models import (
     ThinkingPart,
     ToolCall,
     ToolError,
+    ToolExecutionState,
     ToolResult,
     ToolUsePart,
     Usage,
@@ -396,6 +399,250 @@ async def test_scripted_model_runs_read_write_command_then_commits_the_group(
 
 
 @pytest.mark.asyncio
+async def test_loop_rejects_a_write_without_a_session_read(
+    tmp_path: Path, valid_settings: AppSettings
+) -> None:
+    """Spec 10.3's freshness gate: a write against unread content self-corrects."""
+    tools = ToolRegistry()
+    loop, store, session_id, run_id, _, _, _ = _make_loop(
+        tmp_path,
+        valid_settings,
+        [
+            _tool_turn(
+                ToolCall(
+                    "call-blind-write",
+                    "write_file",
+                    {"operation": "write", "path": "notes.txt", "content": "blind"},
+                )
+            ),
+            _final_turn("give up after the correction"),
+        ],
+        tools=tools,
+    )
+    workspace = Path(store.load_snapshot(session_id).session.workspace_realpath)
+    target = workspace / "notes.txt"
+    target.write_text("precious", encoding="utf-8")
+
+    outcome = await loop.run(run_id, session_id, CancellationToken())
+
+    assert outcome == RunOutcome.complete()
+    execution = next(
+        item
+        for item in store.load_snapshot(session_id).tools
+        if item.tool_call_id == "call-blind-write"
+    )
+    assert execution.execution_state is ToolExecutionState.FAILED
+    assert execution.result is not None
+    assert execution.result.error is not None
+    assert execution.result.error.code == "READ_FRESH_REQUIRED"
+    assert target.read_text(encoding="utf-8") == "precious"
+
+
+@pytest.mark.asyncio
+async def test_loop_allows_write_after_read_across_runs(
+    tmp_path: Path, valid_settings: AppSettings
+) -> None:
+    """A read in one run keeps the target fresh for a write in a later run."""
+    tools = ToolRegistry()
+    loop, store, session_id, run_id, _, _, _ = _make_loop(
+        tmp_path,
+        valid_settings,
+        [
+            _turn(
+                "turn-read",
+                ModelStopReason.TOOL_USE,
+                ToolUsePart(ToolCall("call-read", "read_file", {"path": "notes.txt"})),
+            ),
+            _turn("final-read", ModelStopReason.END_TURN, TextPart("read done")),
+            _turn(
+                "turn-write",
+                ModelStopReason.TOOL_USE,
+                ToolUsePart(
+                    ToolCall(
+                        "call-write",
+                        "write_file",
+                        {"operation": "write", "path": "notes.txt", "content": "second"},
+                    )
+                ),
+            ),
+            _turn("final-write", ModelStopReason.END_TURN, TextPart("write done")),
+        ],
+        tools=tools,
+    )
+    workspace = Path(store.load_snapshot(session_id).session.workspace_realpath)
+    target = workspace / "notes.txt"
+    target.write_text("first", encoding="utf-8")
+
+    first = await loop.run(run_id, session_id, CancellationToken())
+    assert first == RunOutcome.complete()
+
+    second_run = store.begin_run(session_id, "now write", {}, "start-2", "hash-2")
+    second = await loop.run(second_run.id, session_id, CancellationToken())
+
+    assert second == RunOutcome.complete()
+    assert target.read_text(encoding="utf-8") == "second"
+
+
+@pytest.mark.asyncio
+async def test_loop_keeps_own_write_fresh_for_a_followup_replace(
+    tmp_path: Path, valid_settings: AppSettings
+) -> None:
+    """The model's own write establishes freshness, so no re-read is needed."""
+    tools = ToolRegistry()
+    loop, store, session_id, run_id, _, _, _ = _make_loop(
+        tmp_path,
+        valid_settings,
+        [
+            _turn(
+                "turn-create",
+                ModelStopReason.TOOL_USE,
+                ToolUsePart(
+                    ToolCall(
+                        "call-create",
+                        "write_file",
+                        {"operation": "write", "path": "own.txt", "content": "alpha\n"},
+                    )
+                ),
+            ),
+            _turn(
+                "turn-replace",
+                ModelStopReason.TOOL_USE,
+                ToolUsePart(
+                    ToolCall(
+                        "call-replace",
+                        "write_file",
+                        {
+                            "operation": "replace",
+                            "path": "own.txt",
+                            "old_text": "alpha",
+                            "new_text": "beta",
+                        },
+                    )
+                ),
+            ),
+            _final_turn("done"),
+        ],
+        tools=tools,
+    )
+    workspace = Path(store.load_snapshot(session_id).session.workspace_realpath)
+    target = workspace / "own.txt"
+
+    outcome = await loop.run(run_id, session_id, CancellationToken())
+
+    assert outcome == RunOutcome.complete()
+    assert target.read_text(encoding="utf-8") == "beta\n"
+    executions = {item.tool_call_id: item for item in store.load_snapshot(session_id).tools}
+    assert executions["call-create"].execution_state is ToolExecutionState.SUCCEEDED
+    assert executions["call-replace"].execution_state is ToolExecutionState.SUCCEEDED
+
+
+@pytest.mark.asyncio
+async def test_loop_conflicts_when_file_changed_after_the_session_read(
+    tmp_path: Path, valid_settings: AppSettings
+) -> None:
+    """An external edit after the session's read surfaces as WRITE_CONFLICT."""
+    tools = ToolRegistry()
+    loop, store, session_id, run_id, _, _, _ = _make_loop(
+        tmp_path,
+        valid_settings,
+        [
+            _turn(
+                "turn-read",
+                ModelStopReason.TOOL_USE,
+                ToolUsePart(ToolCall("call-read", "read_file", {"path": "notes.txt"})),
+            ),
+            _turn("final-read", ModelStopReason.END_TURN, TextPart("read done")),
+            _turn(
+                "turn-stale-write",
+                ModelStopReason.TOOL_USE,
+                ToolUsePart(
+                    ToolCall(
+                        "call-stale-write",
+                        "write_file",
+                        {"operation": "write", "path": "notes.txt", "content": "stale"},
+                    )
+                ),
+            ),
+            _turn("final-stale-write", ModelStopReason.END_TURN, TextPart("write rejected")),
+        ],
+        tools=tools,
+    )
+    workspace = Path(store.load_snapshot(session_id).session.workspace_realpath)
+    target = workspace / "notes.txt"
+    target.write_text("first", encoding="utf-8")
+
+    await loop.run(run_id, session_id, CancellationToken())
+    target.write_text("external edit", encoding="utf-8")
+
+    second_run = store.begin_run(session_id, "stale write", {}, "start-2", "hash-2")
+    outcome = await loop.run(second_run.id, session_id, CancellationToken())
+
+    assert outcome == RunOutcome.complete()
+    execution = next(
+        item
+        for item in store.load_snapshot(session_id).tools
+        if item.tool_call_id == "call-stale-write"
+    )
+    assert execution.result is not None
+    assert execution.result.error is not None
+    assert execution.result.error.code == "WRITE_CONFLICT"
+    assert target.read_text(encoding="utf-8") == "external edit"
+
+
+@pytest.mark.asyncio
+async def test_loop_records_the_context_estimate_after_each_build(
+    tmp_path: Path, valid_settings: AppSettings
+) -> None:
+    """The run's read-only context projection publishes every build's estimate."""
+    observed: list[str | None] = []
+    store_box: list[SQLiteStore] = []
+
+    def observe(_prepared) -> None:
+        with store_box[0].connection() as connection:
+            observed.append(
+                connection.execute(
+                    "SELECT context_json FROM runs WHERE id = ?", (run_id,)
+                ).fetchone()[0]
+            )
+
+    tools = RecordingTools(observe)
+    loop, store, session_id, run_id, model, _, _ = _make_loop(
+        tmp_path,
+        valid_settings,
+        [
+            _tool_turn(ToolCall("call-estimate", "read_file", {"path": "a.txt"})),
+            _final_turn("done"),
+        ],
+        tools=tools,
+    )
+    store_box.append(store)
+    assert store.get_run(run_id).context is None
+
+    outcome = await loop.run(run_id, session_id, CancellationToken())
+
+    assert outcome == RunOutcome.complete()
+    # The round-1 build was recorded before that round's tool ran, and the
+    # round-2 build overwrote it, so the projection updates per round.
+    assert observed and observed[0] is not None
+    first_estimated = json.loads(observed[0])["estimated_tokens"]
+    final = store.get_run(run_id).context
+    assert final is not None
+    assert final.estimated_tokens > first_estimated
+    assert final.available_tokens == (
+        valid_settings.model.context_window
+        - valid_settings.model.max_output_tokens
+        - valid_settings.context.safety_margin_tokens
+    )
+    assert final.window_tokens == valid_settings.model.context_window
+    assert final.max_output_tokens == valid_settings.model.max_output_tokens
+    assert final.safety_margin_tokens == valid_settings.context.safety_margin_tokens
+    expected = estimate_input_tokens(
+        model.requests[1].system, model.requests[1].messages, model.requests[1].tools
+    )
+    assert final.estimated_tokens == expected
+
+
+@pytest.mark.asyncio
 async def test_trusted_mode_approval_is_still_fully_audited(
     tmp_path: Path, valid_settings: AppSettings
 ) -> None:
@@ -424,7 +671,8 @@ async def test_loop_executes_the_real_read_write_and_command_registry(
 ) -> None:
     """A loop compatible only with its test double would fail at the real tool dispatch boundary."""
     calls = (
-        ToolCall("real-read", "read_file", {"path": "seed.txt"}),
+        # Reading the write target first is spec 10.3's freshness gate in action.
+        ToolCall("real-read", "read_file", {"path": "out.txt"}),
         ToolCall(
             "real-write",
             "write_file",
@@ -1289,6 +1537,28 @@ async def test_provider_context_overflow_compacts_once_then_rebuilds(
     assert requests[0][4] == requests[2][4]
     assert requests[1][4] != requests[0][4]
     assert tuple(run_metrics) == (2, 44, 10)
+    compaction_events = [
+        event for event in store.events_after(session_id, 0) if event.type.startswith("compaction.")
+    ]
+    assert [event.type for event in compaction_events] == [
+        "compaction.started",
+        "compaction.finished",
+    ]
+    assert all(event.run_id == run_id for event in compaction_events)
+    assert compaction_events[0].payload["forced"] is True
+    assert compaction_events[1].payload["forced"] is True
+    assert (
+        compaction_events[0].payload["before_estimated_tokens"]
+        > compaction_events[1].payload["after_estimated_tokens"]
+    )
+    final_context = store.get_run(run_id).context
+    assert final_context is not None
+    assert final_context.estimated_tokens == estimate_input_tokens(
+        model.requests[2].system, model.requests[2].messages, model.requests[2].tools
+    )
+    snapshot = store.load_snapshot(session_id)
+    assert snapshot.last_finished_run is not None
+    assert snapshot.last_finished_run.context == final_context
 
 
 @pytest.mark.asyncio
@@ -1314,6 +1584,205 @@ async def test_second_provider_context_overflow_fails_without_another_compaction
             "SELECT kind FROM model_requests WHERE run_id = ?", (run_id,)
         ).fetchall()
     assert [row[0] for row in kinds].count("compaction") == 1
+
+
+@pytest.mark.asyncio
+async def test_threshold_compaction_emits_its_lifecycle_events(
+    tmp_path: Path, valid_settings: AppSettings
+) -> None:
+    """The 80% path must publish compaction.started/finished with forced=false."""
+    settings = replace(
+        valid_settings,
+        model=replace(valid_settings.model, context_window=6_000, max_output_tokens=1_000),
+        context=replace(valid_settings.context, summary_max_tokens=512),
+    )
+    loop, store, session_id, run_id, model, _, _ = _make_loop(
+        tmp_path,
+        settings,
+        [_summary_turn(), _final_turn("after the summary")],
+        history=("detail " * 900, "second answer", "third answer"),
+    )
+
+    outcome = await loop.run(run_id, session_id, CancellationToken())
+
+    assert outcome == RunOutcome.complete()
+    assert model.call_count == 2
+    events = store.events_after(session_id, 0)
+    state_changes = [event for event in events if event.type == "run.state_changed"]
+    compaction_events = [event for event in events if event.type.startswith("compaction.")]
+    assert [event.type for event in compaction_events] == [
+        "compaction.started",
+        "compaction.finished",
+    ]
+    assert all(event.run_id == run_id for event in compaction_events)
+    started, finished = compaction_events
+    assert started.payload == {
+        "before_estimated_tokens": started.payload["before_estimated_tokens"],
+        "forced": False,
+    }
+    assert finished.payload["forced"] is False
+    assert finished.payload["before_estimated_tokens"] == started.payload["before_estimated_tokens"]
+    assert finished.payload["after_estimated_tokens"] < finished.payload["before_estimated_tokens"]
+    compacting = next(
+        event for event in state_changes if event.payload.get("state") == "compacting"
+    )
+    assert compacting.seq < started.seq < finished.seq
+    snapshot = store.load_context_snapshot(session_id)
+    assert snapshot is not None
+    assert snapshot.version == 1
+
+
+def _compact_payload_hash(session_id: str) -> str:
+    return hashlib.sha256(f"session.compact\0{session_id}".encode()).hexdigest()
+
+
+@pytest.mark.asyncio
+async def test_maintenance_compaction_compacts_without_a_run(
+    tmp_path: Path, valid_settings: AppSettings
+) -> None:
+    """session.compact must compact the committed transcript even far below 80%."""
+    loop, store, session_id, run_id, model, _, _ = _make_loop(
+        tmp_path,
+        valid_settings,
+        [_final_turn("seeded"), _summary_turn()],
+        history=("first big answer " * 400, "second answer", "third answer"),
+    )
+    assert await loop.run(run_id, session_id, CancellationToken()) == RunOutcome.complete()
+    transcript_before = store.load_committed_transcript(session_id)
+    with store.connection() as connection:
+        runs_before = connection.execute("SELECT count(*) FROM runs").fetchone()[0]
+
+    session = await loop.compact_session(
+        session_id, "compact-1", _compact_payload_hash(session_id), CancellationToken()
+    )
+
+    assert session.id == session_id
+    events = store.events_after(session_id, 0)
+    started = next(event for event in events if event.type == "compaction.started")
+    finished = next(event for event in events if event.type == "compaction.finished")
+    assert started.run_id is None
+    assert finished.run_id is None
+    assert started.payload == {
+        "before_estimated_tokens": started.payload["before_estimated_tokens"],
+        "forced": True,
+    }
+    assert finished.payload["forced"] is True
+    assert finished.payload["after_estimated_tokens"] < finished.payload["before_estimated_tokens"]
+    assert model.call_count == 2  # the seeded run's final turn, then the summary request
+    snapshot = store.load_context_snapshot(session_id)
+    assert snapshot is not None
+    assert snapshot.version == 1
+    assert store.load_committed_transcript(session_id) == transcript_before
+    with store.connection() as connection:
+        assert connection.execute("SELECT count(*) FROM runs").fetchone()[0] == runs_before
+
+
+@pytest.mark.asyncio
+async def test_maintenance_compaction_replays_a_duplicate_command_id(
+    tmp_path: Path, valid_settings: AppSettings
+) -> None:
+    """Retrying session.compact with the same id must not compact twice."""
+    loop, store, session_id, run_id, model, _, _ = _make_loop(
+        tmp_path,
+        valid_settings,
+        [_final_turn("seeded"), _summary_turn()],
+        history=("first big answer " * 400, "second answer", "third answer"),
+    )
+    assert await loop.run(run_id, session_id, CancellationToken()) == RunOutcome.complete()
+    first = await loop.compact_session(
+        session_id, "compact-1", _compact_payload_hash(session_id), CancellationToken()
+    )
+    assert first.id == session_id
+    events_before = store.events_after(session_id, 0)
+
+    replayed = await loop.compact_session(
+        session_id, "compact-1", _compact_payload_hash(session_id), CancellationToken()
+    )
+
+    assert replayed.id == session_id
+    assert model.call_count == 2  # the seeded run's final turn, then one summary request
+    assert store.events_after(session_id, 0) == events_before
+
+
+@pytest.mark.asyncio
+async def test_maintenance_compaction_rejects_an_active_run(
+    tmp_path: Path, valid_settings: AppSettings
+) -> None:
+    """While a run is active, the running loop's own builder owns compaction."""
+    loop, store, session_id, run_id, _, _, _ = _make_loop(
+        tmp_path, valid_settings, [_final_turn("never reached")]
+    )
+
+    with pytest.raises(StoreError) as raised:
+        await loop.compact_session(
+            session_id, "compact-1", _compact_payload_hash(session_id), CancellationToken()
+        )
+
+    assert raised.value.code == "RUN_ALREADY_ACTIVE"
+    with store.connection() as connection:
+        assert (
+            connection.execute(
+                "SELECT count(*) FROM client_commands WHERE command_type = 'session.compact'"
+            ).fetchone()[0]
+            == 0
+        )
+    assert store.get_run(run_id).state is RunState.STARTING
+
+
+@pytest.mark.asyncio
+async def test_maintenance_compaction_rejects_a_transcript_with_no_candidates(
+    tmp_path: Path, valid_settings: AppSettings
+) -> None:
+    """A transcript whose every group is mandatory has nothing to replace."""
+    loop, store, session_id, run_id, _, _, _ = _make_loop(
+        tmp_path, valid_settings, [_final_turn("only answer")]
+    )
+    assert await loop.run(run_id, session_id, CancellationToken()) == RunOutcome.complete()
+
+    with pytest.raises(StoreError) as raised:
+        await loop.compact_session(
+            session_id, "compact-1", _compact_payload_hash(session_id), CancellationToken()
+        )
+
+    assert raised.value.code == "COMPACTION_NOT_POSSIBLE"
+    with store.connection() as connection:
+        assert (
+            connection.execute(
+                "SELECT count(*) FROM client_commands WHERE command_type = 'session.compact'"
+            ).fetchone()[0]
+            == 0
+        )
+    assert store.load_context_snapshot(session_id) is None
+
+
+@pytest.mark.asyncio
+async def test_maintenance_compaction_reports_a_model_failure_as_an_event(
+    tmp_path: Path, valid_settings: AppSettings
+) -> None:
+    """A failed maintenance compaction keeps the old snapshot and closes the lifecycle."""
+    loop, store, session_id, run_id, model, _, _ = _make_loop(
+        tmp_path,
+        valid_settings,
+        [
+            _final_turn("seeded"),
+            _turn("garbage summary", ModelStopReason.END_TURN, TextPart("not json")),
+        ],
+        history=("first big answer " * 400, "second answer", "third answer"),
+    )
+    assert await loop.run(run_id, session_id, CancellationToken()) == RunOutcome.complete()
+
+    session = await loop.compact_session(
+        session_id, "compact-1", _compact_payload_hash(session_id), CancellationToken()
+    )
+
+    assert session.id == session_id
+    assert model.call_count == 2
+    finished = next(
+        event for event in store.events_after(session_id, 0) if event.type == "compaction.finished"
+    )
+    assert finished.payload["error"] == {"code": "INVALID_SUMMARY_STRUCTURE"}
+    assert finished.payload["after_estimated_tokens"] == finished.payload["before_estimated_tokens"]
+    assert store.load_context_snapshot(session_id) is None
 
 
 @pytest.mark.asyncio

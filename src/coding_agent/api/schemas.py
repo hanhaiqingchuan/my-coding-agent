@@ -17,6 +17,7 @@ from coding_agent.core.models import (
     MessageStatus,
     PendingApproval,
     Run,
+    RunContextEstimate,
     RunState,
     RunTotals,
     Session,
@@ -112,6 +113,27 @@ class RunTotalsDto(StrictDto):
         )
 
 
+class RunContextDto(StrictDto):
+    """The run's latest context estimate, for the UI's evidence-based progress bar.
+
+    ``estimated_tokens ÷ available_tokens`` is the context percentage; the fields come
+    from the heuristic estimate of the loop's most recent context build (spec 7.1), not
+    from provider usage counters.
+    """
+
+    estimated_tokens: int
+    available_tokens: int
+    window_tokens: int
+
+    @classmethod
+    def from_domain(cls, estimate: RunContextEstimate) -> RunContextDto:
+        return cls(
+            estimated_tokens=estimate.estimated_tokens,
+            available_tokens=estimate.available_tokens,
+            window_tokens=estimate.window_tokens,
+        )
+
+
 class RunDto(StrictDto):
     id: str
     session_id: str
@@ -123,6 +145,8 @@ class RunDto(StrictDto):
     started_at: datetime
     finished_at: datetime | None
     totals: RunTotalsDto
+    context: RunContextDto | None
+    """The latest build's estimate; null until the loop's first build of this run."""
 
     @classmethod
     def from_domain(cls, run: Run) -> RunDto:
@@ -137,6 +161,7 @@ class RunDto(StrictDto):
             started_at=run.started_at,
             finished_at=run.finished_at,
             totals=RunTotalsDto.from_domain(run.totals),
+            context=(RunContextDto.from_domain(run.context) if run.context is not None else None),
         )
 
 
@@ -415,12 +440,22 @@ class SessionAckRecoveryCommand(StrictDto):
     payload: EmptyPayload
 
 
+class SessionCompactCommand(StrictDto):
+    """Force one maintenance compaction of the session while no run is active."""
+
+    type: Literal["session.compact"]
+    client_command_id: str = Field(min_length=1)
+    session_id: str = Field(min_length=1)
+    payload: EmptyPayload
+
+
 ClientCommand: TypeAlias = Annotated[
     SessionSubscribeCommand
     | RunStartCommand
     | RunStopCommand
     | ApprovalResolveCommand
-    | SessionAckRecoveryCommand,
+    | SessionAckRecoveryCommand
+    | SessionCompactCommand,
     Field(discriminator="type"),
 ]
 
@@ -593,12 +628,14 @@ __all__ = [
     "MessageDto",
     "MessagePartDto",
     "PendingApprovalDto",
+    "RunContextDto",
     "RunDto",
     "RunStartCommand",
     "RunStopCommand",
     "RunTotalsDto",
     "ServerMessage",
     "SessionAckRecoveryCommand",
+    "SessionCompactCommand",
     "SessionDto",
     "SessionSubscribeCommand",
     "SessionSnapshotDto",

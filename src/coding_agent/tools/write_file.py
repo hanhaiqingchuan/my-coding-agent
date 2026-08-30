@@ -67,8 +67,9 @@ class WriteFileTool:
             context.cancellation.raise_if_cancelled()
             request = self._prepared_request(prepared)
             target = context.workspace.resolve(request.path, allow_missing_leaf=True)
+            current_sha256 = self._current_sha256(target)
             if str(target) != prepared.target or not self._baseline_matches(
-                target, prepared.baseline_sha256
+                target, prepared.baseline_sha256, current_sha256=current_sha256
             ):
                 return self._error(
                     call,
@@ -76,6 +77,11 @@ class WriteFileTool:
                     "file changed after write approval",
                     started,
                 )
+            freshness_error = self._freshness_error(
+                context, target, prepared.baseline_sha256, current_sha256
+            )
+            if freshness_error is not None:
+                return self._error(call, freshness_error[0], freshness_error[1], started)
             context.cancellation.raise_if_cancelled()
             self._atomic_write(target, request.content)
         except WorkspacePathError as error:
@@ -90,9 +96,43 @@ class WriteFileTool:
             self.name,
             ok=True,
             summary="wrote file",
-            data={"path": str(target)},
+            data={
+                "path": str(target),
+                # The loop records this fingerprint so the model's own write keeps
+                # the target fresh for a later write in the same session (spec 10.3).
+                "sha256": hashlib.sha256(request.content.encode("utf-8")).hexdigest(),
+            },
             duration_ms=self._duration_ms(started),
         )
+
+    def _freshness_error(
+        self,
+        context: ToolContext,
+        target: Path,
+        baseline_sha256: str | None,
+        current_sha256: str | None,
+    ) -> tuple[str, str] | None:
+        """Spec 10.3's read-before-write gate; ``None`` means the write may proceed.
+
+        Only an existing target can have been read: creating a new file needs no
+        prior read. A session that never read the target gets a correctable
+        READ_FRESH_REQUIRED; a hash that no longer matches means the file changed
+        after the session's last read, which is the existing WRITE_CONFLICT path.
+        """
+        if current_sha256 is None:
+            return None
+        recorded = context.content_fingerprints.get(str(target))
+        if recorded is None:
+            return (
+                "READ_FRESH_REQUIRED",
+                "文件在本次会话中尚未读取最新内容，请先用 read_file 读取后再写入",
+            )
+        if recorded != current_sha256:
+            return (
+                "WRITE_CONFLICT",
+                "file changed since it was last read in this session",
+            )
+        return None
 
     def _arguments(self, input_value: Mapping[str, object]) -> _WriteRequest:
         allowed = {"operation", "path", "content", "old_text", "new_text", "replace_all"}
@@ -181,15 +221,26 @@ class WriteFileTool:
             raise ToolInputError("INVALID_UTF8", "file is not valid UTF-8 text") from error
         return before, hashlib.sha256(raw).hexdigest()
 
-    def _baseline_matches(self, target: Path, baseline_sha256: str | None) -> bool:
-        if baseline_sha256 is None:
-            return not target.exists()
+    @staticmethod
+    def _current_sha256(target: Path) -> str | None:
+        """Hash the target's current bytes, or ``None`` when absent or not a regular file."""
         try:
             if not target.exists() or not stat.S_ISREG(target.stat().st_mode):
-                return False
-            return hashlib.sha256(target.read_bytes()).hexdigest() == baseline_sha256
+                return None
+            return hashlib.sha256(target.read_bytes()).hexdigest()
         except OSError:
-            return False
+            return None
+
+    def _baseline_matches(
+        self,
+        target: Path,
+        baseline_sha256: str | None,
+        *,
+        current_sha256: str | None = None,
+    ) -> bool:
+        if baseline_sha256 is None:
+            return not target.exists()
+        return current_sha256 == baseline_sha256
 
     def _atomic_write(self, target: Path, content: str) -> None:
         mode = stat.S_IMODE(target.stat().st_mode) if target.exists() else None

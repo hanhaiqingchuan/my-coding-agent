@@ -387,6 +387,35 @@ class RunTotals:
 
 
 @dataclass(frozen=True, slots=True)
+class RunContextEstimate:
+    """The latest context-window projection of one run, for the UI progress bar.
+
+    ``estimated_tokens`` is what the context builder estimated for the most recent
+    model view; ``available_tokens`` is the input budget that view had to fit
+    (spec 7.1), and the remaining fields are the static settings that produced the
+    budget. This is evidence about the last build, not a provider usage report and
+    not a token-count guarantee (spec 7.1 keeps the estimate heuristic).
+    """
+
+    estimated_tokens: int
+    available_tokens: int
+    window_tokens: int
+    max_output_tokens: int
+    safety_margin_tokens: int
+
+    def __post_init__(self) -> None:
+        for name, value in (
+            ("estimated_tokens", self.estimated_tokens),
+            ("available_tokens", self.available_tokens),
+            ("window_tokens", self.window_tokens),
+            ("max_output_tokens", self.max_output_tokens),
+            ("safety_margin_tokens", self.safety_margin_tokens),
+        ):
+            if type(value) is not int or value < 0:
+                raise ValueError(f"{name} must be a non-negative integer")
+
+
+@dataclass(frozen=True, slots=True)
 class Run:
     id: str
     session_id: str
@@ -398,6 +427,8 @@ class Run:
     started_at: datetime
     finished_at: datetime | None
     totals: RunTotals = field(default_factory=RunTotals)
+    context: RunContextEstimate | None = None
+    """The run's latest context estimate; ``None`` until the loop's first build."""
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "config_snapshot", _freeze_mapping(self.config_snapshot))

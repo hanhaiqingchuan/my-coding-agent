@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import stat
 import time
 from collections.abc import Mapping
@@ -91,6 +92,10 @@ class ReadFileTool:
             "end_line": end_line,
             "total_lines": total_lines,
             "next_offset": next_offset,
+            # The loop records this fingerprint so write_file's freshness gate can
+            # compare the session's last read against the file's current bytes even
+            # when this view was truncated (spec 10.3).
+            "sha256": hashlib.sha256(raw).hexdigest(),
         }
         return result(
             call.id,

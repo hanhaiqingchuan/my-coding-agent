@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS runs (
     cache_read_input_tokens INTEGER NOT NULL DEFAULT 0,
     round_count INTEGER NOT NULL DEFAULT 0,
     retry_count INTEGER NOT NULL DEFAULT 0,
+    context_json TEXT,
     started_at TEXT NOT NULL,
     finished_at TEXT
 );
@@ -119,5 +120,8 @@ CREATE INDEX IF NOT EXISTS tools_by_message ON tool_executions(assistant_message
 CREATE UNIQUE INDEX IF NOT EXISTS context_snapshot_current_by_session
     ON context_snapshots(session_id);
 
+-- The script baseline stays at v1; SQLiteStore.initialize() upgrades existing
+-- databases (and stamps fresh ones) to user_version 2 with the runs.context_json
+-- column for the run's latest context estimate.
 PRAGMA user_version = 1;
 COMMIT;

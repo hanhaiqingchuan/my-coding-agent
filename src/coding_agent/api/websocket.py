@@ -26,6 +26,7 @@ from coding_agent.api.schemas import (
     RunStartCommand,
     RunStopCommand,
     SessionAckRecoveryCommand,
+    SessionCompactCommand,
     SessionSnapshotDto,
     SessionSubscribeCommand,
     SnapshotEnvelope,
@@ -164,6 +165,12 @@ class _SessionConnection:
                 resource_id = command.payload.tool_call_id
             elif isinstance(command, SessionAckRecoveryCommand):
                 session = await coordinator.acknowledge_recovery(
+                    command.session_id,
+                    command.client_command_id,
+                )
+                resource_id = session.id
+            elif isinstance(command, SessionCompactCommand):
+                session = await coordinator.compact_session(
                     command.session_id,
                     command.client_command_id,
                 )

@@ -17,9 +17,12 @@ from coding_agent.api.schemas import (
     DurableEnvelope,
     DurableEventDto,
     MessageDto,
+    RunContextDto,
+    RunDto,
     RunStartCommand,
     RunStopCommand,
     SessionAckRecoveryCommand,
+    SessionCompactCommand,
     SessionSnapshotDto,
     SessionSubscribeCommand,
     SnapshotEnvelope,
@@ -34,6 +37,7 @@ from coding_agent.core.models import (
     MessageStatus,
     ModelStopReason,
     PreparedToolCall,
+    RunContextEstimate,
     RunState,
     StopReason,
     TextPart,
@@ -414,6 +418,47 @@ def test_snapshot_json_schema_freezes_domain_enums_for_the_frontend() -> None:
     assert definitions["ToolExecutionState"]["enum"] == [item.value for item in ToolExecutionState]
 
 
+def test_run_dto_carries_the_context_block_after_a_build_and_null_before(
+    tmp_path: Path,
+) -> None:
+    """The UI progress bar needs estimated/available/window from the run's latest build."""
+    database = tmp_path / "state.db"
+    store = SQLiteStore(database)
+    store.initialize()
+    session = store.create_session("/tmp/workspace", "context")
+    run = store.begin_run(session.id, "task", {}, "cmd-start", "hash-start")
+
+    before = SessionSnapshotDto.from_domain(store.load_snapshot(session.id))
+
+    assert before.active_run is not None
+    assert before.active_run.context is None
+
+    store.record_context_estimate(
+        run.id,
+        RunContextEstimate(
+            estimated_tokens=1_200,
+            available_tokens=53_760,
+            window_tokens=64_000,
+            max_output_tokens=8_192,
+            safety_margin_tokens=2_048,
+        ),
+    )
+
+    after = SessionSnapshotDto.from_domain(store.load_snapshot(session.id))
+    assert after.active_run is not None
+    assert after.active_run.context == RunContextDto(
+        estimated_tokens=1_200,
+        available_tokens=53_760,
+        window_tokens=64_000,
+    )
+    assert RunDto.from_domain(store.get_run(run.id)).context == after.active_run.context
+    assert after.active_run.model_dump(mode="json")["context"] == {
+        "estimated_tokens": 1_200,
+        "available_tokens": 53_760,
+        "window_tokens": 64_000,
+    }
+
+
 def test_frontend_contract_fixture_matches_the_backend_dto_schema() -> None:
     """A checked-in browser contract must change with strict DTO fields and enums."""
     import json
@@ -446,6 +491,7 @@ def test_frontend_contract_fixture_matches_the_backend_dto_schema() -> None:
             RunStopCommand,
             ApprovalResolveCommand,
             SessionAckRecoveryCommand,
+            SessionCompactCommand,
         )
     ]
     assert fixture["serverMessageTypes"] == [
