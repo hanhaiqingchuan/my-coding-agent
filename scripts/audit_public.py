@@ -472,6 +472,10 @@ def _commit_introducing_blob(repo: Path, sha: str, include_reflog: bool) -> str:
 def _path_findings(scope: str, path: str, commit: str) -> Iterator[Finding]:
     for rule in PATH_RULES:
         if rule.pattern.search(path):
+            # The evaluation harness's per-run state.db is the deliberate public
+            # record of a campaign — written for review, not stray runtime state.
+            if rule.rule_id == "PATH006" and path.startswith("evaluation-results/"):
+                continue
             yield Finding(scope, rule.rule_id, path, 0, commit, rule.title)
 
 
