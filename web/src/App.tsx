@@ -281,6 +281,7 @@ export default function App() {
               onSend={startRun}
               onStop={stopRun}
               onApprovalModeChange={setApprovalMode}
+              onAcknowledgeRecovery={acknowledgeRecovery}
             />
             {/* The focus run is the active one, else the last finished one: the
                 gauge keeps reporting the context the model actually saw. */}

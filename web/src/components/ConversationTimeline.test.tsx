@@ -202,10 +202,10 @@ test("renders a committed thinking part collapsed by default and expands on dema
     />,
   );
 
-  const disclosure = screen.getByRole("button", { name: /^思考中 · / });
+  const disclosure = screen.getByRole("button", { name: /^思考完成 · / });
   expect(disclosure.getAttribute("aria-expanded")).toBe("false");
   // The summary row reports the size of the reasoning it guards.
-  expect(disclosure.textContent).toBe("思考中 · 37 字");
+  expect(disclosure.textContent).toBe("思考完成 · 37 字");
 
   await user.click(disclosure);
   expect(disclosure.getAttribute("aria-expanded")).toBe("true");
@@ -215,7 +215,7 @@ test("renders a committed thinking part collapsed by default and expands on dema
 
   // Part order is authoritative: the thinking disclosure precedes the answer text.
   const article = screen.getByText("Committed answer").closest("article");
-  expect((article?.textContent ?? "").indexOf("思考中")).toBeLessThan(
+  expect((article?.textContent ?? "").indexOf("思考完成")).toBeLessThan(
     (article?.textContent ?? "").indexOf("Committed answer"),
   );
 });

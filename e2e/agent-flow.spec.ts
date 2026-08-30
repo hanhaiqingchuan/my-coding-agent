@@ -40,7 +40,11 @@ test("creates a session, approves write and command, then restores final history
   });
 
   await request.post(`${BACKEND_URL}/__test__/thinking/release`);
-  await expect(thinkingToggle).toHaveAttribute("aria-expanded", "false");
+  // A closed block reads as finished reasoning, so the live locator goes stale.
+  const closedThinkingToggle = page.getByRole("button", {
+    name: /^思考完成 · \d+ 字$/,
+  });
+  await expect(closedThinkingToggle).toHaveAttribute("aria-expanded", "false");
   await expect(thinkingText).toBeHidden();
   await page.screenshot({
     path: "test-results/thinking-live-collapsed.png",
@@ -93,12 +97,12 @@ test("creates a session, approves write and command, then restores final history
 
   // The committed round-one message keeps its reasoning server-side: after the
   // refresh it still renders collapsed by default and expands on demand.
-  await expect(thinkingToggle).toHaveAttribute("aria-expanded", "false");
+  await expect(closedThinkingToggle).toHaveAttribute("aria-expanded", "false");
   await expect(thinkingText).toBeHidden();
   await page.screenshot({
     path: "test-results/thinking-committed-collapsed.png",
   });
-  await thinkingToggle.click();
+  await closedThinkingToggle.click();
   await expect(thinkingText).toBeVisible();
   await expect(thinkingText).toContainText("prepare a workspace change");
   await page.screenshot({

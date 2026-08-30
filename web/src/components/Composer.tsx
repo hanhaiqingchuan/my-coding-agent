@@ -28,6 +28,8 @@ export type ComposerProps = {
   onSend(content: string): void;
   onStop(runId: string): void;
   onApprovalModeChange(autoApprove: boolean): void;
+  /** Clears the recovery gate; the ack lives here too, not only in the timeline banner. */
+  onAcknowledgeRecovery?(): void;
 };
 
 /**
@@ -49,6 +51,7 @@ export function Composer({
   onSend,
   onStop,
   onApprovalModeChange,
+  onAcknowledgeRecovery,
 }: ComposerProps) {
   const [isFocused, setIsFocused] = useState(false);
   const [highlighted, setHighlighted] = useState(0);
@@ -155,6 +158,15 @@ export function Composer({
         </p>
       ) : null}
       <div className="composer-actions">
+        {isRecoveryBlocked && onAcknowledgeRecovery !== undefined ? (
+          <button
+            type="button"
+            className="composer-recovery-ack"
+            onClick={onAcknowledgeRecovery}
+          >
+            我已检查，继续对话
+          </button>
+        ) : null}
         <button
           type="button"
           className={`approval-mode-btn${autoApprove ? " approval-mode-on" : ""}`}

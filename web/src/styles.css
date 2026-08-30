@@ -1468,6 +1468,19 @@ input:focus-visible {
   background: var(--amber-bg);
   font-weight: 700;
 }
+/* The recovery ack is the only way forward while the input is locked. */
+.composer-recovery-ack {
+  margin-right: auto;
+  padding: 6px 14px;
+  border-color: var(--amber-line);
+  color: var(--amber-strong);
+  background: var(--amber-bg);
+  font-weight: 700;
+}
+.composer-recovery-ack:hover {
+  border-color: var(--amber-strong);
+  background: var(--amber-bg);
+}
 
 /* --- Slash command menu -------------------------------------------------- */
 .slash-menu {
