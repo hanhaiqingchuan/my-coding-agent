@@ -1,10 +1,9 @@
 /* ---------------------------------------------------------------------------
    Lit Console — 明室暗井
 
-   You supervise from a lit desk; the machine's artifacts (commands, diffs,
-   output, reasoning) live in dark wells. Light chrome, dark data: the material
-   contrast is the signature. Colour pairs are chosen for WCAG AA (>= 4.5:1)
-   on the surface they sit on; wells keep their own on-dark tokens.
+   You supervise from a lit desk; code surfaces are light cards on the cream
+   chrome, and only the machine's reasoning stream keeps a dark well.
+   Colour pairs are chosen for WCAG AA (>= 4.5:1) on the surface they sit on.
    --------------------------------------------------------------------------- */
 
 /* Self-hosted voices (OFL): Plex Sans carries UI latin, JetBrains Mono is the
@@ -211,9 +210,8 @@ body {
   scrollbar-color: var(--line-strong) transparent;
 }
 .tool-card pre,
-.approval-dock pre,
-.thinking-text {
-  scrollbar-color: var(--well-edge) transparent;
+.approval-dock pre {
+  scrollbar-color: var(--line-strong) transparent;
 }
 ::-webkit-scrollbar {
   width: 9px;
@@ -1169,17 +1167,18 @@ button:disabled:hover {
   color: var(--ink);
   background: var(--sunken);
 }
-/* Tool payloads and output are machine artifacts: dark wells. */
+/* Tool payloads and output are machine artifacts: light cards matching the
+   markdown code blocks, so every code surface on the desk reads the same. */
 .tool-card pre,
 .approval-dock pre {
   overflow-x: auto;
   margin: var(--space-3) 0 0;
   padding: var(--space-3);
-  border: 1px solid var(--well-edge);
+  border: 1px solid var(--line);
   border-radius: var(--radius-sm);
-  color: var(--well-fg);
-  background: var(--well);
-  box-shadow: var(--shadow-well);
+  color: var(--ink);
+  background: var(--card);
+  box-shadow: var(--shadow-card);
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   line-height: 1.5;
@@ -1262,8 +1261,8 @@ button:disabled:hover {
 
 /* --- The amber gate: fixed approval dock --------------------------------- */
 /* The one bold moment. A pending approval is an amber-lit instrument panel:
-   it rises in once, its frozen facts sit in dark wells, and its two decisions
-   are the biggest buttons on the screen. */
+   it rises in once, its frozen facts sit in a light frame, and its two
+   decisions are the biggest buttons on the screen. */
 .conversation-controls {
   align-self: end;
   min-width: 0;
