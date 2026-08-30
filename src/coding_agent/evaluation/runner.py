@@ -198,6 +198,12 @@ def run_oracle(
     monotonic: Monotonic = time.monotonic,
 ) -> OracleRun:
     """Run one oracle script outside ``workspace`` and map its exit code to an outcome."""
+    # The subprocess gets its own cwd, so every path handed to it must be
+    # absolute — a relative workspace would resolve against the oracle's cwd
+    # inside the script and silently point at a nonexistent tree.
+    entry = entry.resolve()
+    workspace = workspace.resolve()
+    cwd = cwd.resolve()
     if cwd == workspace or workspace in cwd.parents:
         raise CampaignError("oracle: must never run inside the agent workspace")
     cwd.mkdir(parents=True, exist_ok=True)

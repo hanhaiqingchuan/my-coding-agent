@@ -252,6 +252,38 @@ def test_run_oracle_never_executes_inside_the_agent_workspace(
     assert (workspace / "marker.txt").exists() is False
 
 
+def test_run_oracle_accepts_paths_relative_to_the_harness_cwd(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The oracle subprocess runs with its own cwd, so relative paths must be
+    absolutised before spawning — otherwise the oracle resolves the workspace
+    against its own cwd and reports a nonexistent tree as a failure."""
+    monkeypatch.chdir(tmp_path)
+    entry = tmp_path / "marker_oracle.py"
+    entry.write_text(
+        "import sys\n"
+        "from pathlib import Path\n"
+        "workspace = Path(sys.argv[1]).resolve()\n"
+        "sys.exit(0 if (workspace / 'sentinel.txt').is_file() else 1)\n",
+        encoding="utf-8",
+    )
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    (workspace / "sentinel.txt").write_text("here", encoding="utf-8")
+    oracle_cwd = tmp_path / "oracle-cwd"
+    oracle_cwd.mkdir()
+
+    outcome = run_oracle(
+        Path("marker_oracle.py"),
+        Path("workspace"),
+        cwd=Path("oracle-cwd"),
+    )
+
+    assert outcome.passed is True
+    assert outcome.errored is False
+
+
 def test_each_repeat_uses_a_fresh_workspace_and_isolated_data_dir(
     manifest_root: Path,
     config_file: Path,
