@@ -1,8 +1,8 @@
 /* ---------------------------------------------------------------------------
-   Lit Console — 明室暗井
+   Lit Console — 明室工作台
 
-   You supervise from a lit desk; code surfaces are light cards on the cream
-   chrome, and only the machine's reasoning stream keeps a dark well.
+   You supervise from a lit desk: every surface is light — cream chrome,
+   recessed paper frames for code and reasoning, amber for the approval gate.
    Colour pairs are chosen for WCAG AA (>= 4.5:1) on the surface they sit on.
    --------------------------------------------------------------------------- */
 
@@ -68,13 +68,6 @@
   --ink-faint: #6d6650;
   --line: #dcd4bd;
   --line-strong: #c2b897;
-
-  /* Dark wells: machine output only — warm charcoal, high-legibility text */
-  --well: #1f1b14;
-  --well-edge: #3b3527;
-  --well-fg: #ede7d6;
-  --well-muted: #b3aa92;
-  --well-accent: #a8b4f0;
 
   /* Action accent (indigo) */
   --accent: #2e4fd7;
@@ -174,9 +167,6 @@
   --shadow-menu:
     inset 0 1px 0 rgb(255 255 255 / 65%),
     0 8px 24px rgb(38 34 26 / 18%);
-  --shadow-well:
-    inset 0 1px 0 rgb(255 255 255 / 5%),
-    inset 0 2px 6px rgb(0 0 0 / 45%);
 
   color: var(--ink);
   background: var(--paper);
@@ -281,11 +271,6 @@ a:focus-visible,
   outline: 2px solid var(--accent);
   outline-offset: 2px;
   box-shadow: 0 0 0 4px rgb(46 79 215 / 16%);
-}
-/* Inside a dark well the accent outline is too dim; use the on-dark accent. */
-.thinking-box button:focus-visible {
-  outline-color: var(--well-accent);
-  box-shadow: 0 0 0 4px rgb(168 180 240 / 22%);
 }
 button:not(:disabled):active {
   transform: scale(0.97);
@@ -714,7 +699,7 @@ button:disabled:hover {
 }
 
 /* --- Messages: a transcript, not chat bubbles ---------------------------- */
-/* Your own message is a solid ink card — an issued instruction. */
+/* Your own message is a deep-orange tinted card — an issued instruction. */
 .message-bubble {
   min-width: 0;
   max-width: min(680px, 92%);
@@ -742,16 +727,16 @@ button:disabled:hover {
 }
 .message-user {
   justify-self: end;
-  border-color: var(--ink);
+  border: 1px solid #e3c298;
   border-bottom-right-radius: var(--radius-sm);
-  background: var(--ink);
+  background: #fcefdd;
   box-shadow: var(--shadow-card);
 }
 .message-user header {
-  color: rgb(255 255 255 / 65%);
+  color: #a5641f;
 }
 .message-user p {
-  color: #f6f1e4;
+  color: #7c3f0e;
 }
 /* The assistant speaks as an open transcript block on the paper. */
 .message-assistant {
@@ -951,11 +936,10 @@ button:disabled:hover {
   max-height: 280px;
   margin: var(--space-2) 0 0;
   padding: var(--space-3);
-  border: 1px solid var(--well-edge);
+  border: 1px solid var(--line);
   border-radius: var(--radius-sm);
-  color: var(--well-fg);
-  background: var(--well);
-  box-shadow: var(--shadow-well);
+  color: var(--ink-soft);
+  background: var(--paper);
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   line-height: 1.5;
