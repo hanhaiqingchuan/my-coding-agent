@@ -140,6 +140,7 @@
     "approval.resolve",
     "session.ack_recovery",
     "session.compact",
+    "session.clear",
     "session.set_approval_mode"
   ],
   "serverMessageTypes": [

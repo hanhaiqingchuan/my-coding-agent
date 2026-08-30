@@ -366,6 +366,13 @@ export type ClientCommand =
       payload: Record<string, never>;
     }
   | {
+      /** Wipe the conversation history; the session itself stays. */
+      type: "session.clear";
+      client_command_id: string;
+      session_id: string;
+      payload: Record<string, never>;
+    }
+  | {
       /** Persist the per-session approval mode (spec 13.4); audited durably. */
       type: "session.set_approval_mode";
       client_command_id: string;

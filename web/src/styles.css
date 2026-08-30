@@ -355,10 +355,15 @@ button:disabled:hover {
 .session-list li {
   min-width: 0;
 }
+.session-item {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+}
 .session-row {
   display: grid;
   gap: 2px;
-  width: 100%;
+  flex: 1;
   min-width: 0;
   padding: var(--space-2) var(--space-3);
   border-color: transparent;
@@ -395,6 +400,28 @@ button:disabled:hover {
 }
 .session-row[aria-current="page"] > span {
   color: var(--text-primary);
+}
+/* The delete affordance stays quiet until the row is hovered. */
+.session-delete {
+  flex: none;
+  width: 26px;
+  margin: var(--space-1) var(--space-1) var(--space-1) 0;
+  border-color: transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: var(--text-lg);
+  line-height: 1;
+  visibility: hidden;
+}
+.session-item:hover .session-delete,
+.session-delete:focus-visible {
+  visibility: visible;
+}
+.session-delete:hover {
+  border-color: var(--danger-line);
+  color: var(--danger-fg);
+  background: var(--bg-raised);
 }
 
 /* --- Conversation column ------------------------------------------------ */
@@ -1063,6 +1090,7 @@ button:disabled:hover {
 
 /* --- Composer ----------------------------------------------------------- */
 .composer {
+  position: relative;
   display: grid;
   gap: var(--space-2);
   min-width: 0;
@@ -1108,30 +1136,75 @@ button:disabled:hover {
 }
 /* Send and Stop occupy the same slot and the same width, so the in-place
    swap never moves the control. */
-.composer-actions button {
+.composer-actions .composer-send,
+.composer-actions .composer-stop {
   min-width: 96px;
   padding: 8px 16px;
 }
-/* The per-session approval mode switch rides at the start of the actions row. */
-.approval-mode {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
+/* The per-session approval mode button rides at the start of the actions row;
+   its label names the mode a click will switch TO. */
+.approval-mode-btn {
   margin-right: auto;
+  padding: 5px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: transparent;
   color: var(--text-secondary);
   font-size: var(--text-xs);
   cursor: pointer;
-  user-select: none;
 }
-.approval-mode input {
-  width: 15px;
-  height: 15px;
-  accent-color: var(--accent);
+.approval-mode-btn:hover {
+  border-color: var(--border-strong);
+  color: var(--text-primary);
 }
 /* Auto-approve skips the human gate, so the ON state reads as a live warning. */
-.approval-mode-on {
+.approval-mode-btn.approval-mode-on {
+  border-color: var(--amber-line);
   color: var(--amber-fg-strong);
   font-weight: 650;
+}
+
+/* --- Slash command menu -------------------------------------------------- */
+.slash-menu {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: var(--space-1);
+  z-index: 30;
+  margin: 0;
+  min-width: 260px;
+  padding: 4px;
+  list-style: none;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--bg-raised);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 45%);
+}
+.slash-item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  width: 100%;
+  padding: 6px 10px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+.slash-item-active,
+.slash-item:hover {
+  background: var(--bg-selected);
+}
+.slash-name {
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-weight: 650;
+}
+.slash-desc {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
 }
 
 /* --- Status row under the composer: context gauge + compaction chip ----- */
@@ -1170,13 +1243,13 @@ button:disabled:hover {
   display: block;
   height: 100%;
   border-radius: var(--radius-pill);
-  background: var(--success-line);
+  background: #2f5e44;
 }
 .context-gauge-warn {
-  background: var(--amber-line);
+  background: #6b5320;
 }
 .context-gauge-high {
-  background: var(--danger-line);
+  background: #6e3434;
 }
 .context-gauge-value {
   color: var(--text-secondary);

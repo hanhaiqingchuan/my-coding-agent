@@ -22,6 +22,7 @@ from coding_agent.api.schemas import (
     RunStartCommand,
     RunStopCommand,
     SessionAckRecoveryCommand,
+    SessionClearCommand,
     SessionCompactCommand,
     SessionSetApprovalModeCommand,
     SessionSnapshotDto,
@@ -493,6 +494,7 @@ def test_frontend_contract_fixture_matches_the_backend_dto_schema() -> None:
             ApprovalResolveCommand,
             SessionAckRecoveryCommand,
             SessionCompactCommand,
+            SessionClearCommand,
             SessionSetApprovalModeCommand,
         )
     ]

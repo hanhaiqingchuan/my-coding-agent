@@ -63,6 +63,15 @@ export class ApiClient {
     );
   }
 
+  async deleteSession(sessionId: string): Promise<void> {
+    await this.bootstrap();
+    await this.request<void>(
+      `/api/sessions/${encodeURIComponent(sessionId)}`,
+      { method: "DELETE" },
+      true,
+    );
+  }
+
   private async request<T>(
     path: string,
     init: RequestInit,
@@ -91,6 +100,7 @@ export class ApiClient {
         `API request failed with status ${response.status}`,
       );
     }
+    if (response.status === 204) return undefined as T;
     return (await response.json()) as T;
   }
 }

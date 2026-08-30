@@ -301,6 +301,29 @@ test("sends session.compact for the /compact slash command instead of a run", as
   });
 });
 
+test("sends session.clear for the /clear slash command instead of a run", async () => {
+  mocks.draftText = "/clear";
+  mocks.hasActiveRun = false;
+  mocks.recoveryAck = false;
+  const user = userEvent.setup();
+  render(<App />);
+
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "发送" })).toBeTruthy(),
+  );
+  await user.click(screen.getByRole("button", { name: "发送" }));
+
+  expect(mocks.send).toHaveBeenCalledTimes(1);
+  expect(mocks.send).toHaveBeenCalledWith(
+    expect.objectContaining({
+      type: "session.clear",
+      client_command_id: expect.any(String),
+      session_id: "session-1",
+      payload: {},
+    }),
+  );
+});
+
 test("a normal message still starts a run", async () => {
   mocks.draftText = "hello there";
   mocks.hasActiveRun = false;
@@ -328,14 +351,10 @@ test("the approval toggle sends the persisted mode change for the session", asyn
   render(<App />);
 
   await waitFor(() =>
-    expect(screen.getByRole("switch", { name: "自动批准" })).toBeTruthy(),
+    expect(screen.getByRole("button", { name: "自动批准" })).toBeTruthy(),
   );
-  expect(
-    (screen.getByRole("switch", { name: "自动批准" }) as HTMLInputElement)
-      .checked,
-  ).toBe(false);
 
-  await user.click(screen.getByRole("switch", { name: "自动批准" }));
+  await user.click(screen.getByRole("button", { name: "自动批准" }));
 
   expect(mocks.send).toHaveBeenCalledWith(
     expect.objectContaining({

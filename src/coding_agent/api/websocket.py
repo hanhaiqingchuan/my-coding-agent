@@ -26,6 +26,7 @@ from coding_agent.api.schemas import (
     RunStartCommand,
     RunStopCommand,
     SessionAckRecoveryCommand,
+    SessionClearCommand,
     SessionCompactCommand,
     SessionSetApprovalModeCommand,
     SessionSnapshotDto,
@@ -172,6 +173,12 @@ class _SessionConnection:
                 resource_id = session.id
             elif isinstance(command, SessionCompactCommand):
                 session = await coordinator.compact_session(
+                    command.session_id,
+                    command.client_command_id,
+                )
+                resource_id = session.id
+            elif isinstance(command, SessionClearCommand):
+                session = await coordinator.clear_session(
                     command.session_id,
                     command.client_command_id,
                 )

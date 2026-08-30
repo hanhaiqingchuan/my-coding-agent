@@ -65,6 +65,26 @@ export default function App() {
     setSelectedSessionId(session.id);
   }
 
+  async function deleteSession(sessionId: string) {
+    const target = sessions.find((session) => session.id === sessionId);
+    const label = target?.title ?? "未命名会话";
+    if (!window.confirm(`删除会话「${label}」？该会话的全部记录将被移除。`)) return;
+    try {
+      await api.deleteSession(sessionId);
+    } catch {
+      // A 409 means a run is active in that session; surface it without unselecting.
+      window.alert("删除失败：会话中仍有正在进行的运行，请先停止。");
+      return;
+    }
+    setSessions((current) => {
+      const remaining = current.filter((session) => session.id !== sessionId);
+      setSelectedSessionId((selected) =>
+        selected === sessionId ? (remaining[0]?.id ?? null) : selected,
+      );
+      return remaining;
+    });
+  }
+
   function commandId(): string {
     return crypto.randomUUID();
   }
@@ -85,6 +105,17 @@ export default function App() {
     if (content === "/compact") {
       send({
         type: "session.compact",
+        client_command_id: commandId(),
+        session_id: selectedSessionId,
+        payload: {},
+      });
+      dispatch({ type: "draft.changed", draftText: "" });
+      return;
+    }
+    // `/clear` wipes the conversation but keeps the session (and its workspace).
+    if (content === "/clear") {
+      send({
+        type: "session.clear",
         client_command_id: commandId(),
         session_id: selectedSessionId,
         payload: {},
@@ -182,6 +213,7 @@ export default function App() {
             sessions={sessions}
             selectedSessionId={selectedSessionId}
             onSelect={setSelectedSessionId}
+            onDelete={deleteSession}
           />
         </>
       }

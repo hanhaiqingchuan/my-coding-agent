@@ -53,7 +53,7 @@ test("replaces Send with Stop while a run is active", async () => {
   expect(onStop).toHaveBeenCalledWith("run-1");
 });
 
-test("the approval-mode switch reports every flip and reflects the persisted mode", async () => {
+test("the approval-mode button reports every flip and reflects the persisted mode", async () => {
   const user = userEvent.setup();
   const onApprovalModeChange = vi.fn();
   const { rerender } = render(
@@ -68,14 +68,14 @@ test("the approval-mode switch reports every flip and reflects the persisted mod
     />,
   );
 
-  const toggle = screen.getByRole("switch", { name: "自动批准" });
-  expect((toggle as HTMLInputElement).checked).toBe(false);
+  const toggle = screen.getByRole("button", { name: "自动批准" });
+  expect(toggle.getAttribute("aria-pressed")).toBe("false");
 
   await user.click(toggle);
   expect(onApprovalModeChange).toHaveBeenCalledWith(true);
-  // The switch is controlled by the persisted session mode, not local state: it
+  // The button is controlled by the persisted session mode, not local state: it
   // only flips once the server round-trip lands in the snapshot.
-  expect((toggle as HTMLInputElement).checked).toBe(false);
+  expect(screen.getByRole("button", { name: "自动批准" })).toBeTruthy();
 
   rerender(
     <Composer
@@ -88,11 +88,76 @@ test("the approval-mode switch reports every flip and reflects the persisted mod
       onStop={vi.fn()}
     />,
   );
-  expect(
-    (screen.getByRole("switch", { name: "自动批准" }) as HTMLInputElement)
-      .checked,
-  ).toBe(true);
+  const onToggle = screen.getByRole("button", { name: "人工审批" });
+  expect(onToggle.getAttribute("aria-pressed")).toBe("true");
 });
+
+test("typing a slash opens the command menu and picking one sends the command", async () => {
+  const user = userEvent.setup();
+  const onSend = vi.fn();
+  render(
+    <SlashHarness onSend={onSend} />,
+  );
+
+  await user.type(screen.getByRole("textbox", { name: "消息" }), "/c");
+
+  const listbox = screen.getByRole("listbox", { name: "斜杠命令" });
+  expect(listbox).toBeTruthy();
+  expect(screen.getByText("/clear")).toBeTruthy();
+  expect(screen.getByText("/compact")).toBeTruthy();
+
+  await user.click(screen.getByRole("option", { name: /清空当前会话/ }));
+  expect(onSend).toHaveBeenCalledWith("/clear");
+});
+
+test("the slash menu filters by the typed prefix and Enter sends the highlight", async () => {
+  const user = userEvent.setup();
+  const onSend = vi.fn();
+  render(
+    <SlashHarness onSend={onSend} initialDraft="/comp" />,
+  );
+
+  const textarea = screen.getByRole("textbox", { name: "消息" });
+  await user.click(textarea);
+  expect(screen.queryByText("/clear")).toBeNull();
+  expect(screen.getByText("/compact")).toBeTruthy();
+
+  await user.type(textarea, "{Enter}");
+  expect(onSend).toHaveBeenCalledWith("/compact");
+});
+
+test("the slash menu stays closed for plain text and words with spaces", async () => {
+  const user = userEvent.setup();
+  render(
+    <SlashHarness initialDraft="hello /clear world" />,
+  );
+
+  expect(screen.queryByRole("listbox", { name: "斜杠命令" })).toBeNull();
+
+  await user.type(screen.getByRole("textbox", { name: "消息" }), " more");
+  expect(screen.queryByRole("listbox", { name: "斜杠命令" })).toBeNull();
+});
+
+function SlashHarness({
+  initialDraft = "",
+  onSend,
+}: {
+  initialDraft?: string;
+  onSend?: (content: string) => void;
+}) {
+  const [draft, setDraft] = useState(initialDraft);
+  return (
+    <Composer
+      activeRun={null}
+      draft={draft}
+      autoApprove={false}
+      onApprovalModeChange={vi.fn()}
+      onDraftChange={setDraft}
+      onSend={onSend ?? vi.fn()}
+      onStop={vi.fn()}
+    />
+  );
+}
 
 test.each<RunState>([
   "starting",

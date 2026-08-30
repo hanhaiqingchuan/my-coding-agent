@@ -93,6 +93,22 @@ def list_sessions(
     return [SessionDto.from_domain(session) for session in dependencies.store.list_sessions()]
 
 
+@router.delete(
+    "/sessions/{session_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_process_token)],
+)
+def delete_session(
+    session_id: str,
+    dependencies: ApiDependencies = Depends(get_api_dependencies),
+) -> Response:
+    try:
+        dependencies.store.delete_session(session_id)
+    except StoreError as error:
+        raise _store_http_error(error) from error
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @router.get("/sessions/{session_id}/snapshot", response_model=SessionSnapshotDto)
 def session_snapshot(
     session_id: str,

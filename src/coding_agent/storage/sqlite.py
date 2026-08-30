@@ -1149,6 +1149,89 @@ class SQLiteStore:
             self._complete_command(connection, session_id, client_command_id, event_seq)
             return self._require_session(connection, session_id)
 
+    def clear_session(
+        self,
+        session_id: str,
+        client_command_id: str,
+        payload_hash: str,
+    ) -> Session:
+        """Wipe the session's conversation while keeping the session itself.
+
+        Runs, messages, tool executions, model requests and the rolling summary are
+        deleted in one transaction; session-level durable events keep their seq
+        (run-scoped rows only have ``run_id`` nulled first, because events reference
+        runs with ON DELETE CASCADE) so the frontend's monotonic ``lastSeq`` stays
+        valid. A ``session.cleared`` event then triggers the UI's snapshot refresh.
+        """
+        with self._transaction() as connection:
+            duplicate = self._existing_command(
+                connection,
+                session_id,
+                client_command_id,
+                payload_hash,
+                "session.clear",
+            )
+            if duplicate is not None:
+                return self._require_session(connection, duplicate)
+            self._require_session(connection, session_id)
+            active = connection.execute(
+                "SELECT id FROM runs WHERE session_id = ?"
+                f" AND state NOT IN ({_TERMINAL_PLACEHOLDERS}) LIMIT 1",
+                (session_id, *(state.value for state in _TERMINAL_STATES)),
+            ).fetchone()
+            if active is not None:
+                raise StoreError(
+                    "RUN_ALREADY_ACTIVE",
+                    "cannot clear a session while a run is active",
+                )
+            now = _now()
+            self._claim_command(
+                connection,
+                session_id,
+                client_command_id,
+                "session.clear",
+                payload_hash,
+                session_id,
+                now,
+            )
+            connection.execute(
+                "UPDATE events SET run_id = NULL WHERE session_id = ?",
+                (session_id,),
+            )
+            connection.execute("DELETE FROM runs WHERE session_id = ?", (session_id,))
+            connection.execute(
+                "DELETE FROM context_snapshots WHERE session_id = ?", (session_id,)
+            )
+            event_seq = self._append_event(
+                connection,
+                session_id,
+                None,
+                "session.cleared",
+                {},
+            )
+            self._complete_command(connection, session_id, client_command_id, event_seq)
+            connection.execute(
+                "UPDATE sessions SET updated_at = ? WHERE id = ?", (now, session_id)
+            )
+            return self._require_session(connection, session_id)
+
+    def delete_session(self, session_id: str) -> Session:
+        """Delete the session and every related row; rejected while a run is active."""
+        with self._transaction() as connection:
+            session = self._require_session(connection, session_id)
+            active = connection.execute(
+                "SELECT id FROM runs WHERE session_id = ?"
+                f" AND state NOT IN ({_TERMINAL_PLACEHOLDERS}) LIMIT 1",
+                (session_id, *(state.value for state in _TERMINAL_STATES)),
+            ).fetchone()
+            if active is not None:
+                raise StoreError(
+                    "RUN_ALREADY_ACTIVE",
+                    "cannot delete a session while a run is active",
+                )
+            connection.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
+            return session
+
     def completed_command_resource(
         self,
         session_id: str,

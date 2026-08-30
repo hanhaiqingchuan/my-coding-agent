@@ -476,6 +476,15 @@ class SessionCompactCommand(StrictDto):
     payload: EmptyPayload
 
 
+class SessionClearCommand(StrictDto):
+    """Wipe the session's conversation history while keeping the session itself."""
+
+    type: Literal["session.clear"]
+    client_command_id: str = Field(min_length=1)
+    session_id: str = Field(min_length=1)
+    payload: EmptyPayload
+
+
 class SessionSetApprovalModePayload(StrictDto):
     # Strict so a JSON string like "yes" can never coerce into a mode change.
     auto_approve: bool = Field(strict=True)
@@ -497,6 +506,7 @@ ClientCommand: TypeAlias = Annotated[
     | ApprovalResolveCommand
     | SessionAckRecoveryCommand
     | SessionCompactCommand
+    | SessionClearCommand
     | SessionSetApprovalModeCommand,
     Field(discriminator="type"),
 ]

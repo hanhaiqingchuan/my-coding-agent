@@ -197,6 +197,23 @@ class RunMutationGate:
             await self._publish_after(session_id, previous_seq)
             return session
 
+    async def clear_session(
+        self,
+        session_id: str,
+        client_command_id: str,
+    ) -> Session:
+        """Wipe the conversation and publish ``session.cleared`` under the lock."""
+        async with self._lock:
+            previous_seq = _latest_seq(self._store, session_id)
+            digest = hashlib.sha256(f"session.clear\0{session_id}".encode()).hexdigest()
+            session = self._store.clear_session(
+                session_id,
+                client_command_id,
+                digest,
+            )
+            await self._publish_after(session_id, previous_seq)
+            return session
+
     async def finish_run(self, run_id: str, outcome: RunOutcome) -> RunOutcome:
         """Let a persisted Stop win over any late non-tool terminal outcome."""
         async with self._lock:
@@ -373,6 +390,13 @@ class RunCoordinator:
         return await self._mutation_gate.set_approval_mode(
             session_id, auto_approve, client_command_id
         )
+
+    async def clear_session(
+        self,
+        session_id: str,
+        client_command_id: str,
+    ) -> Session:
+        return await self._mutation_gate.clear_session(session_id, client_command_id)
 
 
 def _latest_seq(store: SQLiteStore, session_id: str) -> int:

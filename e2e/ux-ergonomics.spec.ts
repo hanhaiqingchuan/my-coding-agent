@@ -55,11 +55,15 @@ test("the approval toggle skips the docks, completes the run, and survives reloa
   request,
 }) => {
   await createSession(page, request, "Auto approve");
-  const toggle = page.getByRole("switch", { name: "自动批准" });
-  await expect(toggle).not.toBeChecked();
+  // The button's label names the mode a click switches TO: 人工审批 is shown
+  // while the session is in auto-approve mode.
+  const toggle = page.getByRole("button", { name: "自动批准" });
+  await expect(toggle).toHaveAttribute("aria-pressed", "false");
 
   await toggle.click();
-  await expect(toggle).toBeChecked();
+  await expect(
+    page.getByRole("button", { name: "人工审批" }),
+  ).toHaveAttribute("aria-pressed", "true");
 
   await page.getByRole("textbox", { name: "消息" }).fill("agent-flow");
   await page.getByRole("button", { name: "发送" }).click();
@@ -81,7 +85,9 @@ test("the approval toggle skips the docks, completes the run, and survives reloa
 
   // The mode is a durable session field: it survives a reload.
   await page.reload();
-  await expect(page.getByRole("switch", { name: "自动批准" })).toBeChecked();
+  await expect(
+    page.getByRole("button", { name: "人工审批" }),
+  ).toHaveAttribute("aria-pressed", "true");
 });
 
 test("both rails collapse to strips and restore their content", async ({
