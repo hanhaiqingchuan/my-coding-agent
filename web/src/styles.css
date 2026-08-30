@@ -871,6 +871,34 @@ button:disabled:hover {
   background: transparent;
   font-size: inherit;
 }
+/* GFM tables: quiet ledger rules, warm header strip. */
+.markdown table {
+  min-width: 0;
+  margin: 0 0 var(--space-3);
+  border: 1px solid var(--line);
+  border-collapse: collapse;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+}
+.markdown th {
+  padding: 6px var(--space-3);
+  border-bottom: 1px solid var(--line-strong);
+  color: var(--ink);
+  background: var(--sunken);
+  font-weight: 700;
+  text-align: left;
+}
+.markdown td {
+  padding: 6px var(--space-3);
+  border-bottom: 1px solid var(--line);
+  color: var(--ink-soft);
+}
+.markdown tbody tr:last-child td {
+  border-bottom: 0;
+}
+.markdown tbody tr:hover td {
+  background: var(--accent-soft-bg);
+}
 
 /* --- Thinking disclosures ---------------------------------------------- */
 /* Provider reasoning is display-only: a dark well one size down, collapsed in

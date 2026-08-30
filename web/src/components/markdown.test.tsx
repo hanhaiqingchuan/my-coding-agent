@@ -45,7 +45,7 @@ test("renders the supported block subset of an assistant message", () => {
   expect(link.getAttribute("rel")).toContain("noopener");
   expect(screen.getByText("第一项").tagName).toBe("LI");
   expect(screen.getByText("步骤二").tagName).toBe("LI");
-  expect(screen.getByText("引用一行").tagName).toBe("BLOCKQUOTE");
+  expect(screen.getByText("引用一行").closest("blockquote")).not.toBeNull();
   expect(screen.getByText("print('hello')").tagName).toBe("CODE");
 });
 
@@ -92,7 +92,7 @@ test("renders only http and https links; anything else stays literal text", () =
 });
 
 test("raw HTML in model output renders as literal text and never executes", () => {
-  render(
+  const { container } = render(
     <Markdown
       text={
         '<script>alert("xss")</script>\n\n' +
@@ -107,8 +107,9 @@ test("raw HTML in model output renders as literal text and never executes", () =
   expect(document.querySelector("img")).toBeNull();
   expect(document.querySelector("b")).toBeNull();
   // …and the markup stays visible as escaped literal text.
-  expect(screen.getByText('<script>alert("xss")</script>')).not.toBeNull();
-  expect(screen.getByText('<img src=x onerror="alert(1)">')).not.toBeNull();
+  const text = container.textContent ?? "";
+  expect(text).toContain('<script>alert("xss")</script>');
+  expect(text).toContain('<img src=x onerror="alert(1)">');
   expect(screen.getByText("正常文本 <b>不是加粗</b>")).not.toBeNull();
 });
 
@@ -122,4 +123,19 @@ test("emphasis markers without a pair stay literal text", () => {
   render(<Markdown text={"2 * 3 = 6 和 _下划线 与 *星号"} />);
 
   expect(screen.getByText("2 * 3 = 6 和 _下划线 与 *星号")).not.toBeNull();
+});
+
+test("renders a GFM pipe table as a real table", () => {
+  render(
+    <Markdown
+      text={["| 能力 | 触发场景 |", "| --- | --- |", "| 搜索 | 找资料时 |", "| 写文件 | 改代码时 |"].join("\n")}
+    />,
+  );
+
+  const table = screen.getByRole("table");
+  expect(table).not.toBeNull();
+  expect(screen.getByRole("columnheader", { name: "能力" })).not.toBeNull();
+  expect(screen.getByRole("columnheader", { name: "触发场景" })).not.toBeNull();
+  expect(screen.getByRole("cell", { name: "写文件" })).not.toBeNull();
+  expect(screen.getByRole("cell", { name: "改代码时" })).not.toBeNull();
 });

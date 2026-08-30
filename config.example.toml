@@ -27,16 +27,16 @@ model = "claude-model-name"
 api_key_env = "ANTHROPIC_API_KEY"
 # 模型上下文窗口（token）。必须与真实模型一致——上下文预算、压缩阈值都由它推导。
 # 须满足：context_window > max_output_tokens + safety_margin_tokens。
-context_window = 64000
+context_window = 1000000
 # 单次回复的最大输出 token（对应 Messages API 必填的 max_tokens）。
-max_output_tokens = 8192
+max_output_tokens = 32768
 # 必须为 true：P0 只实现流式（SSE）路径，false 会被启动校验拒绝。
 stream = true
 
 # ─── Agent 行为 ─────────────────────────────────────────────────────────────
 [agent]
 # 一次 run 的最大模型调用轮数。最后一轮不提供工具并强制总结，超出以 MAX_ROUNDS 收束。
-max_rounds = 30
+max_rounds = 80
 # 模型给出「完整但非法」的工具参数时，允许连续自纠的次数（错误结果回灌后重试）。
 tool_argument_retries = 2
 # 防循环阈值：同一工具+相同参数指纹连续第 N 次提出时不再执行并回灌
@@ -90,11 +90,7 @@ pass_env = []
 
 # ─── 可选路径 ───────────────────────────────────────────────────────────────
 [paths]
-# 两项都可省略（省略或整节省略时用内置默认值）。相对路径以进程启动目录
-# （通常是仓库根目录）为基准解析。CLI 参数 --data-dir / --eval-results 优先于本节。
-# 运行数据目录（SQLite 数据库等）。默认 "./.coding-agent"。
+# 运行数据目录（SQLite 等）。默认 "./.coding-agent"。
 data_dir = ".coding-agent"
-# 评测结果根目录：网页左栏「评测记录」页的数据来源（只读浏览，不触发模型调用）。
-# 指向 make eval-run 的输出目录，即可在同一个网页里同时使用会话工作台与评测历史。
-# 默认 "<data_dir>/evaluation-results"。
+# 评测结果根目录（网页「评测记录」页的数据来源，只读）。
 evaluation_results = "evaluation-results"
