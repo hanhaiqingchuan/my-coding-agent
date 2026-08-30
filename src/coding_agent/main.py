@@ -225,9 +225,17 @@ def serve_web(
     auto_approve: bool = False,
     evaluation_results_root: Path | None = None,
 ) -> int:
-    """Run the local browser API on the fixed loopback interface."""
+    """Run the local browser API on the fixed loopback interface.
+
+    Path precedence is CLI argument over ``[paths]`` in the config file over the
+    built-in default, matching the documented configuration order. Relative
+    config paths resolve against the process startup directory.
+    """
     runtime_workspace = WorkspaceBoundary(workspace or Path.cwd()).root
-    runtime_data_dir = data_dir or Path.cwd() / ".coding-agent"
+    configured_data_dir = (
+        Path(settings.paths.data_dir) if settings.paths.data_dir is not None else None
+    )
+    runtime_data_dir = data_dir or configured_data_dir or Path.cwd() / ".coding-agent"
     runtime = dependencies or build_runtime_dependencies(
         settings=settings,
         workspace=runtime_workspace,
@@ -248,6 +256,11 @@ def serve_web(
         "max_output_tokens": settings.model.max_output_tokens,
         "max_rounds": settings.agent.max_rounds,
     }
+    configured_results = (
+        Path(settings.paths.evaluation_results)
+        if settings.paths.evaluation_results is not None
+        else None
+    )
     app = create_app(
         runtime.store,
         coordinator,
@@ -255,7 +268,7 @@ def serve_web(
         server_port=settings.server.port,
         web_dist=Path(__file__).resolve().parents[2] / "web" / "dist",
         evaluation_results_root=(
-            evaluation_results_root or runtime_data_dir / "evaluation-results"
+            evaluation_results_root or configured_results or runtime_data_dir / "evaluation-results"
         ),
     )
     if settings.server.open_browser:

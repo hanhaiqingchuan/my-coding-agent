@@ -9,25 +9,29 @@
 #   make install                 创建 .venv(Python 3.12) + 前端依赖 + Chromium
 #
 # 运行（网页工作台）:
-#   make start                   构建前端并启动生产服务，默认 http://127.0.0.1:8000
+#   make run                     构建前端并启动完整服务：同一个网页里既有会话工作台
+#                                （左栏「会话」）也有评测历史（左栏「评测记录」/
+#                                #/evaluations）。数据目录与评测结果目录由
+#                                config.toml 的 [paths] 节决定（CLI 参数优先）。
 #     CONFIG=<path>              配置文件，默认 ./config.toml
 #     ARGS='--workspace DIR --open'
 #                                传给 serve 的参数：初始 workspace、自动开浏览器、
 #                                --yes 受信任模式(跳过审批，仍全审计)、--port N
+#   make start                   同 make run（别名，语义相同）
 #   make dev-api / make dev-web  开发模式双终端（Vite 热更新，/api 与 WS 代理）
 #
 # 测评（需要 DASHSCOPE_API_KEY 等真实凭据，走真实模型）:
 #   make eval-run                跑一轮 campaign（默认 12 个公开任务 × 1 次）
-#     EVAL_OUT=<dir>             结果目录（默认 evaluation-results/，勿入 git）
+#     EVAL_OUT=<dir>             结果目录（默认 evaluation-results/，勿入 git；与
+#                                config.toml [paths].evaluation_results 保持一致即可
+#                                在 make run 的网页里直接看到）
 #     EVAL_REPEATS=<n>           每任务重复次数，默认 1
 #     CONFIG=<path>              模型配置，默认 ./config.toml
 #   make eval-judge              同 eval-run，并在每次运行后用 LLM 裁判打
 #                                task_completion/process_quality/communication 三项分
 #   make eval-history            在终端列出历史 campaign（含成功率与裁判均分）
-#   make eval-web                启动服务并浏览测评结果网页（左栏 Evaluations 或
-#                                #/evaluations 深链）：campaign 列表 → 任务指标 →
-#                                单次运行 + 裁判理由；只读，可看任意历史数据
-#     EVAL_OUT=<dir>             与 eval-run 的输出目录一致
+#   make eval-web                同 make run，但用 EVAL_OUT 显式覆盖评测结果目录
+#                                （临时查看其它位置的历史数据时用）
 #
 # 测试（默认全部离线，不访问模型网络）:
 #   make test / test-backend / test-frontend / test-e2e / lint / format / check
@@ -42,7 +46,7 @@ EVAL_OUT ?= evaluation-results
 EVAL_REPEATS ?= 1
 MANIFEST ?= evaluation/tasks/public/manifest.toml
 
-.PHONY: help install build start dev-api dev-web test-backend test-frontend test test-e2e lint format check eval-run eval-judge eval-history eval-web
+.PHONY: help install build run start dev-api dev-web test-backend test-frontend test test-e2e lint format check eval-run eval-judge eval-history eval-web
 
 help:
 	@echo "My Coding Agent commands"
@@ -52,7 +56,8 @@ help:
 	@echo "  build          Build the production web application"
 	@echo ""
 	@echo "Run"
-	@echo "  start          Build and start the production service (web workbench)"
+	@echo "  run            Build and start the full service (sessions + evaluations in one page)"
+	@echo "  start          Alias of run"
 	@echo "  dev-api        Start only the API development server"
 	@echo "  dev-web        Start only the Vite development server"
 	@echo ""
@@ -60,7 +65,7 @@ help:
 	@echo "  eval-run       Run a campaign over the public task set (EVAL_OUT/EVAL_REPEATS/CONFIG)"
 	@echo "  eval-judge     eval-run plus the LLM judge scoring every finished run"
 	@echo "  eval-history   List past campaigns with success rates and judge means"
-	@echo "  eval-web       Start the service and browse evaluation results (EVAL_OUT)"
+	@echo "  eval-web       Same as run, but overrides the results dir with EVAL_OUT"
 	@echo ""
 	@echo "Test (offline by default)"
 	@echo "  test-backend   Run offline Python tests (excluding tests/live)"
@@ -84,7 +89,7 @@ install:
 build:
 	npm --prefix web run build
 
-start: build
+run start: build
 	uv run --python 3.12 coding-agent serve --config "$(CONFIG)" $(ARGS)
 
 dev-api:

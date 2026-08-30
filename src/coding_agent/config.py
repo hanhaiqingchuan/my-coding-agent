@@ -65,6 +65,19 @@ class ToolSettings:
 
 
 @dataclass(frozen=True, slots=True)
+class PathsSettings:
+    """Optional filesystem locations; ``None`` keeps the built-in defaults.
+
+    Relative paths resolve against the process startup directory, exactly where
+    ``config.toml`` itself is looked up, so a repo-root config can use plain
+    relative names.
+    """
+
+    data_dir: str | None = None
+    evaluation_results: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class AppSettings:
     server: ServerSettings
     model: ModelSettings
@@ -72,6 +85,7 @@ class AppSettings:
     context: ContextSettings
     retry: RetrySettings
     tools: ToolSettings
+    paths: PathsSettings = PathsSettings()
 
 
 _DEFAULTS: dict[str, dict[str, object]] = {
@@ -107,6 +121,7 @@ _DEFAULTS: dict[str, dict[str, object]] = {
         "kill_grace_seconds": 3,
         "pass_env": (),
     },
+    "paths": {"data_dir": None, "evaluation_results": None},
 }
 
 
@@ -234,8 +249,14 @@ def _make_settings(values: dict[str, dict[str, object]]) -> AppSettings:
         ),
         pass_env=_string_tuple(values["tools"]["pass_env"], "tools.pass_env"),
     )
+    paths = PathsSettings(
+        data_dir=_optional_nonempty_string(values["paths"]["data_dir"], "paths.data_dir"),
+        evaluation_results=_optional_nonempty_string(
+            values["paths"]["evaluation_results"], "paths.evaluation_results"
+        ),
+    )
     _validate(server, model, agent, context, retry, tools)
-    return AppSettings(server, model, agent, context, retry, tools)
+    return AppSettings(server, model, agent, context, retry, tools, paths)
 
 
 def _validate(
@@ -297,6 +318,14 @@ def _validate(
 def _nonempty_string(value: object, field: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise ConfigurationError(f"{field}: must be a non-empty string")
+    return value
+
+
+def _optional_nonempty_string(value: object, field: str) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value.strip():
+        raise ConfigurationError(f"{field}: must be a non-empty string when set")
     return value
 
 

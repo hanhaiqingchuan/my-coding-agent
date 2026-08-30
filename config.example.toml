@@ -87,3 +87,14 @@ kill_grace_seconds = 3
 # 模型密钥变量（[model].api_key_env 指向的）永远禁止透传，写了也会被剔除。
 # 例：pass_env = ["HTTP_PROXY", "NPM_CONFIG_REGISTRY"]
 pass_env = []
+
+# ─── 可选路径 ───────────────────────────────────────────────────────────────
+[paths]
+# 两项都可省略（省略或整节省略时用内置默认值）。相对路径以进程启动目录
+# （通常是仓库根目录）为基准解析。CLI 参数 --data-dir / --eval-results 优先于本节。
+# 运行数据目录（SQLite 数据库等）。默认 "./.coding-agent"。
+data_dir = ".coding-agent"
+# 评测结果根目录：网页左栏「评测记录」页的数据来源（只读浏览，不触发模型调用）。
+# 指向 make eval-run 的输出目录，即可在同一个网页里同时使用会话工作台与评测历史。
+# 默认 "<data_dir>/evaluation-results"。
+evaluation_results = "evaluation-results"
