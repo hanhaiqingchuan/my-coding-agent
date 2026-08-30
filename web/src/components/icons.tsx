@@ -92,6 +92,22 @@ export function IconKey({ size = 13 }: IconProps) {
   );
 }
 
+export function IconChevronLeft({ size = 12 }: IconProps) {
+  return (
+    <svg {...base(size)}>
+      <path d="m14 6-6 6 6 6" />
+    </svg>
+  );
+}
+
+export function IconChevronRight({ size = 12 }: IconProps) {
+  return (
+    <svg {...base(size)}>
+      <path d="m10 6 6 6-6 6" />
+    </svg>
+  );
+}
+
 /** The tool-type glyph riding beside a tool card's name. */
 export function ToolGlyph({ name, size = 14 }: { name: string; size?: number }) {
   if (name.includes("command")) return <IconTerminal size={size} />;

@@ -44,6 +44,11 @@ export function ToolCard({ tool, outputDraft }: ToolCardProps) {
   const writeRows = tool.name.includes("write")
     ? writeArgumentRows(tool.input)
     : [];
+  // The collapsed header still identifies the target: the path for file tools,
+  // the model's stated reason (else the command itself) for run_command.
+  const hint = isCommand
+    ? (stringValue(tool.input.reason) ?? stringValue(tool.input.command))
+    : stringValue(tool.input.path);
 
   return (
     <motion.article
@@ -58,6 +63,11 @@ export function ToolCard({ tool, outputDraft }: ToolCardProps) {
           <ToolGlyph name={tool.name} />
           {tool.name}
         </strong>
+        {hint !== null && hint !== "" ? (
+          <span className="tool-card-hint" title={hint}>
+            {hint}
+          </span>
+        ) : null}
         <span className="tool-status">
           {toolStateLabel(tool.execution_state)}
         </span>

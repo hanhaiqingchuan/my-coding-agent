@@ -8,6 +8,8 @@ import {
   type ReactNode,
 } from "react";
 
+import { IconChevronLeft, IconChevronRight } from "./icons";
+
 type AppShellProps = {
   sidebar: ReactNode;
   conversation: ReactNode;
@@ -101,11 +103,13 @@ export function AppShell({
       >
         <button
           type="button"
-          className="rail-toggle"
+          className="rail-toggle rail-toggle-left"
           aria-expanded={!sidebarCollapsed}
+          aria-label={sidebarCollapsed ? "»" : "«"}
+          title={sidebarCollapsed ? "展开会话栏" : "收起会话栏"}
           onClick={() => setSidebarCollapsed((collapsed) => !collapsed)}
         >
-          {sidebarCollapsed ? "»" : "«"}
+          {sidebarCollapsed ? <IconChevronRight /> : <IconChevronLeft />}
         </button>
         {sidebarCollapsed ? null : (
           <>
@@ -134,11 +138,13 @@ export function AppShell({
       >
         <button
           type="button"
-          className="rail-toggle"
+          className="rail-toggle rail-toggle-right"
           aria-expanded={!detailsCollapsed}
+          aria-label={detailsCollapsed ? "«" : "»"}
+          title={detailsCollapsed ? "展开运行详情栏" : "收起运行详情栏"}
           onClick={() => setDetailsCollapsed((collapsed) => !collapsed)}
         >
-          {detailsCollapsed ? "«" : "»"}
+          {detailsCollapsed ? <IconChevronLeft /> : <IconChevronRight />}
         </button>
         {detailsCollapsed ? null : (
           <>

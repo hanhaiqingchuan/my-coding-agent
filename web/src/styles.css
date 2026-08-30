@@ -285,7 +285,6 @@ a:focus-visible,
   box-shadow: 0 0 0 4px rgb(46 79 215 / 16%);
 }
 /* Inside a dark well the accent outline is too dim; use the on-dark accent. */
-.md-code-block button:focus-visible,
 .thinking-box button:focus-visible {
   outline-color: var(--well-accent);
   box-shadow: 0 0 0 4px rgb(168 180 240 / 22%);
@@ -340,7 +339,8 @@ button:disabled:hover {
   padding: var(--space-5) var(--space-4);
   background: var(--card);
   border-color: var(--line);
-  overflow: hidden;
+  /* No overflow clip here: .rail-scroll owns the scrolling, and the edge
+     toggle tab must overflow the rail's border to stay clickable. */
 }
 /* The scrollable part of a rail; the toggle and resize handle are its fixed
    siblings, so they stay on screen no matter how far the content scrolls. */
@@ -360,33 +360,48 @@ button:disabled:hover {
 .run-details-panel {
   border-left: 1px solid var(--line);
 }
-/* A collapsed rail keeps only its expand control, so the strip sheds its
-   content padding and centers the affordance. */
+/* A collapsed rail keeps only its (absolutely positioned) edge tab, so the
+   strip sheds its content padding. */
 .session-sidebar[data-collapsed="true"],
 .run-details-panel[data-collapsed="true"] {
-  align-items: center;
   padding: var(--space-4) 0;
 }
+/* Rail toggles are slim drawer-pulls straddling the rail's inner border:
+   they cost the rail no layout space and sit where a hand scans the edge. */
 .rail-toggle {
-  align-self: flex-end;
-  flex: none;
-  width: 34px;
-  height: 26px;
+  position: absolute;
+  top: 50%;
+  z-index: 3;
+  width: 18px;
+  height: 52px;
   padding: 0;
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius-sm);
-  color: var(--ink-soft);
+  color: var(--ink-faint);
   background: var(--card);
-  font-size: var(--text-sm);
-  line-height: 1;
+  border: 1px solid var(--line);
+  transform: translateY(-50%);
+  transition:
+    color 120ms ease,
+    border-color 120ms ease,
+    background-color 120ms ease,
+    transform 90ms ease;
 }
 .rail-toggle:hover {
-  border-color: var(--accent);
   color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-soft-bg);
 }
-.session-sidebar[data-collapsed="true"] .rail-toggle,
-.run-details-panel[data-collapsed="true"] .rail-toggle {
-  align-self: center;
+.rail-toggle:not(:disabled):active {
+  transform: translateY(-50%) scale(0.94);
+}
+.rail-toggle-left {
+  right: -10px;
+  border-left: 0;
+  border-radius: 0 8px 8px 0;
+}
+.rail-toggle-right {
+  left: -10px;
+  border-right: 0;
+  border-radius: 8px 0 0 8px;
 }
 /* The draggable inner edge of a rail: a slim hit area straddling the border. */
 .rail-resize {
@@ -817,14 +832,15 @@ button:disabled:hover {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
 }
-/* Code is machine output: it renders in a dark well. */
+/* Code inside assistant text is a light card on the desk: readable at a
+   glance alongside the prose it belongs to. */
 .markdown .md-code-block {
   min-width: 0;
   margin: 0 0 var(--space-3);
-  border: 1px solid var(--well-edge);
+  border: 1px solid var(--line);
   border-radius: var(--radius-md);
-  background: var(--well);
-  box-shadow: var(--shadow-well);
+  background: var(--card);
+  box-shadow: var(--shadow-card);
   overflow: hidden;
 }
 .markdown .md-code-head {
@@ -832,32 +848,33 @@ button:disabled:hover {
   align-items: center;
   justify-content: space-between;
   padding: var(--space-2) var(--space-3);
-  border-bottom: 1px solid var(--well-edge);
+  border-bottom: 1px solid var(--line);
+  background: var(--sunken);
 }
 .markdown .md-code-lang {
-  color: var(--well-muted);
+  color: var(--ink-faint);
   font-family: var(--font-mono);
   font-size: var(--text-2xs);
   letter-spacing: 0.05em;
 }
 .markdown .md-code-copy {
-  border: 1px solid var(--well-edge);
+  border: 1px solid var(--line-strong);
   border-radius: var(--radius-sm);
   padding: 2px 10px;
-  color: var(--well-fg);
-  background: transparent;
+  color: var(--ink-soft);
+  background: var(--card);
   font-size: var(--text-2xs);
 }
 .markdown .md-code-copy:hover {
-  border-color: var(--well-accent);
-  color: #ffffff;
-  background: var(--well-edge);
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft-bg);
 }
 .markdown .md-code-block pre {
   margin: 0;
   padding: var(--space-3);
   overflow-x: auto;
-  color: var(--well-fg);
+  color: var(--ink);
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   line-height: 1.5;
@@ -995,6 +1012,17 @@ button:disabled:hover {
 .tool-card > header strong svg {
   flex: none;
   color: var(--ink-faint);
+}
+/* The collapsed card's one-line fact: path for file tools, reason for commands. */
+.tool-card-hint {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink-faint);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 /* State pill: a lamp dot plus the label. */
 .tool-status {
