@@ -7,76 +7,76 @@
    on the surface they sit on; wells keep their own on-dark tokens.
    --------------------------------------------------------------------------- */
 :root {
-  /* Lit chrome */
-  --paper: #edeff2;
-  --card: #fafbfc;
-  --sunken: #e4e7ec;
-  --ink: #1b2430;
-  --ink-soft: #4d5966;
-  --ink-faint: #66727f;
-  --line: #d5dbe2;
-  --line-strong: #b7c0ca;
+  /* Warm cream chrome */
+  --paper: #f1ecdf;
+  --card: #faf7ec;
+  --sunken: #e7e0ce;
+  --ink: #26221a;
+  --ink-soft: #4c4636;
+  --ink-faint: #6d6650;
+  --line: #dcd4bd;
+  --line-strong: #c2b897;
 
-  /* Dark wells: machine output only */
-  --well: #161c24;
-  --well-edge: #2a3442;
-  --well-fg: #d8e1ea;
-  --well-muted: #9aa7b4;
-  --well-accent: #8fa6ff;
+  /* Dark wells: machine output only — warm charcoal, high-legibility text */
+  --well: #1f1b14;
+  --well-edge: #3b3527;
+  --well-fg: #ede7d6;
+  --well-muted: #b3aa92;
+  --well-accent: #a8b4f0;
 
   /* Action accent (indigo) */
   --accent: #2e4fd7;
-  --accent-strong: #2440b8;
-  --accent-soft-bg: #e4e9fa;
+  --accent-strong: #243fb0;
+  --accent-soft-bg: #e6e4f2;
   --accent-on: #ffffff;
 
-  /* State palette (light-tuned; fg on its bg >= 4.5:1) */
-  --amber-fg: #92580a;
-  --amber-strong: #7a4906;
-  --amber-bg: #fdf3e0;
-  --amber-border: #e3c98f;
-  --amber-line: #d99b2b;
+  /* State palette (warm pastels; fg on its bg >= 4.5:1) */
+  --amber-fg: #8a5a0b;
+  --amber-strong: #6b4607;
+  --amber-bg: #f7ebcf;
+  --amber-border: #e2cb96;
+  --amber-line: #c28e1e;
 
-  --info-fg: #1d5fa8;
-  --info-bg: #e5effa;
-  --info-border: #a9c6e6;
-  --info-line: #4e8ccf;
+  --info-fg: #24578d;
+  --info-bg: #e2eaf4;
+  --info-border: #b0c6e0;
+  --info-line: #527faf;
 
-  --success-fg: #1c7a4d;
-  --success-bg: #e4f4ea;
-  --success-border: #9ed3b6;
-  --success-line: #3e9e6b;
-  --success-solid: #1c7a4d;
+  --success-fg: #216940;
+  --success-bg: #e2efdc;
+  --success-border: #a5cea8;
+  --success-line: #4a8f60;
+  --success-solid: #1f6b43;
 
-  --danger-fg: #b33737;
-  --danger-strong: #8f2626;
-  --danger-bg: #fbe9e7;
-  --danger-border: #ecb3ad;
-  --danger-line: #ce5e57;
-  --danger-solid: #a93232;
+  --danger-fg: #a3382f;
+  --danger-strong: #83271f;
+  --danger-bg: #f7e5de;
+  --danger-border: #e4b9af;
+  --danger-line: #bf5c4c;
+  --danger-solid: #9c2f27;
 
-  --refusal-fg: #9a4a1f;
-  --refusal-bg: #fbede3;
-  --refusal-border: #e8c3a8;
-  --refusal-line: #ce7a45;
+  --refusal-fg: #8c4a20;
+  --refusal-bg: #f5e7d6;
+  --refusal-border: #dfc29e;
+  --refusal-line: #b8763a;
 
-  --neutral-fg: #5b6878;
-  --neutral-bg: #eceff3;
-  --neutral-border: #c3ccd5;
-  --neutral-line: #9aa6b2;
+  --neutral-fg: #5b5342;
+  --neutral-bg: #e9e4d4;
+  --neutral-border: #c9c1a9;
+  --neutral-line: #968e74;
 
-  --muted-fg: #66727f;
-  --muted-line: #9aa6b2;
+  --muted-fg: #6d6650;
+  --muted-line: #968e74;
 
-  --indeterminate-fg: #8a4f8f;
-  --indeterminate-bg: #f3e8f4;
-  --indeterminate-border: #d9bedd;
-  --indeterminate-line: #b57eba;
+  --indeterminate-fg: #7c4a82;
+  --indeterminate-bg: #f0e6f1;
+  --indeterminate-border: #d6bedb;
+  --indeterminate-line: #a87aaf;
 
-  --compact-fg: #5b3ea8;
-  --compact-bg: #ece6f8;
-  --compact-border: #c4b3e8;
-  --compact-line: #8a6fd0;
+  --compact-fg: #55389a;
+  --compact-bg: #eae4f4;
+  --compact-border: #c6b7e2;
+  --compact-line: #8368c7;
 
   /* Typography: sans for the desk, mono as the instrument voice */
   --font-sans:
@@ -110,10 +110,10 @@
   --radius-pill: 999px;
   /* Light chrome wants elevation you feel more than see */
   --shadow-card:
-    0 1px 2px rgb(27 36 48 / 6%), 0 1px 3px rgb(27 36 48 / 4%);
+    0 1px 2px rgb(38 34 26 / 7%), 0 1px 3px rgb(38 34 26 / 5%);
   --shadow-dock:
-    0 -12px 32px rgb(27 36 48 / 12%), 0 -2px 8px rgb(27 36 48 / 8%);
-  --shadow-menu: 0 8px 24px rgb(27 36 48 / 16%);
+    0 -12px 32px rgb(38 34 26 / 14%), 0 -2px 8px rgb(38 34 26 / 9%);
+  --shadow-menu: 0 8px 24px rgb(38 34 26 / 18%);
 
   color: var(--ink);
   background: var(--paper);
@@ -221,20 +221,36 @@ button:disabled:hover {
   grid-template-columns:
     var(--sidebar-track, minmax(220px, 280px)) minmax(0, 1fr)
     var(--details-track, minmax(250px, 320px));
-  min-height: 100vh;
+  height: 100vh;
+  /* The page itself never scrolls: each column owns its internal scrolling. */
+  overflow: hidden;
 }
 .session-sidebar,
 .run-details-panel {
   position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
   min-width: 0;
+  min-height: 0;
   padding: var(--space-5) var(--space-4);
   background: var(--card);
   border-color: var(--line);
+  overflow: hidden;
 }
-.session-sidebar {
+/* The scrollable part of a rail; the toggle and resize handle are its fixed
+   siblings, so they stay on screen no matter how far the content scrolls. */
+.rail-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+.session-sidebar .rail-scroll {
   display: grid;
   align-content: start;
   gap: var(--space-6);
+}
+.session-sidebar {
   border-right: 1px solid var(--line);
 }
 .run-details-panel {
@@ -244,12 +260,12 @@ button:disabled:hover {
    content padding and centers the affordance. */
 .session-sidebar[data-collapsed="true"],
 .run-details-panel[data-collapsed="true"] {
-  align-content: start;
-  justify-items: center;
+  align-items: center;
   padding: var(--space-4) 0;
 }
 .rail-toggle {
-  justify-self: end;
+  align-self: flex-end;
+  flex: none;
   width: 34px;
   height: 26px;
   padding: 0;
@@ -266,7 +282,7 @@ button:disabled:hover {
 }
 .session-sidebar[data-collapsed="true"] .rail-toggle,
 .run-details-panel[data-collapsed="true"] .rail-toggle {
-  justify-self: center;
+  align-self: center;
 }
 /* The draggable inner edge of a rail: a slim hit area straddling the border. */
 .rail-resize {
@@ -294,8 +310,13 @@ button:disabled:hover {
 .conversation-panel {
   position: relative;
   min-width: 0;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
   padding: var(--space-5) var(--space-6);
+}
+/* The evaluations view has no fixed composer, so its panel scrolls internally. */
+.evaluations-shell .conversation-panel {
+  overflow-y: auto;
 }
 
 /* Section labels: mono eyebrows — the instrument voice marking each region. */
@@ -310,7 +331,7 @@ button:disabled:hover {
   letter-spacing: var(--tracking-label);
   text-transform: uppercase;
 }
-.session-sidebar > section {
+.session-sidebar .rail-scroll > section {
   min-width: 0;
   padding-top: var(--space-5);
   border-top: 1px solid var(--line);
@@ -589,7 +610,7 @@ button:disabled:hover {
   color: rgb(255 255 255 / 65%);
 }
 .message-user p {
-  color: #f4f7fa;
+  color: #f6f1e4;
 }
 /* The assistant speaks as an open transcript block on the paper. */
 .message-assistant {
@@ -789,7 +810,7 @@ button:disabled:hover {
   padding: var(--space-3);
   border: 1px solid var(--well-edge);
   border-radius: var(--radius-sm);
-  color: var(--well-muted);
+  color: var(--well-fg);
   background: var(--well);
   font-family: var(--font-mono);
   font-size: var(--text-xs);
@@ -2161,13 +2182,24 @@ p.run-details-scope {
 @media (max-width: 560px) {
   .app-shell {
     grid-template-columns: minmax(0, 1fr);
+    /* Stacked single column: back to normal page flow and page scrolling. */
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
   }
   .session-sidebar {
+    height: auto;
+    overflow: visible;
     border-right: 0;
     border-bottom: 1px solid var(--line);
   }
+  .session-sidebar .rail-scroll {
+    overflow: visible;
+  }
   .conversation-panel {
+    height: auto;
     min-height: 78vh;
+    overflow: visible;
     padding: var(--space-4);
   }
   .tool-command-details div {

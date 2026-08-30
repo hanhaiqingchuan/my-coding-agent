@@ -110,7 +110,7 @@ export function AppShell({
         {sidebarCollapsed ? null : (
           <>
             <RailResizeHandle label="调整会话栏宽度" onDelta={resizeSidebar} />
-            {sidebar}
+            <div className="rail-scroll">{sidebar}</div>
           </>
         )}
       </nav>
@@ -143,7 +143,7 @@ export function AppShell({
         {detailsCollapsed ? null : (
           <>
             <RailResizeHandle label="调整运行详情栏宽度" onDelta={resizeDetails} />
-            {runDetails}
+            <div className="rail-scroll">{runDetails}</div>
           </>
         )}
       </aside>
