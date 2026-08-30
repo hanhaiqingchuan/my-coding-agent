@@ -13,7 +13,12 @@ const mocks = vi.hoisted(() => ({
   draftText: null as string | null,
   compaction: null as
     | { phase: "running" }
-    | { phase: "finished"; beforeTokens: number; afterTokens: number }
+    | {
+        phase: "finished";
+        beforeTokens: number;
+        afterTokens: number;
+        errorCode?: string;
+      }
     | null,
   /** `true` keeps the fixture's active run; `false` renders an idle session. */
   hasActiveRun: true,
@@ -384,5 +389,55 @@ test("the compaction chip renders the finished compaction next to the gauge", as
     expect(
       screen.getByText("上下文压缩完成：61,440 → 33,200 tokens"),
     ).toBeTruthy(),
+  );
+});
+
+test("a finished compaction retargets the gauge to the compacted estimate", async () => {
+  const activeRun = snapshot.active_run;
+  if (activeRun !== null) {
+    activeRun.context = {
+      estimated_tokens: 61_440,
+      available_tokens: 60_000,
+      window_tokens: 64_000,
+    };
+  }
+  mocks.compaction = {
+    phase: "finished",
+    beforeTokens: 61_440,
+    afterTokens: 33_200,
+  };
+  render(<App />);
+
+  await waitFor(() =>
+    expect(
+      screen.getByRole("status", { name: "上下文占用" }).textContent,
+    ).toContain("55%"),
+  );
+  expect(
+    screen.getByRole("status", { name: "上下文占用" }).textContent,
+  ).toContain("33,200");
+});
+
+test("a failed compaction leaves the gauge on the run's recorded estimate", async () => {
+  const activeRun = snapshot.active_run;
+  if (activeRun !== null) {
+    activeRun.context = {
+      estimated_tokens: 12_000,
+      available_tokens: 60_000,
+      window_tokens: 64_000,
+    };
+  }
+  mocks.compaction = {
+    phase: "finished",
+    beforeTokens: 61_440,
+    afterTokens: 0,
+    errorCode: "SUMMARY_TRUNCATED",
+  };
+  render(<App />);
+
+  await waitFor(() =>
+    expect(
+      screen.getByRole("status", { name: "上下文占用" }).textContent,
+    ).toContain("20%"),
   );
 });

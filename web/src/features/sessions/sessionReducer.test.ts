@@ -473,6 +473,35 @@ test("a malformed compaction payload degrades to the phase statement", () => {
   });
 });
 
+test("starting a new run dismisses the finished compaction chip", () => {
+  const compacted = reduceServerMessage(
+    { ...createInitialSessionViewState(), lastSeq: 9 },
+    {
+      type: "durable",
+      event: {
+        ...eventWithSeq(10),
+        type: "compaction.finished",
+        payload: {
+          before_estimated_tokens: 61_440,
+          after_estimated_tokens: 33_200,
+        },
+      },
+    },
+  );
+  expect(compacted.compaction?.phase).toBe("finished");
+
+  const started = reduceServerMessage(compacted, {
+    type: "durable",
+    event: {
+      ...eventWithSeq(11),
+      type: "run.started",
+      payload: { state: "starting" },
+    },
+  });
+  expect(started.compaction).toBeNull();
+  expect(started.lastSeq).toBe(11);
+});
+
 test("selecting another session resets the compaction chip", () => {
   const compacting = {
     ...createInitialSessionViewState(),

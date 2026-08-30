@@ -143,7 +143,20 @@ test("/compact force-compacts the transcript and surfaces the compaction chip", 
   await page.getByRole("textbox", { name: "消息" }).fill("/compact");
   await page.getByRole("button", { name: "发送" }).click();
 
+  const chip = page.getByText(/上下文压缩完成：[\d,]+ → [\d,]+ tokens/);
+  await expect(chip).toBeVisible({ timeout: 15_000 });
+
+  // The gauge must follow the compaction's own after-figure, not the stale
+  // pre-compaction estimate recorded on the last run.
+  const afterTokens =
+    /→ ([\d,]+) tokens/.exec((await chip.textContent()) ?? "")?.[1] ?? "";
+  expect(afterTokens).not.toBe("");
   await expect(
-    page.getByText(/上下文压缩完成：[\d,]+ → [\d,]+ tokens/),
-  ).toBeVisible({ timeout: 15_000 });
+    page.getByRole("status", { name: "上下文占用" }),
+  ).toContainText(afterTokens);
+
+  // Starting the next turn dismisses the chip as soon as the run starts.
+  await page.getByRole("textbox", { name: "消息" }).fill("turn 4");
+  await page.getByRole("button", { name: "发送" }).click();
+  await expect(chip).toHaveCount(0, { timeout: 15_000 });
 });

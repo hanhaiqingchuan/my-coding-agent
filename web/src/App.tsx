@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { ApiClient } from "./api/client";
-import type { ApprovalDecision, SessionDto } from "./api/types";
+import type {
+  ApprovalDecision,
+  RunContextDto,
+  SessionDto,
+} from "./api/types";
 import { connectionLabel } from "./api/labels";
 import { ApprovalDock } from "./components/ApprovalDock";
 import { AppShell } from "./components/AppShell";
@@ -17,6 +21,7 @@ import { ViewSwitcher, type AppView } from "./components/ViewSwitcher";
 import { EvaluationsPanel } from "./features/evaluation/EvaluationsPanel";
 import { EvaluationClient } from "./features/evaluation/evaluationApi";
 import { useSession } from "./features/sessions/useSession";
+import type { CompactionStatus } from "./features/sessions/sessionReducer";
 
 type AppRoute = { view: AppView; campaign: string | null };
 
@@ -52,6 +57,28 @@ function friendlyCommandError(error: { code: string; message: string }): string 
     return "当前任务还在运行中，请先停止或等待完成。";
   }
   return error.message;
+}
+
+/**
+ * The gauge's evidence is the focus run's recorded estimate, which a successful
+ * compaction has just shrunk; show the compactor's own after-figure until the
+ * next run's estimate takes over. Failed or figure-less compactions change
+ * nothing.
+ */
+function gaugeContext(
+  runContext: RunContextDto | null,
+  compaction: CompactionStatus | null,
+): RunContextDto | null {
+  if (
+    runContext === null ||
+    compaction === null ||
+    compaction.phase !== "finished" ||
+    compaction.errorCode !== undefined ||
+    compaction.afterTokens <= 0
+  ) {
+    return runContext;
+  }
+  return { ...runContext, estimated_tokens: compaction.afterTokens };
 }
 
 export default function App() {
@@ -314,13 +341,17 @@ export default function App() {
                 onAcknowledgeRecovery={acknowledgeRecovery}
               />
               {/* The focus run is the active one, else the last finished one: the
-                gauge keeps reporting the context the model actually saw. */}
+                gauge keeps reporting the context the model actually saw. A
+                maintenance compaction has no run to record the new estimate on,
+                so a successful chip overrides the stale figure until the next
+                run starts (which clears the chip and refreshes the snapshot). */}
               <div className="composer-status">
                 <ContextGauge
-                  context={
+                  context={gaugeContext(
                     (snapshot?.active_run ?? snapshot?.last_finished_run)
-                      ?.context ?? null
-                  }
+                      ?.context ?? null,
+                    state.compaction,
+                  )}
                 />
                 <CompactionChip status={state.compaction} />
                 {state.commandError != null ? (

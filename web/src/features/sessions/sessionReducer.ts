@@ -107,6 +107,10 @@ export function reduceServerMessage(
           }
         : { ...state, lastSeq: message.event.seq };
     const compaction = compactionFromEvent(message.event);
+    // A finished chip only announces the last compaction; a new run supersedes it.
+    if (message.event.type === "run.started") {
+      return { ...base, compaction: null };
+    }
     return compaction === null ? base : { ...base, compaction };
   }
 
