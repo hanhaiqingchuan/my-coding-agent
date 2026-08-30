@@ -45,10 +45,11 @@ export function ToolCard({ tool, outputDraft }: ToolCardProps) {
     ? writeArgumentRows(tool.input)
     : [];
   // The collapsed header still identifies the target: the path for file tools,
-  // the model's stated reason (else the command itself) for run_command.
+  // the skill's name for the skill tool, and the model's stated reason (else
+  // the command itself) for run_command.
   const hint = isCommand
     ? (stringValue(tool.input.reason) ?? stringValue(tool.input.command))
-    : stringValue(tool.input.path);
+    : (stringValue(tool.input.path) ?? stringValue(tool.input.name));
 
   return (
     <motion.article
