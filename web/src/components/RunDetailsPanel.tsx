@@ -1,6 +1,13 @@
+import { Fragment } from "react";
+
 import { describeStopOutcome } from "../api/errors";
 import { runStateLabel } from "../api/labels";
-import type { JsonValue, RunTotalsDto, SessionSnapshotDto } from "../api/types";
+import type {
+  ContextLoadDto,
+  JsonValue,
+  RunTotalsDto,
+  SessionSnapshotDto,
+} from "../api/types";
 
 type RunDetailsPanelProps = { snapshot: SessionSnapshotDto | null };
 
@@ -13,6 +20,7 @@ export function RunDetailsPanel({ snapshot }: RunDetailsPanelProps) {
    */
   const finishedRun = snapshot?.last_finished_run ?? null;
   const run = activeRun ?? finishedRun;
+  const contextLoad = snapshot?.context_load ?? null;
   if (run === null) {
     return (
       <section>
@@ -51,7 +59,7 @@ export function RunDetailsPanel({ snapshot }: RunDetailsPanelProps) {
         <div>
           <dt>累计 Token</dt>
           <dd>
-            <span>{tokenSummary(run.totals)}</span>
+            <TokenMetrics totals={run.totals} />
             <span className="run-details-note">
               跨轮次累计的已知用量，非当前上下文占用。
             </span>
@@ -74,6 +82,7 @@ export function RunDetailsPanel({ snapshot }: RunDetailsPanelProps) {
           />
         ) : null}
       </dl>
+      {contextLoad !== null ? <ContextLoadList load={contextLoad} /> : null}
       {stopOutcome !== null ? (
         <div className="run-stop-detail">
           <p>{stopOutcome.description}</p>
@@ -96,13 +105,58 @@ function DetailRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function tokenSummary(totals: RunTotalsDto): string {
-  return [
-    `输入 ${totals.input_tokens}`,
-    `输出 ${totals.output_tokens}`,
-    `缓存写入 ${totals.cache_creation_input_tokens}`,
-    `缓存读取 ${totals.cache_read_input_tokens}`,
-  ].join(" · ");
+/**
+ * The token counters of the narrow rail: each metric is one unbreakable unit so the
+ * line wraps between `输入` / `输出` / `缓存写入` / `缓存读取` instead of tearing a
+ * label or its number apart (UX wave item 7).
+ */
+function TokenMetrics({ totals }: { totals: RunTotalsDto }) {
+  const metrics: Array<[string, number]> = [
+    ["输入", totals.input_tokens],
+    ["输出", totals.output_tokens],
+    ["缓存写入", totals.cache_creation_input_tokens],
+    ["缓存读取", totals.cache_read_input_tokens],
+  ];
+  return (
+    <span className="run-token-metrics">
+      {metrics.map(([label, value], index) => (
+        <Fragment key={label}>
+          {index > 0 ? " · " : null}
+          <span className="run-token-metric">
+            {label} {value.toLocaleString()}
+          </span>
+        </Fragment>
+      ))}
+    </span>
+  );
+}
+
+/**
+ * What the focus run loaded into its system context (spec 13.5): the AGENTS.md the
+ * run-start scan read, and only the skills the model actually pulled through the
+ * skill tool — never the discovered index. The server reports `null` before the
+ * first run, and the section simply stays hidden then.
+ */
+function ContextLoadList({ load }: { load: ContextLoadDto }) {
+  return (
+    <section className="run-context-load" aria-label="已加载上下文">
+      <h3>已加载上下文</h3>
+      <p className="run-context-agents">
+        {load.agents_md_path !== null
+          ? `AGENTS.md：${load.agents_md_path}`
+          : "本工作区没有 AGENTS.md"}
+      </p>
+      {load.skills.length > 0 ? (
+        <ul className="run-context-skills">
+          {load.skills.map((skill) => (
+            <li key={skill}>{skill}</li>
+          ))}
+        </ul>
+      ) : (
+        <p>本次运行未读取技能。</p>
+      )}
+    </section>
+  );
 }
 
 /**

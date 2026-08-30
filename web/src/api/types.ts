@@ -76,6 +76,8 @@ export type SessionDto = {
   title: string | null;
   workspace_realpath: string;
   requires_recovery_ack: boolean;
+  /** Per-session approval mode (spec 13.4); server-persisted, default interactive. */
+  auto_approve: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -180,6 +182,16 @@ export type InterruptedBannerDto = {
   requires_recovery_ack: boolean;
 };
 
+/**
+ * What the focus run (active, else last finished) loaded into its system context
+ * (spec 13.5). `skills` lists only skills the model pulled through the skill tool,
+ * never the discovered index.
+ */
+export type ContextLoadDto = {
+  agents_md_path: string | null;
+  skills: string[];
+};
+
 export type SessionSnapshotDto = {
   session: SessionDto;
   active_run: RunDto | null;
@@ -188,6 +200,7 @@ export type SessionSnapshotDto = {
   tools: ToolExecutionDto[];
   pending_approval: PendingApprovalDto | null;
   interrupted_banner: InterruptedBannerDto | null;
+  context_load: ContextLoadDto | null;
   snapshot_seq: number;
 };
 
@@ -264,6 +277,7 @@ export const REQUIRED_DTO_FIELDS = {
     "tools",
     "pending_approval",
     "interrupted_banner",
+    "context_load",
     "snapshot_seq",
   ],
   DurableEvent: [
@@ -350,6 +364,13 @@ export type ClientCommand =
       client_command_id: string;
       session_id: string;
       payload: Record<string, never>;
+    }
+  | {
+      /** Persist the per-session approval mode (spec 13.4); audited durably. */
+      type: "session.set_approval_mode";
+      client_command_id: string;
+      session_id: string;
+      payload: { auto_approve: boolean };
     };
 
 export type ServerMessage =

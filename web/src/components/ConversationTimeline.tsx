@@ -1,4 +1,4 @@
-import { Fragment } from "react";
+import { Fragment, useEffect, useRef } from "react";
 
 import { describeStopOutcome, failureBannerFor } from "../api/errors";
 import type {
@@ -58,6 +58,25 @@ export function ConversationTimeline({
   // limit and a normal completion are facts, not errors.
   const runFailure = failureBannerFor(lastFinishedRun);
 
+  // Auto-scroll follows the newest content only while the reader stays at the
+  // bottom; once they scroll up to reread, their position is respected until
+  // they return to the bottom.
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const pinnedToBottom = useRef(true);
+  useEffect(() => {
+    const element = scrollRef.current;
+    if (element !== null && pinnedToBottom.current) {
+      element.scrollTop = element.scrollHeight;
+    }
+  }, [messages, tools, assistantDrafts, thinkingDrafts, toolOutputDrafts]);
+  const handleScroll = () => {
+    const element = scrollRef.current;
+    if (element === null) return;
+    const distanceFromBottom =
+      element.scrollHeight - element.scrollTop - element.clientHeight;
+    pinnedToBottom.current = distanceFromBottom < 24;
+  };
+
   return (
     <section
       className="conversation-timeline"
@@ -70,7 +89,7 @@ export function ConversationTimeline({
         />
       ) : null}
       {runFailure !== null ? <RunFailureBanner failure={runFailure} /> : null}
-      <div className="timeline-scroll">
+      <div className="timeline-scroll" ref={scrollRef} onScroll={handleScroll}>
         {messages.map((message) => (
           <Fragment key={message.id}>
             <MessageBubble message={message} />

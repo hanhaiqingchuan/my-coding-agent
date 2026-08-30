@@ -43,6 +43,7 @@ function snapshot(
       title: "Demo",
       workspace_realpath: "/tmp/demo",
       requires_recovery_ack: false,
+      auto_approve: false,
       created_at: "2026-08-28T00:00:00Z",
       updated_at: "2026-08-28T00:00:00Z",
     },
@@ -90,6 +91,7 @@ function snapshot(
     tools: [],
     pending_approval: null,
     interrupted_banner: null,
+    context_load: null,
     snapshot_seq: sequence,
   };
 }

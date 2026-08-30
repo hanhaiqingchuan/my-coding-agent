@@ -67,7 +67,7 @@ const pendingRunCommand: PendingApprovalDto = {
   },
 };
 
-test("shows the frozen run_command timeout in seconds and always warns that the command is not sandboxed", () => {
+test("shows the frozen run_command facts without the dropped non-sandbox warning", () => {
   render(
     <ApprovalDock pendingApproval={pendingRunCommand} onResolve={vi.fn()} />,
   );
@@ -76,7 +76,7 @@ test("shows the frozen run_command timeout in seconds and always warns that the 
   expect(dock.textContent).toContain("pytest -q");
   expect(dock.textContent).toContain("Run the offline suite");
   expect(screen.getByText("10s")).not.toBeNull();
-  expect(dock.textContent).toContain("本命令不在沙箱中运行");
+  expect(dock.textContent).not.toContain("沙箱");
 });
 
 test("prefers the effective cwd and timeout the backend froze for a bare command call", () => {
@@ -107,7 +107,7 @@ test("prefers the effective cwd and timeout the backend froze for a bare command
   expect(dock.textContent).toContain("pytest -q");
   expect(screen.getByText("/workspace/services")).not.toBeNull();
   expect(screen.getByText("120s")).not.toBeNull();
-  expect(dock.textContent).toContain("本命令不在沙箱中运行");
+  expect(dock.textContent).not.toContain("沙箱");
 });
 
 test("marks the timeout as absent instead of inventing the schema default", () => {
@@ -134,7 +134,7 @@ test("marks the timeout as absent instead of inventing the schema default", () =
   const dock = screen.getByRole("region", { name: "待审批" });
   expect(dock.textContent).not.toContain("120");
   expect(screen.getByText("—")).not.toBeNull();
-  expect(dock.textContent).toContain("本命令不在沙箱中运行");
+  expect(dock.textContent).not.toContain("沙箱");
 });
 
 test("docks the current approval above the composer and resolves by call id and decision only", async () => {
@@ -154,6 +154,8 @@ test("docks the current approval above the composer and resolves by call id and 
       <Composer
         activeRun={null}
         draft=""
+        autoApprove={false}
+        onApprovalModeChange={vi.fn()}
         onDraftChange={vi.fn()}
         onSend={vi.fn()}
         onStop={vi.fn()}
@@ -170,7 +172,7 @@ test("docks the current approval above the composer and resolves by call id and 
   expect(dock.textContent).toContain("/workspace");
   expect(dock.textContent).toContain("Inspect changes");
   expect(dock.textContent).toContain("120s");
-  expect(dock.textContent).toContain("本命令不在沙箱中运行");
+  expect(dock.textContent).not.toContain("沙箱");
 
   await user.click(screen.getByRole("button", { name: "批准" }));
   expect(onResolve).toHaveBeenCalledTimes(1);

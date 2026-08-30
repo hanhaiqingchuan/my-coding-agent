@@ -7,7 +7,7 @@ import { ToolCard } from "./ToolCard";
 
 afterEach(cleanup);
 
-test("reveals complete command context and its non-sandbox warning in collapsed tool details", async () => {
+test("reveals complete command context in collapsed tool details without the dropped warning", async () => {
   const user = userEvent.setup();
   const tool: ToolExecutionDto = {
     tool_call_id: "call-1",
@@ -38,10 +38,10 @@ test("reveals complete command context and its non-sandbox warning in collapsed 
   expect(card.textContent).toContain("/workspace");
   expect(card.textContent).toContain("Inspect changes");
   expect(card.textContent).toContain("120s");
-  expect(card.textContent).toContain("本命令不在沙箱中运行");
+  expect(card.textContent).not.toContain("沙箱");
 });
 
-test("reveals the real run_command timeout and its unconditional non-sandbox warning", async () => {
+test("reveals the real run_command timeout the backend froze", async () => {
   const user = userEvent.setup();
   const tool: ToolExecutionDto = {
     tool_call_id: "call-3",
@@ -70,7 +70,7 @@ test("reveals the real run_command timeout and its unconditional non-sandbox war
   const card = screen.getByRole("article", { name: "run_command 成功" });
   expect(card.textContent).toContain("pytest -q");
   expect(card.textContent).toContain("30s");
-  expect(card.textContent).toContain("本命令不在沙箱中运行");
+  expect(card.textContent).not.toContain("沙箱");
 });
 
 function writeTool(input: ToolExecutionDto["input"]): ToolExecutionDto {

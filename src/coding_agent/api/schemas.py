@@ -11,6 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from coding_agent.core.models import (
     ApprovalDecision,
     ApprovalStatus,
+    ContextLoad,
     DurableEvent,
     ErrorKind,
     Message,
@@ -71,6 +72,8 @@ class SessionDto(StrictDto):
     title: str | None
     workspace_realpath: str
     requires_recovery_ack: bool
+    auto_approve: bool
+    """Per-session approval mode (spec 13.4); default interactive, server-persisted."""
     created_at: datetime
     updated_at: datetime
 
@@ -81,6 +84,7 @@ class SessionDto(StrictDto):
             title=session.title,
             workspace_realpath=session.workspace_realpath,
             requires_recovery_ack=session.requires_recovery_ack,
+            auto_approve=session.auto_approve,
             created_at=session.created_at,
             updated_at=session.updated_at,
         )
@@ -338,6 +342,22 @@ class InterruptedBannerDto(StrictDto):
     requires_recovery_ack: bool
 
 
+class ContextLoadDto(StrictDto):
+    """Read-only projection of what the focus run loaded into its system context.
+
+    ``agents_md_path`` is the workspace-relative AGENTS.md the run-start scan read
+    (``None`` when the workspace has none); ``skills`` lists only skills the model
+    actually pulled through the ``skill`` tool in that run (spec 13.5), never discovery.
+    """
+
+    agents_md_path: str | None
+    skills: list[str]
+
+    @classmethod
+    def from_domain(cls, load: ContextLoad) -> ContextLoadDto:
+        return cls(agents_md_path=load.agents_md_path, skills=list(load.skills_read))
+
+
 class SessionSnapshotDto(StrictDto):
     session: SessionDto
     active_run: RunDto | None
@@ -346,6 +366,8 @@ class SessionSnapshotDto(StrictDto):
     tools: list[ToolExecutionDto]
     pending_approval: PendingApprovalDto | None
     interrupted_banner: InterruptedBannerDto | None
+    context_load: ContextLoadDto | None
+    """The focus run's context-load projection; ``None`` when the session has no run."""
     snapshot_seq: int
 
     @classmethod
@@ -374,6 +396,11 @@ class SessionSnapshotDto(StrictDto):
                     requires_recovery_ack=snapshot.interrupted_banner.requires_recovery_ack,
                 )
                 if snapshot.interrupted_banner is not None
+                else None
+            ),
+            context_load=(
+                ContextLoadDto.from_domain(snapshot.context_load)
+                if snapshot.context_load is not None
                 else None
             ),
             snapshot_seq=snapshot.snapshot_seq,
@@ -449,13 +476,28 @@ class SessionCompactCommand(StrictDto):
     payload: EmptyPayload
 
 
+class SessionSetApprovalModePayload(StrictDto):
+    # Strict so a JSON string like "yes" can never coerce into a mode change.
+    auto_approve: bool = Field(strict=True)
+
+
+class SessionSetApprovalModeCommand(StrictDto):
+    """Persist the per-session approval mode (spec 13.4); audited via a durable event."""
+
+    type: Literal["session.set_approval_mode"]
+    client_command_id: str = Field(min_length=1)
+    session_id: str = Field(min_length=1)
+    payload: SessionSetApprovalModePayload
+
+
 ClientCommand: TypeAlias = Annotated[
     SessionSubscribeCommand
     | RunStartCommand
     | RunStopCommand
     | ApprovalResolveCommand
     | SessionAckRecoveryCommand
-    | SessionCompactCommand,
+    | SessionCompactCommand
+    | SessionSetApprovalModeCommand,
     Field(discriminator="type"),
 ]
 
@@ -619,6 +661,7 @@ __all__ = [
     "BootstrapDto",
     "ClientCommand",
     "CommandErrorEnvelope",
+    "ContextLoadDto",
     "CreateSessionRequest",
     "DirectoryEntryDto",
     "DirectoryListingDto",
@@ -637,6 +680,8 @@ __all__ = [
     "SessionAckRecoveryCommand",
     "SessionCompactCommand",
     "SessionDto",
+    "SessionSetApprovalModeCommand",
+    "SessionSetApprovalModePayload",
     "SessionSubscribeCommand",
     "SessionSnapshotDto",
     "StrictDto",

@@ -1070,3 +1070,63 @@ def test_switching_sessions_removes_the_previous_subscription(tmp_path: Path) ->
     assert received["type"] == "durable"
     assert received["event"]["session_id"] == second.id
     assert received["event"]["type"] == "second.event"
+
+
+def test_session_set_approval_mode_updates_the_session_and_audits_the_change(
+    tmp_path: Path,
+) -> None:
+    """The toggle (spec 13.4) persists server-side and publishes its durable audit event."""
+    runtime = _runtime(tmp_path)
+    session = runtime.store.create_session(str(tmp_path), "mode")
+    command = {
+        "type": "session.set_approval_mode",
+        "client_command_id": "mode-on",
+        "session_id": session.id,
+        "payload": {"auto_approve": True},
+    }
+
+    with TestClient(runtime.app, base_url=BASE_URL) as client:
+        with _connect(client, _token(client)) as websocket:
+            websocket.send_json(command)
+            unsubscribed = websocket.receive_json()
+            _subscribe(websocket, session.id)
+            websocket.send_json(command)
+            ack, _ = _receive_command_result(websocket, "mode-on")
+
+    assert unsubscribed["type"] == "command_error"
+    assert unsubscribed["code"] == "SESSION_NOT_SUBSCRIBED"
+    assert ack["type"] == "ack"
+    assert ack["command_type"] == "session.set_approval_mode"
+    assert ack["resource_id"] == session.id
+    assert runtime.store.get_session(session.id).auto_approve is True
+    mode_events = [
+        event
+        for event in runtime.store.events_after(session.id, 0)
+        if event.type == "session.approval_mode_changed"
+    ]
+    assert len(mode_events) == 1
+    assert mode_events[0].payload == {"auto_approve": True}
+    snapshot = runtime.store.load_snapshot(session.id)
+    assert snapshot.session.auto_approve is True
+
+
+def test_session_set_approval_mode_rejects_a_malformed_payload(tmp_path: Path) -> None:
+    runtime = _runtime(tmp_path)
+    session = runtime.store.create_session(str(tmp_path), "mode-invalid")
+
+    with TestClient(runtime.app, base_url=BASE_URL) as client:
+        with _connect(client, _token(client)) as websocket:
+            _subscribe(websocket, session.id)
+            websocket.send_json(
+                {
+                    "type": "session.set_approval_mode",
+                    "client_command_id": "mode-bad",
+                    "session_id": session.id,
+                    "payload": {"auto_approve": "yes"},
+                }
+            )
+            invalid = websocket.receive_json()
+
+    assert invalid["type"] == "command_error"
+    assert invalid["code"] == "INVALID_COMMAND"
+    assert runtime.store.get_session(session.id).auto_approve is False

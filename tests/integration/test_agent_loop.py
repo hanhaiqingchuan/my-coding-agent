@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import hashlib
 import inspect
 import json
 import logging
 import sys
+import time
 from collections.abc import AsyncIterator
 from dataclasses import replace
 from datetime import UTC, datetime
@@ -2146,3 +2148,96 @@ async def test_agents_md_survives_compaction_while_history_is_summarized(
         if isinstance(part, TextPart)
     ]
     assert any("older work summarized" in text for text in summary_messages)
+
+
+@pytest.mark.asyncio
+async def test_run_context_loaded_event_publishes_the_agents_md_path_and_skill_index(
+    tmp_path: Path, valid_settings: AppSettings
+) -> None:
+    """The UI's context panel (spec 13.5) needs what the run actually loaded."""
+    loop, store, session_id, run_id, _, _, _ = _make_loop(tmp_path, valid_settings, [_final_turn()])
+    _write_workspace_fixture(tmp_path / "workspace")
+
+    outcome = await loop.run(run_id, session_id, CancellationToken())
+
+    assert outcome == RunOutcome.complete()
+    events = [
+        event for event in store.events_after(session_id, 0) if event.type == "run.context_loaded"
+    ]
+    assert len(events) == 1
+    assert events[0].run_id == run_id
+    assert dict(events[0].payload) == {
+        "agents_md_path": "AGENTS.md",
+        # Frozen payloads keep sequences as tuples; the wire form is still a list.
+        "skills_discovered": ("git-helper",),
+    }
+
+
+@pytest.mark.asyncio
+async def test_run_context_loaded_event_reports_a_workspace_without_instructions(
+    tmp_path: Path, valid_settings: AppSettings
+) -> None:
+    loop, store, session_id, run_id, _, _, _ = _make_loop(tmp_path, valid_settings, [_final_turn()])
+
+    await loop.run(run_id, session_id, CancellationToken())
+
+    events = [
+        event for event in store.events_after(session_id, 0) if event.type == "run.context_loaded"
+    ]
+    assert dict(events[0].payload) == {"agents_md_path": None, "skills_discovered": ()}
+
+
+@pytest.mark.asyncio
+async def test_session_auto_approve_mode_is_honored_and_audited_by_the_loop(
+    tmp_path: Path, valid_settings: AppSettings
+) -> None:
+    """The per-session toggle (spec 13.4) acts like --yes: executed but still audited."""
+    loop, store, session_id, run_id, _, tools, _ = _make_loop(
+        tmp_path,
+        valid_settings,
+        [
+            _tool_turn(ToolCall("call-write", "write_file", {"operation": "write", "path": "a"})),
+            _final_turn(),
+        ],
+        approval=ApprovalGate(),
+    )
+    store.set_approval_mode(session_id, True, "mode-on", "mode-on-hash")
+
+    outcome = await loop.run(run_id, session_id, CancellationToken())
+
+    assert outcome == RunOutcome.complete()
+    assert tools.executed == ["call-write"]
+    event_types = [event.type for event in store.events_after(session_id, 0)]
+    assert event_types.count("approval.requested") == 1
+    assert event_types.count("approval.resolved") == 1
+    resolved = next(
+        event for event in store.events_after(session_id, 0) if event.type == "approval.resolved"
+    )
+    assert resolved.payload["decision"] == "approve"
+
+
+@pytest.mark.asyncio
+async def test_interactive_session_mode_still_waits_for_a_human_decision(
+    tmp_path: Path, valid_settings: AppSettings
+) -> None:
+    """Without the toggle the gate queues the call; the run stays awaiting approval."""
+    loop, store, session_id, run_id, _, tools, _ = _make_loop(
+        tmp_path,
+        valid_settings,
+        [
+            _tool_turn(ToolCall("call-write", "write_file", {"operation": "write", "path": "a"})),
+            _final_turn(),
+        ],
+        approval=ApprovalGate(),
+    )
+
+    run_task = asyncio.create_task(loop.run(run_id, session_id, CancellationToken()))
+    deadline = time.monotonic() + 2
+    while store.get_run(run_id).state is not RunState.AWAITING_APPROVAL:
+        assert time.monotonic() < deadline, "run never reached awaiting_approval"
+        await asyncio.sleep(0.01)
+
+    assert tools.executed == []
+    run_task.cancel()
+    with contextlib.suppress(asyncio.CancelledError):
+        await run_task

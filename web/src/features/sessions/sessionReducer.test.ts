@@ -54,6 +54,7 @@ function snapshot(
       title: "Demo",
       workspace_realpath: "/tmp/demo",
       requires_recovery_ack: false,
+      auto_approve: false,
       created_at: "2026-08-28T00:00:00Z",
       updated_at: "2026-08-28T00:00:00Z",
     },
@@ -63,6 +64,7 @@ function snapshot(
     tools: [],
     pending_approval: null,
     interrupted_banner: null,
+    context_load: null,
     snapshot_seq: snapshotSeq,
   };
 }
@@ -398,6 +400,69 @@ test("a terminal durable event clears transient assistant and tool output drafts
 
   expect(next.assistantDrafts).toEqual({});
   expect(next.toolOutputDrafts).toEqual({});
+});
+
+test("compaction events drive the chip through running and finished", () => {
+  const initial = { ...createInitialSessionViewState(), lastSeq: 9 };
+
+  const started = reduceServerMessage(initial, {
+    type: "durable",
+    event: {
+      ...eventWithSeq(10),
+      type: "compaction.started",
+      payload: { before_estimated_tokens: 61_440, forced: true },
+    },
+  });
+  expect(started.compaction).toEqual({ phase: "running" });
+  expect(started.lastSeq).toBe(10);
+
+  const finished = reduceServerMessage(started, {
+    type: "durable",
+    event: {
+      ...eventWithSeq(11),
+      type: "compaction.finished",
+      payload: {
+        before_estimated_tokens: 61_440,
+        after_estimated_tokens: 33_200,
+        forced: true,
+      },
+    },
+  });
+  expect(finished.compaction).toEqual({
+    phase: "finished",
+    beforeTokens: 61_440,
+    afterTokens: 33_200,
+  });
+  expect(finished.lastSeq).toBe(11);
+});
+
+test("a malformed compaction payload degrades to the phase statement", () => {
+  const next = reduceServerMessage(
+    { ...createInitialSessionViewState(), lastSeq: 0 },
+    {
+      type: "durable",
+      event: {
+        ...eventWithSeq(1),
+        type: "compaction.finished",
+        payload: {},
+      },
+    },
+  );
+  expect(next.compaction).toEqual({
+    phase: "finished",
+    beforeTokens: 0,
+    afterTokens: 0,
+  });
+});
+
+test("selecting another session resets the compaction chip", () => {
+  const compacting = {
+    ...createInitialSessionViewState(),
+    compaction: { phase: "running" as const },
+  };
+
+  const next = sessionViewReducer(compacting, { type: "session.selected" });
+  expect(next.compaction).toBeNull();
 });
 
 test("connection changes retain an active run until a server snapshot says otherwise", () => {

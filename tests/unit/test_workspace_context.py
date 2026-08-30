@@ -296,6 +296,7 @@ def test_scan_workspace_combines_instructions_and_skills(tmp_path: Path) -> None
             ),
         ),
         diagnostics=(),
+        instructions_path="AGENTS.md",
     )
 
 

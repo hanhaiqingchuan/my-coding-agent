@@ -90,3 +90,40 @@ async def test_trusted_mode_auto_approves_but_still_exposes_the_policy_result() 
 
     assert decision is ApprovalDecision.APPROVE
     assert gate.pending == ()
+
+
+@pytest.mark.asyncio
+async def test_session_auto_approve_mode_approves_without_entering_the_pending_queue() -> None:
+    """The per-session toggle (spec 13.4) must behave exactly like trusted mode."""
+    gate = ApprovalGate()
+
+    decision = await gate.request(_write_call(), CancellationToken(), session_auto_approve=True)
+
+    assert decision is ApprovalDecision.APPROVE
+    assert gate.pending == ()
+
+
+@pytest.mark.asyncio
+async def test_session_mode_false_never_downgrades_a_trusted_process() -> None:
+    """A session toggle to manual must not silently revoke a --yes process's trust."""
+    gate = ApprovalGate(auto_approve=True)
+
+    decision = await gate.request(_write_call(), CancellationToken(), session_auto_approve=False)
+
+    assert decision is ApprovalDecision.APPROVE
+    assert gate.pending == ()
+
+
+@pytest.mark.asyncio
+async def test_session_mode_false_keeps_the_gate_interactive() -> None:
+    """The default session mode still queues the call for a human decision."""
+    gate = ApprovalGate()
+
+    waiting = asyncio.create_task(
+        gate.request(_write_call(), CancellationToken(), session_auto_approve=False)
+    )
+    requested = await gate.next_request()
+
+    assert gate.pending == (requested,)
+    gate.resolve(requested.call.id, ApprovalDecision.REJECT)
+    assert await waiting is ApprovalDecision.REJECT

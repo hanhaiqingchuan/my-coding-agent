@@ -1,4 +1,8 @@
-import type { ServerMessage, SessionSnapshotDto } from "../../api/types";
+import type {
+  DurableEvent,
+  ServerMessage,
+  SessionSnapshotDto,
+} from "../../api/types";
 
 const TERMINAL_RUN_STATES = new Set([
   "completed",
@@ -19,6 +23,20 @@ export type ConnectionState =
 /** One round's streamed reasoning: `closed` is the backend's auto-collapse signal. */
 export type ThinkingDraft = { text: string; closed: boolean };
 
+/**
+ * Compaction visibility from durable events: `running` while the compactor works,
+ * `finished` once `compaction.finished` reports the before/after estimates. Covers
+ * both run-internal auto-compaction and the `/compact` maintenance command.
+ */
+export type CompactionStatus =
+  | { phase: "running" }
+  | {
+      phase: "finished";
+      beforeTokens: number;
+      afterTokens: number;
+      errorCode?: string;
+    };
+
 export type SessionViewState = {
   snapshot: SessionSnapshotDto | null;
   draftText: string;
@@ -28,6 +46,7 @@ export type SessionViewState = {
   assistantDrafts: Record<string, string>;
   thinkingDrafts: Record<string, ThinkingDraft>;
   toolOutputDrafts: Record<string, string>;
+  compaction: CompactionStatus | null;
 };
 
 export type SessionViewAction =
@@ -48,6 +67,7 @@ export function createInitialSessionViewState(): SessionViewState {
     assistantDrafts: {},
     thinkingDrafts: {},
     toolOutputDrafts: {},
+    compaction: null,
   };
 }
 
@@ -71,19 +91,19 @@ export function reduceServerMessage(
       return state;
     }
     const eventState = message.event.payload.state;
-    if (
+    const base =
       (typeof eventState === "string" && TERMINAL_RUN_STATES.has(eventState)) ||
       DRAFT_COMMIT_EVENTS.has(message.event.type)
-    ) {
-      return {
-        ...state,
-        lastSeq: message.event.seq,
-        assistantDrafts: {},
-        thinkingDrafts: {},
-        toolOutputDrafts: {},
-      };
-    }
-    return { ...state, lastSeq: message.event.seq };
+        ? {
+            ...state,
+            lastSeq: message.event.seq,
+            assistantDrafts: {},
+            thinkingDrafts: {},
+            toolOutputDrafts: {},
+          }
+        : { ...state, lastSeq: message.event.seq };
+    const compaction = compactionFromEvent(message.event);
+    return compaction === null ? base : { ...base, compaction };
   }
 
   if (message.type === "assistant.delta") {
@@ -170,4 +190,30 @@ export function sessionViewReducer(
     case "session.selected":
       return createInitialSessionViewState();
   }
+}
+
+/**
+ * Translate one durable event into compaction visibility, or `null` when the event
+ * says nothing about compaction. The estimates come straight from the backend's
+ * payload; a malformed number never fabricates a figure and only degrades the chip
+ * to the running/finished phase statement.
+ */
+function compactionFromEvent(event: DurableEvent): CompactionStatus | null {
+  if (event.type === "compaction.started") {
+    return { phase: "running" };
+  }
+  if (event.type === "compaction.finished") {
+    const before = event.payload.before_estimated_tokens;
+    const after = event.payload.after_estimated_tokens;
+    const error = event.payload.error;
+    const errorCode =
+      typeof error === "object" && error !== null && "code" in error
+        ? String((error as { code: unknown }).code)
+        : undefined;
+    if (typeof before === "number" && typeof after === "number") {
+      return { phase: "finished", beforeTokens: before, afterTokens: after, errorCode };
+    }
+    return { phase: "finished", beforeTokens: 0, afterTokens: 0, errorCode };
+  }
+  return null;
 }

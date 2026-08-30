@@ -27,6 +27,7 @@ from coding_agent.api.schemas import (
     RunStopCommand,
     SessionAckRecoveryCommand,
     SessionCompactCommand,
+    SessionSetApprovalModeCommand,
     SessionSnapshotDto,
     SessionSubscribeCommand,
     SnapshotEnvelope,
@@ -172,6 +173,13 @@ class _SessionConnection:
             elif isinstance(command, SessionCompactCommand):
                 session = await coordinator.compact_session(
                     command.session_id,
+                    command.client_command_id,
+                )
+                resource_id = session.id
+            elif isinstance(command, SessionSetApprovalModeCommand):
+                session = await coordinator.set_approval_mode(
+                    command.session_id,
+                    command.payload.auto_approve,
                     command.client_command_id,
                 )
                 resource_id = session.id

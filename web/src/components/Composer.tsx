@@ -13,19 +13,24 @@ const TERMINAL_RUN_STATES = new Set([
 export type ComposerProps = {
   activeRun: RunDto | null;
   draft: string;
+  /** Persisted per-session approval mode (spec 13.4); the toggle is its only writer. */
+  autoApprove: boolean;
   isRecoveryBlocked?: boolean;
   onDraftChange(value: string): void;
   onSend(content: string): void;
   onStop(runId: string): void;
+  onApprovalModeChange(autoApprove: boolean): void;
 };
 
 export function Composer({
   activeRun,
   draft,
+  autoApprove,
   isRecoveryBlocked = false,
   onDraftChange,
   onSend,
   onStop,
+  onApprovalModeChange,
 }: ComposerProps) {
   const [isFocused, setIsFocused] = useState(false);
   const active =
@@ -71,6 +76,17 @@ export function Composer({
         </p>
       ) : null}
       <div className="composer-actions">
+        <label
+          className={`approval-mode${autoApprove ? " approval-mode-on" : ""}`}
+        >
+          <input
+            type="checkbox"
+            role="switch"
+            checked={autoApprove}
+            onChange={(event) => onApprovalModeChange(event.target.checked)}
+          />
+          自动批准
+        </label>
         {active ? (
           <button
             className="composer-stop"

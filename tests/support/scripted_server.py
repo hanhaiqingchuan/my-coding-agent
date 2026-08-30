@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import json
 import os
 import tempfile
 from collections.abc import Awaitable, Callable
@@ -212,8 +213,9 @@ class BrowserScriptedModel:
             # Round one opens with a thinking block so the browser exercises the
             # real thinking callbacks end to end (loop -> publisher -> WS).
             thinking = (
-                "The scripted run should first prepare a workspace change, "
-                "then verify the written file exists with a follow-up command."
+                "The scripted run should first read the target file, prepare a "
+                "workspace change, then verify the written file exists with a "
+                "follow-up command."
             )
             await _emit_thinking(
                 thinking,
@@ -230,6 +232,15 @@ class BrowserScriptedModel:
                 parts=(
                     ThinkingPart(thinking),
                     TextPart(text),
+                    # The freshness gate requires reading the target before
+                    # writing it: read_file runs unapproved first.
+                    ToolUsePart(
+                        ToolCall(
+                            f"read-{uuid4()}",
+                            "read_file",
+                            {"path": "agent-output.txt", "offset": 1, "limit": 10},
+                        )
+                    ),
                     ToolUsePart(
                         ToolCall(
                             f"write-{uuid4()}",
@@ -246,7 +257,7 @@ class BrowserScriptedModel:
                 usage=Usage(input_tokens=8, output_tokens=8),
             )
 
-        if prompt == "agent-flow" and len(results) == 1:
+        if prompt == "agent-flow" and len(results) == 2:
             text = "The write succeeded; I will verify it."
             await _emit((text,), on_text_delta, cancellation, delay=0.1)
             return AssistantTurn(
@@ -277,6 +288,39 @@ class BrowserScriptedModel:
             return await _streamed_turn(
                 "All scripted steps completed.", on_text_delta, cancellation
             )
+
+        if prompt == "markdown-flow":
+            # One committed assistant message exercising the renderer's block
+            # subset: bold, a list and a fenced code block with a language tag.
+            text = (
+                "Here is the **summary** of the change.\n\n"
+                "- first point\n"
+                "- second point\n\n"
+                "```python\n"
+                "print('hello')\n"
+                "```\n\n"
+                "Done."
+            )
+            return await _streamed_turn(text, on_text_delta, cancellation)
+
+        # The compactor issues its summary request without tools and with the
+        # compaction system prompt; answer it with a valid summary object so
+        # maintenance /compact succeeds end to end.
+        if not request.tools and "context compactor" in request.system:
+            summary = json.dumps(
+                {
+                    "completed_work_and_evidence": ["完成了多轮脚本对话"],
+                    "important_files_and_symbols": [],
+                    "tool_findings": [],
+                    "commands_and_tests": [],
+                    "failed_attempts": [],
+                    "remaining_work": [],
+                    "blockers": [],
+                    "next_steps": [],
+                },
+                ensure_ascii=False,
+            )
+            return await _streamed_turn(summary, on_text_delta, cancellation)
 
         return await _streamed_turn("Scripted request completed.", on_text_delta, cancellation)
 

@@ -77,9 +77,9 @@ test("creates a session, approves write and command, then restores final history
     ),
   ).toBeVisible();
   await expect(writeApproval.getByText("10s")).toBeVisible();
-  await expect(
-    writeApproval.getByText(/本命令不在沙箱中运行/),
-  ).toBeVisible();
+  // The non-sandbox warning line was dropped by the UX wave: the frozen facts
+  // (command, cwd, reason, timeout) stay, and no 警告 row renders.
+  await expect(writeApproval.getByText("警告")).toHaveCount(0);
   await writeApproval.getByRole("button", { name: "批准" }).click();
 
   await expect(page.getByText("All scripted steps completed.")).toBeVisible();

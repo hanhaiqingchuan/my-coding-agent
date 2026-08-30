@@ -68,6 +68,8 @@ class WorkspaceScan:
     instructions: str | None
     skills: tuple[SkillInfo, ...]
     diagnostics: tuple[SkillDiagnostic, ...]
+    instructions_path: str | None = None
+    """Workspace-relative file the instructions came from; ``None`` when none loaded."""
 
 
 def load_workspace_instructions(boundary: WorkspaceBoundary) -> str | None:
@@ -76,6 +78,14 @@ def load_workspace_instructions(boundary: WorkspaceBoundary) -> str | None:
     A missing, unreadable, non-regular or symlink-escaping file is simply absent:
     instructions are optional, so a workspace without them must never fail a run.
     """
+    loaded = _load_workspace_instructions(boundary)
+    return loaded[1] if loaded is not None else None
+
+
+def _load_workspace_instructions(
+    boundary: WorkspaceBoundary,
+) -> tuple[str, str] | None:
+    """Return ``(workspace-relative path, content)`` for the loaded instructions."""
     for filename in AGENTS_MD_FILENAMES:
         if not _directory_lists_name(boundary.root, filename):
             # The lookup is case-sensitive even on case-insensitive filesystems: a
@@ -95,10 +105,12 @@ def load_workspace_instructions(boundary: WorkspaceBoundary) -> str | None:
         except UnicodeDecodeError:
             continue
         if len(raw) <= AGENTS_MD_MAX_BYTES:
-            return text if text.strip() else None
+            if not text.strip():
+                return None
+            return filename, text
         truncated = raw[:AGENTS_MD_MAX_BYTES].decode("utf-8", errors="ignore").rstrip()
         marker = AGENTS_MD_TRUNCATION_MARKER.format(limit=AGENTS_MD_MAX_BYTES, total=len(raw))
-        return f"{truncated}\n\n{marker}"
+        return filename, f"{truncated}\n\n{marker}"
     return None
 
 
@@ -171,9 +183,16 @@ def discover_skills(
 
 def scan_workspace(boundary: WorkspaceBoundary) -> WorkspaceScan:
     """Freeze the instructions and skill index this run will use."""
-    instructions = load_workspace_instructions(boundary)
+    loaded = _load_workspace_instructions(boundary)
+    instructions = loaded[1] if loaded is not None else None
+    instructions_path = loaded[0] if loaded is not None else None
     skills, diagnostics = discover_skills(boundary)
-    return WorkspaceScan(instructions=instructions, skills=skills, diagnostics=diagnostics)
+    return WorkspaceScan(
+        instructions=instructions,
+        skills=skills,
+        diagnostics=diagnostics,
+        instructions_path=instructions_path,
+    )
 
 
 def render_workspace_sections(scan: WorkspaceScan) -> str:

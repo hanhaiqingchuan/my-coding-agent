@@ -105,13 +105,6 @@ export function CommandDetails({
         <dt>超时</dt>
         <dd>{timeoutLabel(timeoutSeconds)}</dd>
       </div>
-      {/* run_command is never a security sandbox: an approved command runs with
-          the current operating system user's privileges, so the warning belongs
-          to every command card and no backend flag may switch it off. */}
-      <div className="tool-risk">
-        <dt>警告</dt>
-        <dd>本命令不在沙箱中运行，将拥有你当前系统用户的全部权限。</dd>
-      </div>
     </dl>
   );
 }

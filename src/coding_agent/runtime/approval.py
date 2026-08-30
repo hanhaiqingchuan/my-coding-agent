@@ -36,8 +36,16 @@ class ApprovalGate:
         self,
         prepared: PreparedToolCall,
         cancellation: CancellationToken,
+        *,
+        session_auto_approve: bool = False,
     ) -> ApprovalDecision:
-        if not prepared.requires_approval or self.auto_approve:
+        """Decide one prepared call; the session mode can only widen auto-approval.
+
+        ``session_auto_approve`` is the persisted per-session flag (spec 13.4) read by
+        the loop at request time; a process-level ``--yes`` stays stronger than it, so
+        ``False`` here never downgrades a trusted process.
+        """
+        if not prepared.requires_approval or self.auto_approve or session_auto_approve:
             cancellation.raise_if_cancelled()
             return ApprovalDecision.APPROVE
 

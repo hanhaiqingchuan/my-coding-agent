@@ -353,6 +353,30 @@ class Session:
     requires_recovery_ack: bool
     created_at: datetime
     updated_at: datetime
+    auto_approve: bool = False
+    """Per-session approval mode (spec 13.4): ``True`` auto-approves writes/commands.
+
+    The persisted flag survives reloads and restarts; a process-level ``--yes`` flag
+    stays stronger than it, so the session flag can only widen auto-approval.
+    """
+
+
+@dataclass(frozen=True, slots=True)
+class ContextLoad:
+    """What the focus run actually loaded into its system context (spec 13.5).
+
+    ``agents_md_path`` is the workspace-relative file the run-start scan read (``None``
+    when the workspace has none); ``skills_read`` lists only skills the model pulled
+    through the ``skill`` tool in that run, never the discovered index.
+    """
+
+    agents_md_path: str | None
+    skills_read: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        if self.agents_md_path is not None and not self.agents_md_path:
+            raise ValueError("agents_md_path must be a non-empty path or None")
+        object.__setattr__(self, "skills_read", tuple(self.skills_read))
 
 
 @dataclass(frozen=True, slots=True)
@@ -491,6 +515,12 @@ class SessionSnapshot:
     ``active_run`` stays strictly non-terminal, so every ``stop_reason`` is written in the
     same statement that makes a run terminal and would otherwise never reach the browser.
     This field keeps that finished record available to the run panel spec 13 describes.
+    """
+    context_load: ContextLoad | None = None
+    """Read-only projection of what the focus run (active, else last finished) loaded.
+
+    Spec 13.5's context panel needs the AGENTS.md path and the skills the model actually
+    read; both derive from durable evidence the run already produced, never discovery.
     """
 
     def __post_init__(self) -> None:

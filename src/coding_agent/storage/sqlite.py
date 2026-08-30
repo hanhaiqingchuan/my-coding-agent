@@ -19,6 +19,7 @@ from coding_agent.core.models import (
     ApprovalRecord,
     ApprovalStatus,
     AssistantTurn,
+    ContextLoad,
     ContextSnapshot,
     DurableEvent,
     EffectStartResult,
@@ -48,7 +49,7 @@ from coding_agent.core.models import (
     Usage,
 )
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 """The schema level ``initialize`` brings every database to, whatever it started at."""
 
 
@@ -81,15 +82,21 @@ class SQLiteStore:
     def _upgrade_schema(connection: sqlite3.Connection) -> None:
         """Bring a database created at an earlier user_version up to ``SCHEMA_VERSION``.
 
-        ``CREATE TABLE IF NOT EXISTS`` cannot extend an existing ``runs`` table, so the
+        ``CREATE TABLE IF NOT EXISTS`` cannot extend an existing table, so the
         presence of each versioned column is the real migration guard and user_version is
         the bookkeeping that records it.
         """
-        columns = {row[1] for row in connection.execute("PRAGMA table_info(runs)")}
+        run_columns = {row[1] for row in connection.execute("PRAGMA table_info(runs)")}
+        session_columns = {row[1] for row in connection.execute("PRAGMA table_info(sessions)")}
         version = connection.execute("PRAGMA user_version").fetchone()[0]
-        if "context_json" not in columns:
+        if "context_json" not in run_columns:
             # v1 -> v2: the run's latest context estimate projection.
             connection.execute("ALTER TABLE runs ADD COLUMN context_json TEXT")
+        if "auto_approve" not in session_columns:
+            # v2 -> v3: the per-session approval mode toggle (spec 13.4).
+            connection.execute(
+                "ALTER TABLE sessions ADD COLUMN auto_approve INTEGER NOT NULL DEFAULT 0"
+            )
         if version < SCHEMA_VERSION:
             connection.execute(f"PRAGMA user_version = {SCHEMA_VERSION:d}")
 
@@ -123,7 +130,7 @@ class SQLiteStore:
                 "session.created",
                 {"session_id": session_id},
             )
-        return self._get_session(session_id)
+        return self.get_session(session_id)
 
     def list_sessions(self) -> list[Session]:
         with self.connection() as connection:
@@ -354,6 +361,12 @@ class SQLiteStore:
                     "SELECT coalesce(max(seq), 0) FROM events WHERE session_id = ?",
                     (session_id,),
                 ).fetchone()[0]
+                focus_run = active_run if active_run is not None else last_finished_run
+                context_load = (
+                    _context_load_from_rows(connection, session_id, focus_run, tool_rows)
+                    if focus_run is not None
+                    else None
+                )
                 connection.commit()
             except BaseException:
                 connection.rollback()
@@ -367,6 +380,7 @@ class SQLiteStore:
             pending_approval,
             interrupted_banner,
             last_finished_run,
+            context_load,
         )
 
     def stage_tool_group(self, run_id: str, turn: AssistantTurn) -> PendingToolGroup:
@@ -1082,6 +1096,59 @@ class SQLiteStore:
             self._complete_command(connection, session_id, client_command_id, event_seq)
             return self._require_session(connection, session_id)
 
+    def set_approval_mode(
+        self,
+        session_id: str,
+        auto_approve: bool,
+        client_command_id: str,
+        payload_hash: str,
+    ) -> Session:
+        """Persist the per-session approval mode change with its audited event (spec 13.4).
+
+        The receipt, the ``sessions.auto_approve`` column and the
+        ``session.approval_mode_changed`` durable event commit in one transaction, exactly
+        like ``acknowledge_recovery``; the mode applies to approval requests the loop
+        makes after this commit, so a run already awaiting a decision stays interactive.
+        """
+        with self._transaction() as connection:
+            duplicate = self._existing_command(
+                connection,
+                session_id,
+                client_command_id,
+                payload_hash,
+                "session.set_approval_mode",
+            )
+            if duplicate is not None:
+                return self._require_session(connection, duplicate)
+            self._require_session(connection, session_id)
+            now = _now()
+            self._claim_command(
+                connection,
+                session_id,
+                client_command_id,
+                "session.set_approval_mode",
+                payload_hash,
+                session_id,
+                now,
+            )
+            connection.execute(
+                """
+                UPDATE sessions
+                SET auto_approve = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (int(auto_approve), now, session_id),
+            )
+            event_seq = self._append_event(
+                connection,
+                session_id,
+                None,
+                "session.approval_mode_changed",
+                {"auto_approve": auto_approve},
+            )
+            self._complete_command(connection, session_id, client_command_id, event_seq)
+            return self._require_session(connection, session_id)
+
     def completed_command_resource(
         self,
         session_id: str,
@@ -1482,7 +1549,8 @@ class SQLiteStore:
                 recovered.append(run.id)
         return recovered
 
-    def _get_session(self, session_id: str) -> Session:
+    def get_session(self, session_id: str) -> Session:
+        """Return one session for runtime coordination without exposing a connection."""
         with self.connection() as connection:
             return self._require_session(connection, session_id)
 
@@ -1821,6 +1889,7 @@ def _session_from_row(row: sqlite3.Row) -> Session:
         requires_recovery_ack=bool(row["requires_recovery_ack"]),
         created_at=datetime.fromisoformat(row["created_at"]),
         updated_at=datetime.fromisoformat(row["updated_at"]),
+        auto_approve=bool(row["auto_approve"]),
     )
 
 
@@ -2036,6 +2105,48 @@ def _tool_execution_from_row(row: sqlite3.Row) -> ToolExecution:
         result=_result_from_json(row["result_json"]) if row["result_json"] else None,
         duration_ms=row["duration_ms"],
     )
+
+
+def _context_load_from_rows(
+    connection: sqlite3.Connection,
+    session_id: str,
+    focus_run: Run,
+    tool_rows: Sequence[sqlite3.Row],
+) -> ContextLoad:
+    """Assemble the focus run's context-load projection from durable evidence only.
+
+    The AGENTS.md path comes from the run's ``run.context_loaded`` event the loop wrote
+    at run start; the skills come from that run's settled ``skill`` tool executions, so a
+    skill appears here only after the model actually read it (spec 13.5), never because
+    discovery indexed it.
+    """
+    event_row = connection.execute(
+        """
+        SELECT payload_json FROM events
+        WHERE session_id = ? AND run_id = ? AND type = 'run.context_loaded'
+        ORDER BY seq DESC LIMIT 1
+        """,
+        (session_id, focus_run.id),
+    ).fetchone()
+    agents_md_path: str | None = None
+    if event_row is not None:
+        value = json.loads(event_row["payload_json"]).get("agents_md_path")
+        agents_md_path = value if isinstance(value, str) and value else None
+    skills: list[str] = []
+    for row in tool_rows:
+        if (
+            row["run_id"] != focus_run.id
+            or row["name"] != "skill"
+            or row["execution_state"] != ToolExecutionState.SUCCEEDED.value
+        ):
+            continue
+        arguments = json.loads(row["input_json"])
+        if arguments.get("mode", "read") != "read":
+            continue
+        name = arguments.get("name")
+        if isinstance(name, str) and name and name not in skills:
+            skills.append(name)
+    return ContextLoad(agents_md_path=agents_md_path, skills_read=tuple(skills))
 
 
 def _pending_approval_from_rows(

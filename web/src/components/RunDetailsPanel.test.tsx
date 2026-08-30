@@ -2,6 +2,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, expect, test } from "vitest";
 
 import type {
+  ContextLoadDto,
   JsonValue,
   RunDto,
   RunTotalsDto,
@@ -81,6 +82,7 @@ const FINISHED_RUN: RunDto = {
 function snapshotWith(runs: {
   active_run?: RunDto | null;
   last_finished_run?: RunDto | null;
+  context_load?: ContextLoadDto | null;
 }): SessionSnapshotDto {
   return {
     session: {
@@ -88,6 +90,7 @@ function snapshotWith(runs: {
       title: null,
       workspace_realpath: "/workspace",
       requires_recovery_ack: false,
+      auto_approve: false,
       created_at: "2026-08-28T00:00:00Z",
       updated_at: "2026-08-28T00:00:00Z",
     },
@@ -97,6 +100,7 @@ function snapshotWith(runs: {
     tools: [],
     pending_approval: null,
     interrupted_banner: null,
+    context_load: runs.context_load ?? null,
     snapshot_seq: 1,
   };
 }
@@ -227,11 +231,62 @@ test("labels the token totals as cumulative known usage across rounds", () => {
   render(<RunDetailsPanel snapshot={snapshot} />);
 
   expect(
-    screen.getByText("输入 24 · 输出 12 · 缓存写入 2 · 缓存读取 5"),
-  ).not.toBeNull();
+    rowCell("累计 Token")?.querySelector(".run-token-metrics")?.textContent,
+  ).toBe("输入 24 · 输出 12 · 缓存写入 2 · 缓存读取 5");
   expect(
     screen.getByText(/跨轮次累计的已知用量，非当前上下文占用/),
   ).not.toBeNull();
+});
+
+test("each token metric wraps as one unbreakable unit in the narrow rail", () => {
+  const snapshot = activeRunSnapshot({ totals: USED_TOTALS });
+
+  render(<RunDetailsPanel snapshot={snapshot} />);
+
+  const metrics = screen
+    .getAllByText(/^(输入|输出|缓存写入|缓存读取) \d+$/)
+    .map((element) => element.className);
+  expect(metrics).toHaveLength(4);
+  // Every metric carries the nowrap unit class, and the stylesheet keeps it.
+  for (const className of metrics) {
+    expect(className).toContain("run-token-metric");
+  }
+  const unitRule = declarationsFor(".run-token-metric");
+  expect(unitRule?.["white-space"]).toBe("nowrap");
+  expect(unitRule?.display).toBe("inline-block");
+});
+
+test("lists the AGENTS.md and fully-read skills the focus run loaded", () => {
+  const snapshot = activeRunSnapshot();
+  snapshot.context_load = {
+    agents_md_path: "AGENTS.md",
+    skills: ["web-evolve.md", "debug-loop.md"],
+  };
+
+  render(<RunDetailsPanel snapshot={snapshot} />);
+
+  const load = screen.getByRole("region", { name: "已加载上下文" });
+  expect(load.textContent).toContain("AGENTS.md：AGENTS.md");
+  expect(load.querySelectorAll("li").length).toBe(2);
+  expect(load.textContent).toContain("web-evolve.md");
+  expect(load.textContent).toContain("debug-loop.md");
+});
+
+test("states the absences of AGENTS.md and skills instead of hiding the section", () => {
+  const snapshot = activeRunSnapshot();
+  snapshot.context_load = { agents_md_path: null, skills: [] };
+
+  render(<RunDetailsPanel snapshot={snapshot} />);
+
+  const load = screen.getByRole("region", { name: "已加载上下文" });
+  expect(load.textContent).toContain("本工作区没有 AGENTS.md");
+  expect(load.textContent).toContain("本次运行未读取技能。");
+});
+
+test("hides the context-load section before the session ever ran", () => {
+  render(<RunDetailsPanel snapshot={snapshotWith({})} />);
+
+  expect(screen.queryByRole("region", { name: "已加载上下文" })).toBeNull();
 });
 
 test("never presents a context-occupancy figure the run row cannot support", () => {

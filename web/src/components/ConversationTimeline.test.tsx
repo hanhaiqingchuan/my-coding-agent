@@ -445,3 +445,93 @@ test("renders no failure banner while a run is still active", () => {
 
   expect(screen.queryByTestId("run-failure-banner")).toBeNull();
 });
+
+/** Give the jsdom scroller real geometry so scroll pinning is observable. */
+function withGeometry(element: HTMLElement, height: number): void {
+  Object.defineProperty(element, "scrollHeight", {
+    configurable: true,
+    get: () => height,
+  });
+  Object.defineProperty(element, "clientHeight", {
+    configurable: true,
+    get: () => 300,
+  });
+}
+
+test("keeps the newest content in view by scrolling to the bottom", () => {
+  const { rerender } = render(
+    <ConversationTimeline
+      messages={[assistantMessageWith("message-1", "first")]}
+      tools={[]}
+      assistantDrafts={{}}
+      thinkingDrafts={{}}
+      toolOutputDrafts={{}}
+    />,
+  );
+  const scroller = document.querySelector<HTMLElement>(".timeline-scroll");
+  expect(scroller).not.toBeNull();
+  withGeometry(scroller as HTMLElement, 1_000);
+
+  rerender(
+    <ConversationTimeline
+      messages={[
+        assistantMessageWith("message-1", "first"),
+        assistantMessageWith("message-2", "second"),
+      ]}
+      tools={[]}
+      assistantDrafts={{}}
+      thinkingDrafts={{}}
+      toolOutputDrafts={{}}
+    />,
+  );
+  expect((scroller as HTMLElement).scrollTop).toBe(1_000);
+});
+
+test("a reader who scrolled up keeps their position", () => {
+  const { rerender } = render(
+    <ConversationTimeline
+      messages={[assistantMessageWith("message-1", "first")]}
+      tools={[]}
+      assistantDrafts={{}}
+      thinkingDrafts={{}}
+      toolOutputDrafts={{}}
+    />,
+  );
+  const scroller = document.querySelector<HTMLElement>(".timeline-scroll");
+  withGeometry(scroller as HTMLElement, 1_000);
+  // Reading an old message: 1000 - 0 - 300 = 700px above the bottom.
+  (scroller as HTMLElement).scrollTop = 0;
+  (scroller as HTMLElement).dispatchEvent(new Event("scroll"));
+
+  rerender(
+    <ConversationTimeline
+      messages={[
+        assistantMessageWith("message-1", "first"),
+        assistantMessageWith("message-2", "second"),
+      ]}
+      tools={[]}
+      assistantDrafts={{}}
+      thinkingDrafts={{}}
+      toolOutputDrafts={{}}
+    />,
+  );
+  expect((scroller as HTMLElement).scrollTop).toBe(0);
+
+  // Returning to the bottom re-arms the auto-scroll.
+  (scroller as HTMLElement).scrollTop = 700;
+  (scroller as HTMLElement).dispatchEvent(new Event("scroll"));
+  rerender(
+    <ConversationTimeline
+      messages={[
+        assistantMessageWith("message-1", "first"),
+        assistantMessageWith("message-2", "second"),
+        assistantMessageWith("message-3", "third"),
+      ]}
+      tools={[]}
+      assistantDrafts={{}}
+      thinkingDrafts={{}}
+      toolOutputDrafts={{}}
+    />,
+  );
+  expect((scroller as HTMLElement).scrollTop).toBe(1_000);
+});

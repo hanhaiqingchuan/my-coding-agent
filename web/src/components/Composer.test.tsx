@@ -40,6 +40,8 @@ test("replaces Send with Stop while a run is active", async () => {
     <Composer
       activeRun={run("model_streaming")}
       draft="next"
+      autoApprove={false}
+      onApprovalModeChange={vi.fn()}
       onDraftChange={vi.fn()}
       onSend={vi.fn()}
       onStop={onStop}
@@ -49,6 +51,47 @@ test("replaces Send with Stop while a run is active", async () => {
   expect(screen.queryByRole("button", { name: "发送" })).toBeNull();
   await user.click(screen.getByRole("button", { name: "停止" }));
   expect(onStop).toHaveBeenCalledWith("run-1");
+});
+
+test("the approval-mode switch reports every flip and reflects the persisted mode", async () => {
+  const user = userEvent.setup();
+  const onApprovalModeChange = vi.fn();
+  const { rerender } = render(
+    <Composer
+      activeRun={null}
+      draft="next"
+      autoApprove={false}
+      onApprovalModeChange={onApprovalModeChange}
+      onDraftChange={vi.fn()}
+      onSend={vi.fn()}
+      onStop={vi.fn()}
+    />,
+  );
+
+  const toggle = screen.getByRole("switch", { name: "自动批准" });
+  expect((toggle as HTMLInputElement).checked).toBe(false);
+
+  await user.click(toggle);
+  expect(onApprovalModeChange).toHaveBeenCalledWith(true);
+  // The switch is controlled by the persisted session mode, not local state: it
+  // only flips once the server round-trip lands in the snapshot.
+  expect((toggle as HTMLInputElement).checked).toBe(false);
+
+  rerender(
+    <Composer
+      activeRun={null}
+      draft="next"
+      autoApprove
+      onApprovalModeChange={onApprovalModeChange}
+      onDraftChange={vi.fn()}
+      onSend={vi.fn()}
+      onStop={vi.fn()}
+    />,
+  );
+  expect(
+    (screen.getByRole("switch", { name: "自动批准" }) as HTMLInputElement)
+      .checked,
+  ).toBe(true);
 });
 
 test.each<RunState>([
@@ -64,6 +107,8 @@ test.each<RunState>([
     <Composer
       activeRun={run(state)}
       draft="next"
+      autoApprove={false}
+      onApprovalModeChange={vi.fn()}
       onDraftChange={vi.fn()}
       onSend={vi.fn()}
       onStop={vi.fn()}
@@ -80,6 +125,8 @@ test("shows a disabled stopping control while cancellation is in progress", () =
     <Composer
       activeRun={run("cancelling")}
       draft="next"
+      autoApprove={false}
+      onApprovalModeChange={vi.fn()}
       onDraftChange={vi.fn()}
       onSend={vi.fn()}
       onStop={vi.fn()}
@@ -103,6 +150,8 @@ test.each<RunState>([
     <Composer
       activeRun={run(state)}
       draft="next"
+      autoApprove={false}
+      onApprovalModeChange={vi.fn()}
       onDraftChange={vi.fn()}
       onSend={vi.fn()}
       onStop={vi.fn()}
@@ -133,6 +182,8 @@ test("disables Send for empty input and a recovery acknowledgement gate", () => 
     <Composer
       activeRun={null}
       draft="   "
+      autoApprove={false}
+      onApprovalModeChange={vi.fn()}
       onDraftChange={vi.fn()}
       onSend={vi.fn()}
       onStop={vi.fn()}
@@ -147,6 +198,8 @@ test("disables Send for empty input and a recovery acknowledgement gate", () => 
       activeRun={null}
       draft="ready"
       isRecoveryBlocked
+      autoApprove={false}
+      onApprovalModeChange={vi.fn()}
       onDraftChange={vi.fn()}
       onSend={vi.fn()}
       onStop={vi.fn()}
@@ -165,6 +218,8 @@ test("keeps the message input disabled and explained until recovery is acknowled
       activeRun={null}
       draft="ready"
       isRecoveryBlocked
+      autoApprove={false}
+      onApprovalModeChange={vi.fn()}
       onDraftChange={onDraftChange}
       onSend={vi.fn()}
       onStop={vi.fn()}
@@ -189,6 +244,8 @@ test("keeps a visible focus indicator on the message input for keyboard users", 
     <Composer
       activeRun={null}
       draft=""
+      autoApprove={false}
+      onApprovalModeChange={vi.fn()}
       onDraftChange={vi.fn()}
       onSend={vi.fn()}
       onStop={vi.fn()}
@@ -215,6 +272,8 @@ function DraftHarness({
     <Composer
       activeRun={activeRun}
       draft={draft}
+      autoApprove={false}
+      onApprovalModeChange={vi.fn()}
       onDraftChange={setDraft}
       onSend={onSend}
       onStop={vi.fn()}

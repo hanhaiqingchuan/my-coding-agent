@@ -128,6 +128,17 @@ class AgentLoop:
             )
             scan = self._scan_workspace(session_id)
             self._tools.configure_skills(scan.skills)
+            await self._mutate(
+                session_id,
+                lambda: self._store.record_diagnostic(
+                    run_id,
+                    "run.context_loaded",
+                    {
+                        "agents_md_path": scan.instructions_path,
+                        "skills_discovered": [skill.name for skill in scan.skills],
+                    },
+                ),
+            )
             for diagnostic in scan.diagnostics:
                 await self._mutate(
                     session_id,
@@ -341,7 +352,13 @@ class AgentLoop:
                             session_id,
                             lambda: self._store.request_approval(run_id, prepared),
                         )
-                        decision = await self._approval_gate.request(prepared, cancellation)
+                        # The mode is read per request, so a mid-run session toggle
+                        # applies to every approval the loop asks for afterwards.
+                        decision = await self._approval_gate.request(
+                            prepared,
+                            cancellation,
+                            session_auto_approve=self._store.get_session(session_id).auto_approve,
+                        )
                         if not self._approval_gate.is_persisted(prepared.call.id):
                             await self._mutation_gate.resolve_approval(
                                 run_id,

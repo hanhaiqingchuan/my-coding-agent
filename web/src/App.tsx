@@ -6,6 +6,8 @@ import { connectionLabel } from "./api/labels";
 import { ApprovalDock } from "./components/ApprovalDock";
 import { AppShell } from "./components/AppShell";
 import { Composer } from "./components/Composer";
+import { CompactionChip } from "./components/CompactionChip";
+import { ContextGauge } from "./components/ContextGauge";
 import { ConversationTimeline } from "./components/ConversationTimeline";
 import { RunDetailsPanel } from "./components/RunDetailsPanel";
 import { SessionSidebar } from "./components/SessionSidebar";
@@ -77,6 +79,19 @@ export default function App() {
 
   function startRun(content: string) {
     if (selectedSessionId === null) return;
+    // `/compact` is the maintenance slash command: it asks the coordinator to
+    // force-compaction the committed transcript instead of starting a run, and the
+    // backend rejects it while a run is active (the composer already shows Stop then).
+    if (content === "/compact") {
+      send({
+        type: "session.compact",
+        client_command_id: commandId(),
+        session_id: selectedSessionId,
+        payload: {},
+      });
+      dispatch({ type: "draft.changed", draftText: "" });
+      return;
+    }
     send({
       type: "run.start",
       client_command_id: commandId(),
@@ -84,6 +99,17 @@ export default function App() {
       payload: { content },
     });
     dispatch({ type: "draft.changed", draftText: "" });
+  }
+
+  /** The toggle is the only writer of the per-session approval mode (spec 13.4). */
+  function setApprovalMode(autoApprove: boolean) {
+    if (selectedSessionId === null) return;
+    send({
+      type: "session.set_approval_mode",
+      client_command_id: commandId(),
+      session_id: selectedSessionId,
+      payload: { auto_approve: autoApprove },
+    });
   }
 
   function stopRun(runId: string) {
@@ -196,13 +222,26 @@ export default function App() {
             <Composer
               activeRun={snapshot?.active_run ?? null}
               draft={state.draftText}
+              autoApprove={snapshot?.session.auto_approve ?? false}
               isRecoveryBlocked={recoveryBlocked}
               onDraftChange={(draftText) =>
                 dispatch({ type: "draft.changed", draftText })
               }
               onSend={startRun}
               onStop={stopRun}
+              onApprovalModeChange={setApprovalMode}
             />
+            {/* The focus run is the active one, else the last finished one: the
+                gauge keeps reporting the context the model actually saw. */}
+            <div className="composer-status">
+              <ContextGauge
+                context={
+                  (snapshot?.active_run ?? snapshot?.last_finished_run)?.context ??
+                  null
+                }
+              />
+              <CompactionChip status={state.compaction} />
+            </div>
           </div>
         </div>
       }

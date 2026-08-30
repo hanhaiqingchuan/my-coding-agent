@@ -763,7 +763,7 @@ def _real_session_scale_request() -> ContextRequest:
     return ContextRequest(
         system=(
             "system instructions\n\nCurrent environment:\n"
-            "- workspace root: /Users/hhc/Desktop/codes/my-agent/tmp\n"
+            "- workspace root: /tmp/overflow-repro/workspace\n"
             "- platform: darwin\n"
             "- read_file returns at most 800 lines or 40960 bytes per call\n"
             "- run_command times out after 120s and truncates output at 40960 bytes"

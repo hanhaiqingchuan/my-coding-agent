@@ -1,6 +1,7 @@
 import type { MessageDto, MessagePartDto } from "../api/types";
 import { roleLabel } from "../api/labels";
 import type { ThinkingDraft } from "../features/sessions/sessionReducer";
+import { Markdown } from "./markdown";
 import { ThinkingDisclosure } from "./ThinkingDisclosure";
 
 type MessageBubbleProps = {
@@ -67,6 +68,16 @@ export function MessageBubble({
   const segments = renderableSegments(message.parts);
   if (segments.length === 0) return null;
 
+  // Only committed assistant text goes through the Markdown subset: user input
+  // stays literal, and the transient streaming draft stays plain until commit so
+  // half-streamed markers never flicker between raw and rendered.
+  const renderText = (text: string, index: number) =>
+    message.role === "assistant" ? (
+      <Markdown key={index} text={text} />
+    ) : (
+      <p key={index}>{text}</p>
+    );
+
   return (
     <article className={`message-bubble message-${message.role}`}>
       <header>{roleLabel(message.role)}</header>
@@ -74,7 +85,7 @@ export function MessageBubble({
         segment.kind === "thinking" ? (
           <ThinkingDisclosure key={index} text={segment.text} />
         ) : (
-          <p key={index}>{segment.text}</p>
+          renderText(segment.text, index)
         ),
       )}
     </article>

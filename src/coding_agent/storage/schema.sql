@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS sessions (
     title TEXT,
     workspace_realpath TEXT NOT NULL,
     requires_recovery_ack INTEGER NOT NULL DEFAULT 0 CHECK (requires_recovery_ack IN (0, 1)),
+    auto_approve INTEGER NOT NULL DEFAULT 0 CHECK (auto_approve IN (0, 1)),
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
@@ -121,7 +122,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS context_snapshot_current_by_session
     ON context_snapshots(session_id);
 
 -- The script baseline stays at v1; SQLiteStore.initialize() upgrades existing
--- databases (and stamps fresh ones) to user_version 2 with the runs.context_json
--- column for the run's latest context estimate.
+-- databases (and stamps fresh ones) to user_version 3 with runs.context_json (v2)
+-- and sessions.auto_approve (v3).
 PRAGMA user_version = 1;
 COMMIT;

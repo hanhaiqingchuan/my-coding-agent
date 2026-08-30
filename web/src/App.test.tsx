@@ -10,6 +10,15 @@ const mocks = vi.hoisted(() => ({
   send: vi.fn(),
   dispatch: vi.fn(),
   campaignDetail: vi.fn(),
+  draftText: null as string | null,
+  compaction: null as
+    | { phase: "running" }
+    | { phase: "finished"; beforeTokens: number; afterTokens: number }
+    | null,
+  /** `true` keeps the fixture's active run; `false` renders an idle session. */
+  hasActiveRun: true,
+  /** `false` un-gates the composer so send-path tests can click 发送. */
+  recoveryAck: true,
 }));
 
 vi.mock("./api/client", () => ({
@@ -20,6 +29,7 @@ vi.mock("./api/client", () => ({
         title: "Demo",
         workspace_realpath: "/workspace",
         requires_recovery_ack: true,
+        auto_approve: false,
         created_at: "2026-08-28T00:00:00Z",
         updated_at: "2026-08-28T00:00:00Z",
       },
@@ -42,6 +52,7 @@ const snapshot: SessionSnapshotDto = {
     title: "Demo",
     workspace_realpath: "/workspace",
     requires_recovery_ack: true,
+    auto_approve: false,
     created_at: "2026-08-28T00:00:00Z",
     updated_at: "2026-08-28T00:00:00Z",
   },
@@ -93,18 +104,27 @@ const snapshot: SessionSnapshotDto = {
     stop_reason: "server_restart",
     requires_recovery_ack: true,
   },
+  context_load: null,
   snapshot_seq: 1,
 };
 
 vi.mock("./features/sessions/useSession", () => ({
   useSession: () => ({
     state: {
-      snapshot,
-      draftText: "next task",
+      snapshot: {
+        ...snapshot,
+        active_run: mocks.hasActiveRun ? snapshot.active_run : null,
+        session: {
+          ...snapshot.session,
+          requires_recovery_ack: mocks.recoveryAck,
+        },
+      },
+      draftText: mocks.draftText ?? "next task",
       assistantDrafts: {},
       thinkingDrafts: {},
       toolOutputDrafts: {},
       connection: "connected",
+      compaction: mocks.compaction,
     },
     dispatch: mocks.dispatch,
     send: mocks.send,
@@ -125,6 +145,11 @@ afterEach(() => {
   mocks.send.mockClear();
   mocks.dispatch.mockClear();
   mocks.campaignDetail.mockClear();
+  mocks.draftText = null;
+  mocks.compaction = null;
+  mocks.hasActiveRun = true;
+  mocks.recoveryAck = true;
+  if (snapshot.active_run !== null) snapshot.active_run.context = null;
 });
 
 test("renders the fixed approval dock and sends only backend commands for approval and recovery", async () => {
@@ -245,4 +270,110 @@ test("deep-links to one campaign through #/evaluations/<campaign>", async () => 
   );
   await waitFor(() => expect(screen.getByText("demo-task")).toBeTruthy());
   expect(mocks.campaignDetail).toHaveBeenCalledWith("judged-campaign");
+});
+
+test("sends session.compact for the /compact slash command instead of a run", async () => {
+  mocks.draftText = "/compact";
+  // The composer only shows Send on an idle, recovery-acknowledged session; while
+  // a run is active it holds Stop and the backend rejects concurrent compaction.
+  mocks.hasActiveRun = false;
+  mocks.recoveryAck = false;
+  const user = userEvent.setup();
+  render(<App />);
+
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "发送" })).toBeTruthy(),
+  );
+  await user.click(screen.getByRole("button", { name: "发送" }));
+
+  expect(mocks.send).toHaveBeenCalledTimes(1);
+  expect(mocks.send).toHaveBeenCalledWith(
+    expect.objectContaining({
+      type: "session.compact",
+      client_command_id: expect.any(String),
+      session_id: "session-1",
+      payload: {},
+    }),
+  );
+  expect(mocks.dispatch).toHaveBeenCalledWith({
+    type: "draft.changed",
+    draftText: "",
+  });
+});
+
+test("a normal message still starts a run", async () => {
+  mocks.draftText = "hello there";
+  mocks.hasActiveRun = false;
+  mocks.recoveryAck = false;
+  const user = userEvent.setup();
+  render(<App />);
+
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "发送" })).toBeTruthy(),
+  );
+  await user.click(screen.getByRole("button", { name: "发送" }));
+
+  expect(mocks.send).toHaveBeenCalledTimes(1);
+  expect(mocks.send).toHaveBeenCalledWith(
+    expect.objectContaining({
+      type: "run.start",
+      session_id: "session-1",
+      payload: { content: "hello there" },
+    }),
+  );
+});
+
+test("the approval toggle sends the persisted mode change for the session", async () => {
+  const user = userEvent.setup();
+  render(<App />);
+
+  await waitFor(() =>
+    expect(screen.getByRole("switch", { name: "自动批准" })).toBeTruthy(),
+  );
+  expect(
+    (screen.getByRole("switch", { name: "自动批准" }) as HTMLInputElement)
+      .checked,
+  ).toBe(false);
+
+  await user.click(screen.getByRole("switch", { name: "自动批准" }));
+
+  expect(mocks.send).toHaveBeenCalledWith(
+    expect.objectContaining({
+      type: "session.set_approval_mode",
+      session_id: "session-1",
+      payload: { auto_approve: true },
+    }),
+  );
+});
+
+test("the context gauge under the composer reports the focus run estimate", async () => {
+  const activeRun = snapshot.active_run;
+  if (activeRun !== null) {
+    activeRun.context = {
+    estimated_tokens: 12_000,
+    available_tokens: 60_000,
+      window_tokens: 64_000,
+    };
+  }
+  render(<App />);
+
+  await waitFor(() =>
+    expect(screen.getByRole("status", { name: "上下文占用" })).toBeTruthy(),
+  );
+  expect(screen.getByRole("status", { name: "上下文占用" }).textContent).toContain(
+    "20%",
+  );
+});
+
+test("the compaction chip renders the finished compaction next to the gauge", async () => {
+  mocks.compaction = {
+    phase: "finished",
+    beforeTokens: 61_440,
+    afterTokens: 33_200,
+  };
+  render(<App />);
+
+  await waitFor(() =>
+    expect(screen.getByText("上下文已压缩：61,440 → 33,200 tokens")).toBeTruthy(),
+  );
 });

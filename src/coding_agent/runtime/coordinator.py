@@ -176,6 +176,27 @@ class RunMutationGate:
             await self._publish_after(session_id, previous_seq)
             return session
 
+    async def set_approval_mode(
+        self,
+        session_id: str,
+        auto_approve: bool,
+        client_command_id: str,
+    ) -> Session:
+        """Persist the per-session approval mode and publish its audited event."""
+        async with self._lock:
+            previous_seq = _latest_seq(self._store, session_id)
+            digest = hashlib.sha256(
+                f"session.set_approval_mode\0{session_id}\0{int(auto_approve)}".encode()
+            ).hexdigest()
+            session = self._store.set_approval_mode(
+                session_id,
+                auto_approve,
+                client_command_id,
+                digest,
+            )
+            await self._publish_after(session_id, previous_seq)
+            return session
+
     async def finish_run(self, run_id: str, outcome: RunOutcome) -> RunOutcome:
         """Let a persisted Stop win over any late non-tool terminal outcome."""
         async with self._lock:
@@ -342,6 +363,16 @@ class RunCoordinator:
         client_command_id: str,
     ) -> Session:
         return await self._mutation_gate.acknowledge_recovery(session_id, client_command_id)
+
+    async def set_approval_mode(
+        self,
+        session_id: str,
+        auto_approve: bool,
+        client_command_id: str,
+    ) -> Session:
+        return await self._mutation_gate.set_approval_mode(
+            session_id, auto_approve, client_command_id
+        )
 
 
 def _latest_seq(store: SQLiteStore, session_id: str) -> int:

@@ -9,6 +9,7 @@ from coding_agent.core.errors import CommandIdConflict, StoreError
 from coding_agent.core.models import (
     ApprovalDecision,
     AssistantTurn,
+    ContextLoad,
     EffectStartResult,
     ErrorKind,
     MessageStatus,
@@ -117,8 +118,12 @@ def test_initialize_creates_the_current_schema_and_configures_connections(tmp_pa
             "events",
             "client_commands",
         }
-        assert connection.execute("PRAGMA user_version").fetchone()[0] == 2
+        assert connection.execute("PRAGMA user_version").fetchone()[0] == 3
         assert connection.execute("PRAGMA journal_mode").fetchone()[0] == "wal"
+        assert {row[1] for row in connection.execute("PRAGMA table_info(sessions)")} >= {
+            "requires_recovery_ack",
+            "auto_approve",
+        }
         assert {row[1] for row in connection.execute("PRAGMA table_info(tool_executions)")} >= {
             "tool_call_id",
             "assistant_message_id",
@@ -147,7 +152,7 @@ def test_initialize_creates_the_current_schema_and_configures_connections(tmp_pa
 
 
 def test_initialize_upgrades_a_v1_database_keeping_its_runs(tmp_path) -> None:
-    """A database created before user_version 2 must gain the context column, not lose data."""
+    """A database created before user_version 3 must gain the new columns, not lose data."""
     database = tmp_path / "state.db"
     store = SQLiteStore(database)
     store.initialize()
@@ -155,13 +160,17 @@ def test_initialize_upgrades_a_v1_database_keeping_its_runs(tmp_path) -> None:
     legacy_run = store.begin_run(session.id, "kept task", {}, "legacy-cmd", "legacy-hash")
     with store.connection() as connection:
         connection.execute("ALTER TABLE runs DROP COLUMN context_json")
+        connection.execute("ALTER TABLE sessions DROP COLUMN auto_approve")
         connection.execute("PRAGMA user_version = 1")
 
     store.initialize()
 
     with sqlite3.connect(database) as connection:
         assert "context_json" in {row[1] for row in connection.execute("PRAGMA table_info(runs)")}
-        assert connection.execute("PRAGMA user_version").fetchone()[0] == 2
+        assert "auto_approve" in {
+            row[1] for row in connection.execute("PRAGMA table_info(sessions)")
+        }
+        assert connection.execute("PRAGMA user_version").fetchone()[0] == 3
     assert store.get_run(legacy_run.id).context is None
     estimate = _context_estimate(estimated_tokens=4321)
     store.record_context_estimate(legacy_run.id, estimate)
@@ -832,3 +841,111 @@ def test_finish_session_compaction_reports_a_failure_without_changing_the_shape(
         "forced": True,
         "error": {"code": "MODEL_API_ERROR"},
     }
+
+
+def test_set_approval_mode_round_trips_with_its_audited_event(store: SQLiteStore, session) -> None:
+    """The per-session mode (spec 13.4) persists with a durable, auditable event."""
+    assert session.auto_approve is False
+
+    toggled = store.set_approval_mode(session.id, True, "mode-on", "mode-on-hash")
+
+    assert toggled.auto_approve is True
+    assert store.get_session(session.id).auto_approve is True
+    events = store.events_after(session.id, 0)
+    mode_events = [event for event in events if event.type == "session.approval_mode_changed"]
+    assert len(mode_events) == 1
+    assert mode_events[0].payload == {"auto_approve": True}
+    assert mode_events[0].run_id is None
+
+    reverted = store.set_approval_mode(session.id, False, "mode-off", "mode-off-hash")
+    assert reverted.auto_approve is False
+    assert store.get_session(session.id).auto_approve is False
+
+    # A replayed command id is idempotent: it re-answers with the session and never
+    # appends a second mode event, exactly like the other session-level commands.
+    replayed = store.set_approval_mode(session.id, True, "mode-on", "mode-on-hash")
+    assert replayed.id == session.id
+    assert (
+        len(
+            [
+                event
+                for event in store.events_after(session.id, 0)
+                if event.type == "session.approval_mode_changed"
+            ]
+        )
+        == 2
+    )
+
+    with pytest.raises(CommandIdConflict):
+        store.set_approval_mode(session.id, False, "mode-on", "mode-other-hash")
+
+
+def test_new_sessions_default_to_interactive_approval(store: SQLiteStore) -> None:
+    """Interactive approval is the default; only an explicit toggle widens it."""
+    assert store.create_session("/tmp/other", "Fresh").auto_approve is False
+
+
+def _seed_completed_run(store: SQLiteStore, session_id: str, *, command_id: str) -> str:
+    run = store.begin_run(session_id, "task", {}, command_id, f"{command_id}-hash")
+    store.transition_run(run.id, {RunState.STARTING}, RunState.BUILDING_CONTEXT, None, None)
+    store.transition_run(run.id, {RunState.BUILDING_CONTEXT}, RunState.MODEL_STREAMING, None, None)
+    return run.id
+
+
+def test_snapshot_projects_the_focus_run_context_load(store: SQLiteStore, session) -> None:
+    """AGENTS.md comes from the run's context_loaded event; skills only from reads."""
+    run_id = _seed_completed_run(store, session.id, command_id="ctx-load-start")
+    store.record_diagnostic(
+        run_id,
+        "run.context_loaded",
+        {"agents_md_path": "AGENTS.md", "skills_discovered": ["git-helper", "unused"]},
+    )
+    skill_turn = AssistantTurn(
+        id="turn-skill",
+        parts=(
+            ToolUsePart(ToolCall("call-skill", "skill", {"name": "git-helper"})),
+            ToolUsePart(ToolCall("call-list", "skill", {"mode": "list"})),
+        ),
+        stop_reason=ModelStopReason.TOOL_USE,
+        usage=Usage(),
+    )
+    store.stage_tool_group(run_id, skill_turn)
+    store.settle_tool_group(
+        "turn-skill",
+        (
+            tool_result("call-skill", "skill", ok=True, summary="loaded"),
+            tool_result("call-list", "skill", ok=True, summary="listed"),
+        ),
+    )
+    store.commit_final_turn(
+        run_id,
+        AssistantTurn("turn-final", (TextPart("done"),), ModelStopReason.END_TURN, Usage()),
+    )
+    store.transition_run(
+        run_id, {RunState.MODEL_STREAMING}, RunState.COMPLETED, StopReason.COMPLETED, None
+    )
+
+    snapshot = store.load_snapshot(session.id)
+
+    assert snapshot.active_run is None
+    assert snapshot.last_finished_run is not None
+    # Only the skill the model read appears; the discovered-but-unused skill never does.
+    assert snapshot.context_load == ContextLoad(
+        agents_md_path="AGENTS.md", skills_read=("git-helper",)
+    )
+
+
+def test_snapshot_context_load_without_a_context_loaded_event(store: SQLiteStore, session) -> None:
+    """A run that predates the event still yields a projection, just path-less."""
+    run_id = _seed_completed_run(store, session.id, command_id="ctx-legacy-start")
+    store.transition_run(
+        run_id, {RunState.MODEL_STREAMING}, RunState.COMPLETED, StopReason.COMPLETED, None
+    )
+
+    snapshot = store.load_snapshot(session.id)
+
+    assert snapshot.context_load == ContextLoad(agents_md_path=None, skills_read=())
+
+
+def test_snapshot_context_load_is_null_without_any_run(store: SQLiteStore, session) -> None:
+    assert store.load_snapshot(session.id).context_load is None

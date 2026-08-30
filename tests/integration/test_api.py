@@ -23,6 +23,7 @@ from coding_agent.api.schemas import (
     RunStopCommand,
     SessionAckRecoveryCommand,
     SessionCompactCommand,
+    SessionSetApprovalModeCommand,
     SessionSnapshotDto,
     SessionSubscribeCommand,
     SnapshotEnvelope,
@@ -492,6 +493,7 @@ def test_frontend_contract_fixture_matches_the_backend_dto_schema() -> None:
             ApprovalResolveCommand,
             SessionAckRecoveryCommand,
             SessionCompactCommand,
+            SessionSetApprovalModeCommand,
         )
     ]
     assert fixture["serverMessageTypes"] == [

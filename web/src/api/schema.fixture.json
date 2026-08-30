@@ -121,6 +121,7 @@
       "tools",
       "pending_approval",
       "interrupted_banner",
+      "context_load",
       "snapshot_seq"
     ],
     "DurableEvent": [
@@ -138,7 +139,8 @@
     "run.stop",
     "approval.resolve",
     "session.ack_recovery",
-    "session.compact"
+    "session.compact",
+    "session.set_approval_mode"
   ],
   "serverMessageTypes": [
     "ack",
