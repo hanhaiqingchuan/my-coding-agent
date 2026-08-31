@@ -87,6 +87,22 @@ function shortLabel(directory: string): string {
     : `${match[1]}-${match[2]} ${match[3]}:${match[4]}`;
 }
 
+/** A stable epoch-millisecond ordering key: started_at first, else the directory timestamp. */
+function campaignTimestamp(campaign: CampaignSummaryDto): number {
+  if (campaign.started_at !== null) {
+    const parsed = Date.parse(campaign.started_at);
+    if (!Number.isNaN(parsed)) return parsed;
+  }
+  const match = /(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})(\d{2})/.exec(campaign.directory);
+  if (match !== null) {
+    const parsed = Date.parse(
+      `${match[1]}-${match[2]}-${match[3]}T${match[4]}:${match[5]}:${match[6]}`,
+    );
+    if (!Number.isNaN(parsed)) return parsed;
+  }
+  return 0;
+}
+
 const CHART_W = 320;
 const CHART_H = 128;
 const BASE_Y = 100;
@@ -198,7 +214,11 @@ export function MetricsCharts({
 }: {
   campaigns: CampaignSummaryDto[];
 }) {
-  const usable = campaigns.filter((campaign) => !campaign.corrupt);
+  // Bars read left-to-right as campaigns run oldest-to-newest, so a fresh
+  // campaign never reorders the earlier columns.
+  const usable = campaigns
+    .filter((campaign) => !campaign.corrupt)
+    .sort((a, b) => campaignTimestamp(a) - campaignTimestamp(b));
   if (usable.length === 0) return null;
   return (
     <section className="eval-charts" aria-label="各轮次指标对比">

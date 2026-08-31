@@ -829,17 +829,13 @@ button:disabled:hover {
   font-weight: 700;
   letter-spacing: 0.04em;
 }
-/* The product name as ANSI art, only in the empty conversation. */
+/* The product name as block pixel art (SVG), only in the empty conversation. */
 .brand-art {
+  display: block;
+  width: min(100%, 560px);
+  height: auto;
   margin: 0 0 var(--space-4);
-  overflow-x: auto;
-  max-width: 100%;
-  color: #c45a1a;
-  font-family: var(--font-mono);
-  font-size: 9px;
-  line-height: 1.15;
-  letter-spacing: 0;
-  text-align: left;
+  fill: #c45a1a;
 }
 
 /* --- Messages: a transcript, not chat bubbles ---------------------------- */

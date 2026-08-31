@@ -1,6 +1,9 @@
 /**
- * The product's name as ANSI art. Built from a five-row block glyph map so the
- * banner stays aligned at any size; rendered only in the empty conversation.
+ * The product's name as block pixel art. Each glyph is a five-row block map
+ * rendered as SVG rectangles, so the banner stays aligned and scalable on every
+ * platform — it never depends on whether the OS ships a monospace font that
+ * covers the block-elements range (the previous ``█`` text art skewed and grew
+ * a scrollbar once a fallback font sized the blocks differently).
  */
 const GLYPHS: Record<string, string[]> = {
   M: ["█   █", "██ ██", "█ █ █", "█   █", "█   █"],
@@ -17,7 +20,7 @@ const GLYPHS: Record<string, string[]> = {
   N: ["█   █", "██  █", "█ █ █", "█  ██", "█   █"],
 };
 
-function artLines(text: string): string[] {
+function artRows(text: string): string[] {
   const rows = ["", "", "", "", ""];
   for (const char of text) {
     if (char === " ") {
@@ -28,15 +31,31 @@ function artLines(text: string): string[] {
     if (glyph === undefined) continue;
     for (let row = 0; row < 5; row += 1) rows[row] += `${glyph[row]} `;
   }
-  return rows.map((row) => row.replace(/ +$/, ""));
+  return rows;
 }
 
 /** The banner is decorative; the name is already present as real text nearby. */
 export function BrandArt() {
-  const lines = [...artLines("MAKE CODE"), "", ...artLines("GREAT AGAIN")];
+  const lines = [...artRows("MAKE CODE"), "", ...artRows("GREAT AGAIN")];
+  const width = Math.max(...lines.map((line) => line.length));
+  const height = lines.length;
+  const cells: Array<{ x: number; y: number }> = [];
+  lines.forEach((line, y) => {
+    for (let x = 0; x < line.length; x += 1) {
+      if (line[x] === "█") cells.push({ x, y });
+    }
+  });
   return (
-    <pre className="brand-art" aria-hidden="true">
-      {lines.join("\n")}
-    </pre>
+    <svg
+      className="brand-art"
+      viewBox={`0 0 ${width} ${height}`}
+      role="img"
+      aria-hidden="true"
+      preserveAspectRatio="xMidYMid meet"
+    >
+      {cells.map((cell, index) => (
+        <rect key={index} x={cell.x} y={cell.y} width={1} height={1} />
+      ))}
+    </svg>
   );
 }
