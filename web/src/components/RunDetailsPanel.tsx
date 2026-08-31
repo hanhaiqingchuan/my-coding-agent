@@ -5,7 +5,6 @@ import { runStateLabel } from "../api/labels";
 import type {
   ContextLoadDto,
   JsonValue,
-  RunDto,
   SessionSnapshotDto,
   SessionTotalsDto,
 } from "../api/types";

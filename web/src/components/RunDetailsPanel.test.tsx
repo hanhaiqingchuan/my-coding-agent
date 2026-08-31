@@ -41,15 +41,6 @@ const ZERO_TOTALS: RunTotalsDto = {
   retry_count: 0,
 };
 
-const USED_TOTALS: RunTotalsDto = {
-  input_tokens: 24,
-  output_tokens: 12,
-  cache_creation_input_tokens: 2,
-  cache_read_input_tokens: 5,
-  round_count: 3,
-  retry_count: 2,
-};
-
 const SESSION_TOTALS: SessionTotalsDto = {
   run_count: 4,
   round_count: 3,
