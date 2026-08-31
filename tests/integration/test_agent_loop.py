@@ -1800,7 +1800,7 @@ async def test_mandatory_view_above_soft_target_keeps_running_with_the_summary(
     """
     settings = replace(
         valid_settings,
-        model=replace(valid_settings.model, context_window=6_000, max_output_tokens=1_000),
+        model=replace(valid_settings.model, context_window=7_000, max_output_tokens=1_000),
     )
     loop, store, session_id, run_id, model, _, _ = _make_loop(
         tmp_path,

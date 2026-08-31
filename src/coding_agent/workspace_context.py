@@ -18,7 +18,7 @@ from pathlib import Path
 
 from coding_agent.tools.paths import WorkspaceBoundary, WorkspacePathError
 
-AGENTS_MD_MAX_BYTES = 16 * 1024
+AGENTS_MD_MAX_BYTES = 128 * 1024
 AGENTS_MD_FILENAMES = ("AGENTS.md", "agents.md")
 AGENTS_MD_TRUNCATION_MARKER = "[AGENTS.md truncated: showing the first {limit} of {total} bytes]"
 

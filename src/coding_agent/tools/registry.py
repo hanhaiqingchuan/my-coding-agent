@@ -33,7 +33,11 @@ class ToolRegistry:
         return [
             {
                 "name": "read_file",
-                "description": "Read a UTF-8 text file from the workspace.",
+                "description": (
+                    "Read a UTF-8 text file from the workspace. Use it to inspect "
+                    "existing code and files before editing; path is workspace-relative "
+                    "and offset/limit select which slice is returned."
+                ),
                 "input_schema": {
                     "type": "object",
                     "properties": {
@@ -52,7 +56,12 @@ class ToolRegistry:
             },
             {
                 "name": "write_file",
-                "description": "Propose a workspace file write or replacement.",
+                "description": (
+                    "Propose a workspace file write or replacement. The proposal is "
+                    "shown to the user for approval before it runs; use operation "
+                    "write with the full content, or replace with old_text/new_text "
+                    "for a targeted edit."
+                ),
                 "input_schema": {
                     "type": "object",
                     "properties": {
@@ -69,7 +78,12 @@ class ToolRegistry:
             },
             {
                 "name": "run_command",
-                "description": "Propose a non-interactive command in the workspace.",
+                "description": (
+                    "Propose a non-interactive command to run in the workspace. Prefer "
+                    "read_file/write_file first and use this only when you actually "
+                    "need to execute something, such as running the project's tests or "
+                    "build; the command is shown to the user for approval."
+                ),
                 "input_schema": {
                     "type": "object",
                     "properties": {
@@ -86,7 +100,8 @@ class ToolRegistry:
                 "name": "skill",
                 "description": (
                     "Read a workspace skill's full SKILL.md body and companion file "
-                    "listing, or list the discovered skill index."
+                    "listing (mode read), or list the discovered skill index (mode "
+                    "list). Load a skill before relying on its instructions."
                 ),
                 "input_schema": {
                     "type": "object",
