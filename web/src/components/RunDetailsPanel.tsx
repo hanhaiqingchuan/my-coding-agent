@@ -5,7 +5,7 @@ import { runStateLabel } from "../api/labels";
 import type {
   ContextLoadDto,
   JsonValue,
-  RunTotalsDto,
+  RunDto,
   SessionSnapshotDto,
   SessionTotalsDto,
 } from "../api/types";
@@ -21,8 +21,12 @@ export function RunDetailsPanel({ snapshot }: RunDetailsPanelProps) {
    */
   const finishedRun = snapshot?.last_finished_run ?? null;
   const run = activeRun ?? finishedRun;
+  const sessionTotals = snapshot?.session_totals ?? null;
   const contextLoad = snapshot?.context_load ?? null;
-  if (run === null) {
+  // Before the session's first run there is nothing to report at all: no run
+  // identity, no counters, no context. Afterwards the counters below are all
+  // session-scoped, so a new request never reads as the numbers being wiped.
+  if (run === null && sessionTotals === null && contextLoad === null) {
     return (
       <section>
         <h2>运行详情</h2>
@@ -31,62 +35,77 @@ export function RunDetailsPanel({ snapshot }: RunDetailsPanelProps) {
     );
   }
   const isFinished = activeRun === null;
-  const model = modelName(run.config_snapshot.model);
-  const stopOutcome = describeStopOutcome(run.stop_reason, run.error_kind);
+  const model = run !== null ? modelName(run.config_snapshot.model) : null;
+  const stopOutcome =
+    run !== null ? describeStopOutcome(run.stop_reason, run.error_kind) : null;
   const errorOutcome =
-    run.error_kind !== null ? describeStopOutcome(run.error_kind) : null;
+    run !== null && run.error_kind !== null
+      ? describeStopOutcome(run.error_kind)
+      : null;
   return (
     <section>
       <h2>运行详情</h2>
       <p className="run-details-scope">
-        {isFinished
-          ? "上一个完成的任务。当前没有运行中的任务。"
-          : "运行中的任务。"}
+        {run === null
+          ? "会话累计。当前没有运行中的任务。"
+          : isFinished
+            ? "上一个完成的任务。当前没有运行中的任务，计数为会话累计。"
+            : "运行中的任务，计数为会话累计。"}
       </p>
       <dl className="run-details-list">
-        <div>
-          <dt>状态</dt>
-          <dd className={`run-state run-state-${run.state}`}>
-            {runStateLabel(run.state)}
-          </dd>
-        </div>
-        <div>
-          <dt>运行 ID</dt>
-          <dd className="run-details-mono">{run.id}</dd>
-        </div>
-        {model !== null ? <DetailRow label="模型" value={model} /> : null}
-        <DetailRow label="轮次" value={String(run.totals.round_count)} />
-        <DetailRow label="重试" value={String(run.totals.retry_count)} />
-        <div>
-          <dt>累计 Token</dt>
-          <dd>
-            <TokenMetrics totals={run.totals} />
-            <span className="run-details-note">
-              跨轮次累计的已知用量，非当前上下文占用。
-            </span>
-          </dd>
-        </div>
-        {stopOutcome !== null ? (
-          <DetailRow label="停止原因" value={stopOutcome.title} />
+        {run !== null ? (
+          <Fragment>
+            <div>
+              <dt>状态</dt>
+              <dd className={`run-state run-state-${run.state}`}>
+                {runStateLabel(run.state)}
+              </dd>
+            </div>
+            <div>
+              <dt>运行 ID</dt>
+              <dd className="run-details-mono">{run.id}</dd>
+            </div>
+            {model !== null ? <DetailRow label="模型" value={model} /> : null}
+          </Fragment>
         ) : null}
-        {run.error_kind !== null && errorOutcome !== null ? (
-          <DetailRow label="错误类型" value={errorOutcome.title} />
+        {sessionTotals !== null ? (
+          <Fragment>
+            <DetailRow label="运行次数" value={String(sessionTotals.run_count)} />
+            <DetailRow label="轮次" value={String(sessionTotals.round_count)} />
+            <DetailRow label="重试" value={String(sessionTotals.retry_count)} />
+            <div>
+              <dt>累计 Token</dt>
+              <dd>
+                <TokenMetrics totals={sessionTotals} />
+                <span className="run-details-note">
+                  会话内全部运行累计的已知用量，非当前上下文占用。
+                </span>
+              </dd>
+            </div>
+          </Fragment>
         ) : null}
-        <div>
-          <dt>开始时间</dt>
-          <dd>{new Date(run.started_at).toLocaleString()}</dd>
-        </div>
-        {run.finished_at !== null ? (
-          <DetailRow
-            label="结束时间"
-            value={new Date(run.finished_at).toLocaleString()}
-          />
+        {run !== null ? (
+          <Fragment>
+            {stopOutcome !== null ? (
+              <DetailRow label="停止原因" value={stopOutcome.title} />
+            ) : null}
+            {run.error_kind !== null && errorOutcome !== null ? (
+              <DetailRow label="错误类型" value={errorOutcome.title} />
+            ) : null}
+            <div>
+              <dt>开始时间</dt>
+              <dd>{new Date(run.started_at).toLocaleString()}</dd>
+            </div>
+            {run.finished_at !== null ? (
+              <DetailRow
+                label="结束时间"
+                value={new Date(run.finished_at).toLocaleString()}
+              />
+            ) : null}
+          </Fragment>
         ) : null}
       </dl>
       {contextLoad !== null ? <ContextLoadList load={contextLoad} /> : null}
-      {snapshot?.session_totals != null ? (
-        <SessionTotalsCard totals={snapshot.session_totals} />
-      ) : null}
       {stopOutcome !== null ? (
         <div className="run-stop-detail">
           <p>{stopOutcome.description}</p>
@@ -114,7 +133,7 @@ function DetailRow({ label, value }: { label: string; value: string }) {
  * line wraps between `输入` / `输出` / `缓存写入` / `缓存读取` instead of tearing a
  * label or its number apart (UX wave item 7).
  */
-function TokenMetrics({ totals }: { totals: RunTotalsDto }) {
+function TokenMetrics({ totals }: { totals: SessionTotalsDto }) {
   const metrics: Array<[string, number]> = [
     ["输入", totals.input_tokens],
     ["输出", totals.output_tokens],
@@ -136,10 +155,11 @@ function TokenMetrics({ totals }: { totals: RunTotalsDto }) {
 }
 
 /**
- * What the focus run loaded into its system context (spec 13.5): the AGENTS.md the
- * run-start scan read, and only the skills the model actually pulled through the
- * skill tool — never the discovered index. The server reports `null` before the
- * first run, and the section simply stays hidden then.
+ * What the session loaded into its system context (spec 13.5): the AGENTS.md some
+ * run of the session read, and every skill the model actually pulled through the
+ * skill tool — never the discovered index. Both accumulate across runs, so the
+ * section survives new requests; the server reports `null` only before the first
+ * run, and the section simply stays hidden then.
  */
 function ContextLoadList({ load }: { load: ContextLoadDto }) {
   return (
@@ -148,7 +168,7 @@ function ContextLoadList({ load }: { load: ContextLoadDto }) {
       <p className="run-context-agents">
         {load.agents_md_path !== null
           ? `AGENTS.md：${load.agents_md_path}`
-          : "本工作区没有 AGENTS.md"}
+          : "本会话未读取 AGENTS.md"}
       </p>
       {load.skills.length > 0 ? (
         <ul className="run-context-skills">
@@ -157,7 +177,7 @@ function ContextLoadList({ load }: { load: ContextLoadDto }) {
           ))}
         </ul>
       ) : (
-        <p>本次运行未读取技能。</p>
+        <p>本会话未读取技能。</p>
       )}
     </section>
   );
@@ -174,27 +194,4 @@ function modelName(value: JsonValue | undefined): string | null {
   }
   const name = value.model;
   return typeof name === "string" && name.length > 0 ? name : null;
-}
-
-/**
- * Whole-session cumulative footprint. The per-run rows above reset whenever a
- * new run starts; this card is what keeps the conversation's total cost visible
- * across turns, so a fresh run never reads as the counters being wiped.
- */
-function SessionTotalsCard({ totals }: { totals: SessionTotalsDto }) {
-  return (
-    <section className="session-totals" aria-label="会话累计">
-      <h3>会话累计</h3>
-      <p>
-        {totals.run_count} 次运行 · {totals.round_count} 轮 · 输入{" "}
-        {totals.input_tokens.toLocaleString()} · 输出{" "}
-        {totals.output_tokens.toLocaleString()}
-      </p>
-      <p className="run-details-note">
-        缓存写入 {totals.cache_creation_input_tokens.toLocaleString()} ·
-        缓存读取 {totals.cache_read_input_tokens.toLocaleString()}
-        ，跨全部运行累计。
-      </p>
-    </section>
-  );
 }

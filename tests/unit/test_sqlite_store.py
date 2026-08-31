@@ -17,6 +17,7 @@ from coding_agent.core.models import (
     RunContextEstimate,
     RunState,
     RunTotals,
+    SessionTotals,
     StopReason,
     TextPart,
     ThinkingPart,
@@ -892,46 +893,71 @@ def _seed_completed_run(store: SQLiteStore, session_id: str, *, command_id: str)
     return run.id
 
 
-def test_snapshot_projects_the_focus_run_context_load(store: SQLiteStore, session) -> None:
-    """AGENTS.md comes from the run's context_loaded event; skills only from reads."""
-    run_id = _seed_completed_run(store, session.id, command_id="ctx-load-start")
+def test_snapshot_projects_the_session_context_load(store: SQLiteStore, session) -> None:
+    """AGENTS.md persists from any run that read it; skills union across runs."""
+    first_run = _seed_completed_run(store, session.id, command_id="ctx-load-first")
     store.record_diagnostic(
-        run_id,
+        first_run,
         "run.context_loaded",
         {"agents_md_path": "AGENTS.md", "skills_discovered": ["git-helper", "unused"]},
     )
     skill_turn = AssistantTurn(
-        id="turn-skill",
-        parts=(
-            ToolUsePart(ToolCall("call-skill", "skill", {"name": "git-helper"})),
-            ToolUsePart(ToolCall("call-list", "skill", {"mode": "list"})),
-        ),
+        id="turn-skill-first",
+        parts=(ToolUsePart(ToolCall("call-skill-first", "skill", {"name": "git-helper"})),),
         stop_reason=ModelStopReason.TOOL_USE,
         usage=Usage(),
     )
-    store.stage_tool_group(run_id, skill_turn)
+    store.stage_tool_group(first_run, skill_turn)
     store.settle_tool_group(
-        "turn-skill",
-        (
-            tool_result("call-skill", "skill", ok=True, summary="loaded"),
-            tool_result("call-list", "skill", ok=True, summary="listed"),
-        ),
+        "turn-skill-first",
+        (tool_result("call-skill-first", "skill", ok=True, summary="loaded"),),
     )
     store.commit_final_turn(
-        run_id,
-        AssistantTurn("turn-final", (TextPart("done"),), ModelStopReason.END_TURN, Usage()),
+        first_run,
+        AssistantTurn("turn-final-first", (TextPart("done"),), ModelStopReason.END_TURN, Usage()),
     )
     store.transition_run(
-        run_id, {RunState.MODEL_STREAMING}, RunState.COMPLETED, StopReason.COMPLETED, None
+        first_run, {RunState.MODEL_STREAMING}, RunState.COMPLETED, StopReason.COMPLETED, None
+    )
+
+    # A second run reads another skill but scans a workspace whose AGENTS.md is
+    # gone: neither fact may wipe the first run's contributions.
+    second_run = _seed_completed_run(store, session.id, command_id="ctx-load-second")
+    store.record_diagnostic(
+        second_run,
+        "run.context_loaded",
+        {"agents_md_path": None, "skills_discovered": []},
+    )
+    second_skill_turn = AssistantTurn(
+        id="turn-skill-second",
+        parts=(ToolUsePart(ToolCall("call-skill-second", "skill", {"name": "web-evolve"})),),
+        stop_reason=ModelStopReason.TOOL_USE,
+        usage=Usage(),
+    )
+    store.stage_tool_group(second_run, second_skill_turn)
+    store.settle_tool_group(
+        "turn-skill-second",
+        (tool_result("call-skill-second", "skill", ok=True, summary="loaded"),),
+    )
+    store.commit_final_turn(
+        second_run,
+        AssistantTurn(
+            "turn-final-second", (TextPart("done"),), ModelStopReason.END_TURN, Usage()
+        ),
+    )
+    store.transition_run(
+        second_run, {RunState.MODEL_STREAMING}, RunState.COMPLETED, StopReason.COMPLETED, None
     )
 
     snapshot = store.load_snapshot(session.id)
 
     assert snapshot.active_run is None
     assert snapshot.last_finished_run is not None
-    # Only the skill the model read appears; the discovered-but-unused skill never does.
+    # The AGENTS.md path the first run read survives the later run that found
+    # none, and the skills of both runs accumulate — while the discovered but
+    # never-read skill stays out.
     assert snapshot.context_load == ContextLoad(
-        agents_md_path="AGENTS.md", skills_read=("git-helper",)
+        agents_md_path="AGENTS.md", skills_read=("git-helper", "web-evolve")
     )
 
 
@@ -949,3 +975,81 @@ def test_snapshot_context_load_without_a_context_loaded_event(store: SQLiteStore
 
 def test_snapshot_context_load_is_null_without_any_run(store: SQLiteStore, session) -> None:
     assert store.load_snapshot(session.id).context_load is None
+
+
+def test_session_totals_accumulate_runs_rounds_retries_and_tokens(
+    store: SQLiteStore, session
+) -> None:
+    """The rail's session-scope counters sum every run of the session, retries included."""
+    first = _seed_completed_run(store, session.id, command_id="totals-first")
+    first_request = store.start_model_request(first, 1, "main", "model-a", "config-hash")
+    store.finish_model_request(
+        first_request,
+        result="succeeded",
+        usage=Usage(input_tokens=11, output_tokens=5),
+        attempt_count=3,
+        network_retry_count=2,
+        total_wait_ms=0,
+    )
+    store.transition_run(
+        first, {RunState.MODEL_STREAMING}, RunState.COMPLETED, StopReason.COMPLETED, None
+    )
+
+    # A second, still-active run keeps accumulating into the same session sums.
+    second = _seed_completed_run(store, session.id, command_id="totals-second")
+    second_request = store.start_model_request(second, 1, "main", "model-a", "config-hash")
+    store.finish_model_request(
+        second_request,
+        result="succeeded",
+        usage=Usage(input_tokens=7, output_tokens=1),
+        attempt_count=1,
+        network_retry_count=0,
+        total_wait_ms=0,
+    )
+
+    snapshot = store.load_snapshot(session.id)
+
+    assert snapshot.active_run is not None
+    assert snapshot.session_totals == SessionTotals(
+        run_count=2,
+        round_count=2,
+        retry_count=2,
+        input_tokens=18,
+        output_tokens=6,
+        cache_creation_input_tokens=0,
+        cache_read_input_tokens=0,
+    )
+
+
+def test_session_totals_stay_null_before_the_first_run(store: SQLiteStore, session) -> None:
+    assert store.load_snapshot(session.id).session_totals is None
+
+
+def test_interrupted_banner_names_the_restart_interrupted_run(
+    store: SQLiteStore, session
+) -> None:
+    run = store.begin_run(session.id, "task", {}, "cmd-start", "hash-start")
+    advance_to_model_streaming(store, run.id)
+    assert store.recover_interrupted_runs() == [run.id]
+
+    snapshot = store.load_snapshot(session.id)
+    assert snapshot.active_run is None
+    assert snapshot.interrupted_banner is not None
+    assert snapshot.interrupted_banner.run_id == run.id
+    assert snapshot.interrupted_banner.stop_reason is StopReason.SERVER_RESTART
+
+
+def test_interrupted_banner_retires_once_a_new_run_starts(
+    store: SQLiteStore, session
+) -> None:
+    run = store.begin_run(session.id, "task", {}, "cmd-start", "hash-start")
+    advance_to_model_streaming(store, run.id)
+    assert store.recover_interrupted_runs() == [run.id]
+    assert store.load_snapshot(session.id).interrupted_banner is not None
+
+    continued = store.begin_run(session.id, "continue", {}, "cmd-2", "hash-2")
+    assert continued.state is RunState.STARTING
+
+    snapshot = store.load_snapshot(session.id)
+    assert snapshot.active_run is not None
+    assert snapshot.interrupted_banner is None

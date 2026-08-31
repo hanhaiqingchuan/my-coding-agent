@@ -45,10 +45,11 @@ test("renders assistant markdown with the context gauge and context-load list", 
   await expect(gauge).toBeVisible();
   await expect(gauge).toContainText(/\d+%/);
 
-  // The right rail lists what the run loaded: the temp workspace has no AGENTS.md
-  // and the model pulled no skill, and both absences are stated, not hidden.
-  await expect(page.getByText("本工作区没有 AGENTS.md")).toBeVisible();
-  await expect(page.getByText("本次运行未读取技能。")).toBeVisible();
+  // The right rail lists what the session loaded: the temp workspace never had an
+  // AGENTS.md and the model pulled no skill, and both absences are stated, not
+  // hidden. The projection is session-scoped, so it survives later requests.
+  await expect(page.getByText("本会话未读取 AGENTS.md")).toBeVisible();
+  await expect(page.getByText("本会话未读取技能。")).toBeVisible();
 });
 
 test("the approval toggle skips the docks, completes the run, and survives reload", async ({
@@ -56,14 +57,14 @@ test("the approval toggle skips the docks, completes the run, and survives reloa
   request,
 }) => {
   await createSession(page, request, "Auto approve");
-  // The button's label names the mode a click switches TO: 人工审批 is shown
-  // while the session is in auto-approve mode.
-  const toggle = page.getByRole("button", { name: "自动批准" });
+  // The button's label names the mode the session is IN right now, matching
+  // what the approval gate enforces: interactive approval first.
+  const toggle = page.getByRole("button", { name: "人工审批" });
   await expect(toggle).toHaveAttribute("aria-pressed", "false");
 
   await toggle.click();
   await expect(
-    page.getByRole("button", { name: "人工审批" }),
+    page.getByRole("button", { name: "自动批准" }),
   ).toHaveAttribute("aria-pressed", "true");
 
   await page.getByRole("textbox", { name: "消息" }).fill("agent-flow");
@@ -87,7 +88,7 @@ test("the approval toggle skips the docks, completes the run, and survives reloa
   // The mode is a durable session field: it survives a reload.
   await page.reload();
   await expect(
-    page.getByRole("button", { name: "人工审批" }),
+    page.getByRole("button", { name: "自动批准" }),
   ).toHaveAttribute("aria-pressed", "true");
 });
 

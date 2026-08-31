@@ -363,11 +363,13 @@ class Session:
 
 @dataclass(frozen=True, slots=True)
 class ContextLoad:
-    """What the focus run actually loaded into its system context (spec 13.5).
+    """What the session actually loaded into its system context (spec 13.5).
 
-    ``agents_md_path`` is the workspace-relative file the run-start scan read (``None``
-    when the workspace has none); ``skills_read`` lists only skills the model pulled
-    through the ``skill`` tool in that run, never the discovered index.
+    ``agents_md_path`` is the workspace-relative file the most recent scan that
+    found one read (``None`` when no run in the session ever saw an AGENTS.md);
+    ``skills_read`` lists every skill any run of the session pulled through the
+    ``skill`` tool, never the discovered index. Both accumulate across runs, so
+    a new request never wipes what earlier turns of the conversation loaded.
     """
 
     agents_md_path: str | None
@@ -504,12 +506,14 @@ class InterruptedRunNotice:
 class SessionTotals:
     """Cumulative usage across every run of the session, live-updating included.
 
-    The per-run rail resets when a new run starts; these sums let the panel show
-    the conversation's whole-session footprint alongside the focus run's.
+    The rail's counters are session-scoped: these sums — runs, rounds, retries and
+    the provider-reported token usage — keep growing with every run, so a new
+    request never reads as the counters being wiped.
     """
 
     run_count: int
     round_count: int
+    retry_count: int
     input_tokens: int
     output_tokens: int
     cache_creation_input_tokens: int
@@ -533,10 +537,11 @@ class SessionSnapshot:
     This field keeps that finished record available to the run panel spec 13 describes.
     """
     context_load: ContextLoad | None = None
-    """Read-only projection of what the focus run (active, else last finished) loaded.
+    """Session-scoped projection of what the session's runs loaded.
 
-    Spec 13.5's context panel needs the AGENTS.md path and the skills the model actually
-    read; both derive from durable evidence the run already produced, never discovery.
+    Spec 13.5's context panel needs the AGENTS.md path and the skills the model
+    actually read; both derive from durable evidence any run of the session
+    produced and accumulate across runs, never from discovery.
     """
     session_totals: SessionTotals | None = None
     """Cumulative usage across the session's runs; absent only before the first run."""

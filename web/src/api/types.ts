@@ -183,9 +183,9 @@ export type InterruptedBannerDto = {
 };
 
 /**
- * What the focus run (active, else last finished) loaded into its system context
- * (spec 13.5). `skills` lists only skills the model pulled through the skill tool,
- * never the discovered index.
+ * What the session's runs loaded into their system context (spec 13.5), accumulated
+ * across runs so a new request never wipes it. `skills` lists only skills the model
+ * pulled through the skill tool, never the discovered index.
  */
 export type ContextLoadDto = {
   agents_md_path: string | null;
@@ -195,6 +195,7 @@ export type ContextLoadDto = {
 export type SessionTotalsDto = {
   run_count: number;
   round_count: number;
+  retry_count: number;
   input_tokens: number;
   output_tokens: number;
   cache_creation_input_tokens: number;

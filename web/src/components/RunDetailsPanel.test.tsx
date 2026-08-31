@@ -7,6 +7,7 @@ import type {
   RunDto,
   RunTotalsDto,
   SessionSnapshotDto,
+  SessionTotalsDto,
 } from "../api/types";
 import stylesheet from "../styles.css?raw";
 import { RunDetailsPanel } from "./RunDetailsPanel";
@@ -49,6 +50,26 @@ const USED_TOTALS: RunTotalsDto = {
   retry_count: 2,
 };
 
+const SESSION_TOTALS: SessionTotalsDto = {
+  run_count: 4,
+  round_count: 3,
+  retry_count: 2,
+  input_tokens: 24,
+  output_tokens: 12,
+  cache_creation_input_tokens: 2,
+  cache_read_input_tokens: 5,
+};
+
+const ZERO_SESSION_TOTALS: SessionTotalsDto = {
+  run_count: 1,
+  round_count: 0,
+  retry_count: 0,
+  input_tokens: 0,
+  output_tokens: 0,
+  cache_creation_input_tokens: 0,
+  cache_read_input_tokens: 0,
+};
+
 /**
  * `active_run` is strictly non-terminal, so a live run carries neither a stop reason
  * nor an error kind nor a finish time.
@@ -83,6 +104,7 @@ function snapshotWith(runs: {
   active_run?: RunDto | null;
   last_finished_run?: RunDto | null;
   context_load?: ContextLoadDto | null;
+  session_totals?: SessionTotalsDto | null;
 }): SessionSnapshotDto {
   return {
     session: {
@@ -101,16 +123,23 @@ function snapshotWith(runs: {
     pending_approval: null,
     interrupted_banner: null,
     context_load: runs.context_load ?? null,
+    session_totals: runs.session_totals ?? null,
     snapshot_seq: 1,
   };
 }
 
 function activeRunSnapshot(run: Partial<RunDto> = {}): SessionSnapshotDto {
-  return snapshotWith({ active_run: { ...LIVE_RUN, ...run } });
+  return snapshotWith({
+    active_run: { ...LIVE_RUN, ...run },
+    session_totals: SESSION_TOTALS,
+  });
 }
 
 function finishedRunSnapshot(run: Partial<RunDto> = {}): SessionSnapshotDto {
-  return snapshotWith({ last_finished_run: { ...FINISHED_RUN, ...run } });
+  return snapshotWith({
+    last_finished_run: { ...FINISHED_RUN, ...run },
+    session_totals: SESSION_TOTALS,
+  });
 }
 
 function rowValue(label: string): string | undefined {
@@ -125,13 +154,15 @@ function rowCell(label: string): HTMLElement | null {
 }
 
 test("shows the run state, model, rounds, retries and stop reason the backend published", () => {
-  const snapshot = finishedRunSnapshot({ totals: USED_TOTALS });
+  const snapshot = finishedRunSnapshot();
 
   render(<RunDetailsPanel snapshot={snapshot} />);
 
   expect(rowValue("状态")).toBe("失败");
   expect(rowValue("运行 ID")).toBe("run-1");
   expect(rowValue("模型")).toBe("demo-model");
+  // The counters are session-scoped: they sum every run of the conversation.
+  expect(rowValue("运行次数")).toBe("4");
   expect(rowValue("轮次")).toBe("3");
   expect(rowValue("重试")).toBe("2");
   expect(rowValue("停止原因")).toBe("请求重试用尽");
@@ -198,7 +229,7 @@ test("keeps the finished run and its stop reason visible once no run is active",
   render(<RunDetailsPanel snapshot={finishedRunSnapshot()} />);
 
   expect(
-    screen.getByText("上一个完成的任务。当前没有运行中的任务。"),
+    screen.getByText("上一个完成的任务。当前没有运行中的任务，计数为会话累计。"),
   ).not.toBeNull();
   expect(screen.queryByText("当前没有运行中的任务。")).toBeNull();
   expect(rowValue("状态")).toBe("失败");
@@ -208,15 +239,36 @@ test("keeps the finished run and its stop reason visible once no run is active",
   );
 });
 
-test("presents a live run as the active one instead of the finished run", () => {
+test("keeps the session counters between runs: no active run never wipes them", () => {
+  // Between requests the snapshot carries no run objects at all, yet the
+  // conversation's accumulated footprint must stay on the rail.
   const snapshot = snapshotWith({
-    active_run: { ...LIVE_RUN, id: "run-2" },
-    last_finished_run: FINISHED_RUN,
+    context_load: { agents_md_path: "AGENTS.md", skills: ["git-helper"] },
+    session_totals: SESSION_TOTALS,
   });
 
   render(<RunDetailsPanel snapshot={snapshot} />);
 
-  expect(screen.getByText("运行中的任务。")).not.toBeNull();
+  expect(screen.getByText("会话累计。当前没有运行中的任务。")).not.toBeNull();
+  expect(rowValue("运行次数")).toBe("4");
+  expect(rowValue("轮次")).toBe("3");
+  expect(rowValue("重试")).toBe("2");
+  expect(rowValue("累计 Token")).toContain("输入 24");
+  expect(
+    screen.getByRole("region", { name: "已加载上下文" }),
+  ).not.toBeNull();
+});
+
+test("presents a live run as the active one instead of the finished run", () => {
+  const snapshot = snapshotWith({
+    active_run: { ...LIVE_RUN, id: "run-2" },
+    last_finished_run: FINISHED_RUN,
+    session_totals: SESSION_TOTALS,
+  });
+
+  render(<RunDetailsPanel snapshot={snapshot} />);
+
+  expect(screen.getByText("运行中的任务，计数为会话累计。")).not.toBeNull();
   expect(screen.queryByText(/上一个完成的任务/)).toBeNull();
   expect(rowValue("运行 ID")).toBe("run-2");
   expect(rowValue("状态")).toBe("生成中");
@@ -225,8 +277,8 @@ test("presents a live run as the active one instead of the finished run", () => 
   expect(screen.queryByText("原始代码：")).toBeNull();
 });
 
-test("labels the token totals as cumulative known usage across rounds", () => {
-  const snapshot = activeRunSnapshot({ totals: USED_TOTALS });
+test("labels the token totals as cumulative known usage across the session", () => {
+  const snapshot = activeRunSnapshot();
 
   render(<RunDetailsPanel snapshot={snapshot} />);
 
@@ -234,12 +286,12 @@ test("labels the token totals as cumulative known usage across rounds", () => {
     rowCell("累计 Token")?.querySelector(".run-token-metrics")?.textContent,
   ).toBe("输入 24 · 输出 12 · 缓存写入 2 · 缓存读取 5");
   expect(
-    screen.getByText(/跨轮次累计的已知用量，非当前上下文占用/),
+    screen.getByText(/会话内全部运行累计的已知用量，非当前上下文占用/),
   ).not.toBeNull();
 });
 
 test("each token metric wraps as one unbreakable unit in the narrow rail", () => {
-  const snapshot = activeRunSnapshot({ totals: USED_TOTALS });
+  const snapshot = activeRunSnapshot();
 
   render(<RunDetailsPanel snapshot={snapshot} />);
 
@@ -256,7 +308,7 @@ test("each token metric wraps as one unbreakable unit in the narrow rail", () =>
   expect(unitRule?.display).toBe("inline-block");
 });
 
-test("lists the AGENTS.md and fully-read skills the focus run loaded", () => {
+test("lists the AGENTS.md and fully-read skills the session loaded", () => {
   const snapshot = activeRunSnapshot();
   snapshot.context_load = {
     agents_md_path: "AGENTS.md",
@@ -279,8 +331,8 @@ test("states the absences of AGENTS.md and skills instead of hiding the section"
   render(<RunDetailsPanel snapshot={snapshot} />);
 
   const load = screen.getByRole("region", { name: "已加载上下文" });
-  expect(load.textContent).toContain("本工作区没有 AGENTS.md");
-  expect(load.textContent).toContain("本次运行未读取技能。");
+  expect(load.textContent).toContain("本会话未读取 AGENTS.md");
+  expect(load.textContent).toContain("本会话未读取技能。");
 });
 
 test("hides the context-load section before the session ever ran", () => {
@@ -290,7 +342,7 @@ test("hides the context-load section before the session ever ran", () => {
 });
 
 test("never presents a context-occupancy figure the run row cannot support", () => {
-  const snapshot = activeRunSnapshot({ totals: USED_TOTALS });
+  const snapshot = activeRunSnapshot();
 
   render(<RunDetailsPanel snapshot={snapshot} />);
 
@@ -300,9 +352,13 @@ test("never presents a context-occupancy figure the run row cannot support", () 
 });
 
 test("omits run-detail rows when the backend did not provide their values", () => {
-  const snapshot = activeRunSnapshot({
-    state: "model_streaming",
-    config_snapshot: { model: { context_window: 4096 } },
+  // A run without published session totals shows identity rows only.
+  const snapshot = snapshotWith({
+    active_run: {
+      ...LIVE_RUN,
+      state: "model_streaming",
+      config_snapshot: { model: { context_window: 4096 } },
+    },
   });
 
   render(<RunDetailsPanel snapshot={snapshot} />);
@@ -311,6 +367,24 @@ test("omits run-detail rows when the backend did not provide their values", () =
   expect(screen.queryByText("上下文窗口")).toBeNull();
   expect(screen.queryByText("停止原因")).toBeNull();
   expect(screen.queryByText("错误类型")).toBeNull();
+  expect(screen.queryByText("运行次数")).toBeNull();
+  expect(screen.queryByText("轮次")).toBeNull();
+  expect(screen.queryByText("重试")).toBeNull();
+});
+
+test("zeroed session counters are the published fact of a young session", () => {
+  const snapshot = snapshotWith({
+    active_run: {
+      ...LIVE_RUN,
+      state: "model_streaming",
+      config_snapshot: { model: { context_window: 4096 } },
+    },
+    session_totals: ZERO_SESSION_TOTALS,
+  });
+
+  render(<RunDetailsPanel snapshot={snapshot} />);
+
+  expect(rowValue("运行次数")).toBe("1");
   // Rounds and retries are stored counters, so zero is the published fact.
   expect(rowValue("轮次")).toBe("0");
   expect(rowValue("重试")).toBe("0");

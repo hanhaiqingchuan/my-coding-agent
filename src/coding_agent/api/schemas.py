@@ -343,11 +343,12 @@ class InterruptedBannerDto(StrictDto):
 
 
 class ContextLoadDto(StrictDto):
-    """Read-only projection of what the focus run loaded into its system context.
+    """Session-scoped projection of what the session's runs loaded.
 
-    ``agents_md_path`` is the workspace-relative AGENTS.md the run-start scan read
-    (``None`` when the workspace has none); ``skills`` lists only skills the model
-    actually pulled through the ``skill`` tool in that run (spec 13.5), never discovery.
+    ``agents_md_path`` is the workspace-relative AGENTS.md the most recent scan
+    that found one read (``None`` when no run of the session ever saw one);
+    ``skills`` lists every skill any run actually pulled through the ``skill``
+    tool (spec 13.5), never discovery. Both accumulate across runs.
     """
 
     agents_md_path: str | None
@@ -363,6 +364,7 @@ class SessionTotalsDto(StrictDto):
 
     run_count: int
     round_count: int
+    retry_count: int
     input_tokens: int
     output_tokens: int
     cache_creation_input_tokens: int
@@ -378,7 +380,7 @@ class SessionSnapshotDto(StrictDto):
     pending_approval: PendingApprovalDto | None
     interrupted_banner: InterruptedBannerDto | None
     context_load: ContextLoadDto | None
-    """The focus run's context-load projection; ``None`` when the session has no run."""
+    """The session's context-load projection; ``None`` when the session has no run."""
     session_totals: SessionTotalsDto | None
     """Cumulative usage across the session's runs; ``None`` before the first run."""
     snapshot_seq: int
@@ -420,6 +422,7 @@ class SessionSnapshotDto(StrictDto):
                 SessionTotalsDto(
                     run_count=snapshot.session_totals.run_count,
                     round_count=snapshot.session_totals.round_count,
+                    retry_count=snapshot.session_totals.retry_count,
                     input_tokens=snapshot.session_totals.input_tokens,
                     output_tokens=snapshot.session_totals.output_tokens,
                     cache_creation_input_tokens=snapshot.session_totals.cache_creation_input_tokens,

@@ -68,14 +68,15 @@ test("the approval-mode button reports every flip and reflects the persisted mod
     />,
   );
 
-  const toggle = screen.getByRole("button", { name: "自动批准" });
+  // The label names the mode the session is in, never the mode a click targets.
+  const toggle = screen.getByRole("button", { name: "人工审批" });
   expect(toggle.getAttribute("aria-pressed")).toBe("false");
 
   await user.click(toggle);
   expect(onApprovalModeChange).toHaveBeenCalledWith(true);
   // The button is controlled by the persisted session mode, not local state: it
   // only flips once the server round-trip lands in the snapshot.
-  expect(screen.getByRole("button", { name: "自动批准" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "人工审批" })).toBeTruthy();
 
   rerender(
     <Composer
@@ -88,7 +89,7 @@ test("the approval-mode button reports every flip and reflects the persisted mod
       onStop={vi.fn()}
     />,
   );
-  const onToggle = screen.getByRole("button", { name: "人工审批" });
+  const onToggle = screen.getByRole("button", { name: "自动批准" });
   expect(onToggle.getAttribute("aria-pressed")).toBe("true");
 });
 

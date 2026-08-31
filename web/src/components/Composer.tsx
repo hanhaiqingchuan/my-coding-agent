@@ -182,7 +182,10 @@ export function Composer({
           }
           onClick={() => onApprovalModeChange(!autoApprove)}
         >
-          {autoApprove ? "人工审批" : "自动批准"}
+          {/* The label names the mode the session is IN right now — the persisted
+              server state the prop carries — so the display can never disagree
+              with what the approval gate actually enforces. */}
+          {autoApprove ? "自动批准" : "人工审批"}
         </button>
         {active ? (
           <button

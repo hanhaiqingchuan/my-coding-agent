@@ -792,6 +792,8 @@ button:disabled:hover {
   background: var(--danger-bg);
 }
 .conversation-timeline {
+  display: flex;
+  flex-direction: column;
   min-width: 0;
   min-height: 0;
 }
@@ -800,7 +802,8 @@ button:disabled:hover {
   align-content: start;
   gap: var(--space-5);
   min-width: 0;
-  height: 100%;
+  min-height: 0;
+  flex: 1;
   overflow-y: auto;
   padding: var(--space-5) var(--space-1) var(--space-6);
   scrollbar-gutter: stable;
@@ -1806,17 +1809,38 @@ input:focus-visible {
   color: var(--ink);
   font-size: var(--text-sm);
 }
-.recovery-banner p + p {
+/* The non-blocking variant: "you can keep talking" plus a dismiss control. */
+.recovery-banner-note {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
   margin-top: var(--space-1);
+}
+.recovery-banner-note p {
   color: var(--ink-soft);
 }
-.recovery-banner button {
+.recovery-banner-dismiss {
+  flex: none;
+  padding: 2px 8px;
+  border-color: var(--amber-border);
+  color: var(--amber-fg);
+  background: transparent;
+  font-size: var(--text-sm);
+  line-height: var(--leading-tight);
+}
+.recovery-banner-dismiss:hover {
+  border-color: var(--amber-line);
+  color: var(--amber-strong);
+}
+/* The blocking variant's acknowledgement button sits under the copy. */
+.recovery-banner > button {
   margin-top: var(--space-3);
   border-color: var(--amber-border);
   color: var(--amber-strong);
   background: var(--card);
 }
-.recovery-banner button:hover {
+.recovery-banner > button:hover {
   border-color: var(--amber-line);
   background: var(--amber-bg);
 }
@@ -2543,29 +2567,6 @@ p.run-details-scope {
 }
 .run-context-skills li {
   overflow-wrap: anywhere;
-}
-/* Whole-session footprint: separated card under the per-run facts. */
-.session-totals {
-  margin-top: var(--space-5);
-  padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  background: var(--paper);
-}
-.session-totals h3 {
-  margin: 0 0 var(--space-2);
-  color: var(--ink-faint);
-  font-family: var(--font-mono);
-  font-size: var(--text-2xs);
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
-.session-totals p {
-  margin: 0;
-  color: var(--ink-soft);
-  font-size: var(--text-xs);
-  font-variant-numeric: tabular-nums;
 }
 /* Model-layer states: streaming, compacting, retry wait, stopped and
    unrecoverable failure each read differently — a lamp plus a pill. */

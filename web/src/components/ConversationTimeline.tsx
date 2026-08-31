@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useRef } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
 
 import { riseIn } from "../motion";
@@ -10,6 +10,7 @@ import type {
   ToolExecutionDto,
 } from "../api/types";
 import type { ThinkingDraft } from "../features/sessions/sessionReducer";
+import { IconX } from "./icons";
 import { MessageBubble } from "./MessageBubble";
 import { RunFailureBanner } from "./RunFailureBanner";
 import { ToolCard } from "./ToolCard";
@@ -156,6 +157,10 @@ function InterruptedBanner({
 }) {
   const restart = banner.stop_reason === "server_restart";
   const outcome = describeStopOutcome(banner.stop_reason);
+  // Dismissal is per run id, so a snapshot refresh never resurrects the banner
+  // but a fresh interruption does — the same contract as the run-failure banner.
+  const [dismissedRunId, setDismissedRunId] = useState<string | null>(null);
+  if (banner.run_id === dismissedRunId) return null;
   return (
     <motion.aside
       className="recovery-banner"
@@ -174,7 +179,17 @@ function InterruptedBanner({
           我已检查工作区/进程
         </button>
       ) : (
-        <p>可以继续对话。</p>
+        <div className="recovery-banner-note">
+          <p>可以继续对话。</p>
+          <button
+            type="button"
+            className="recovery-banner-dismiss"
+            aria-label="关闭提示"
+            onClick={() => setDismissedRunId(banner.run_id)}
+          >
+            <IconX />
+          </button>
+        </div>
       )}
     </motion.aside>
   );

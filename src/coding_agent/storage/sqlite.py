@@ -341,21 +341,22 @@ class SQLiteStore:
                 ).fetchall()
                 tools = tuple(_tool_execution_from_row(item) for item in tool_rows)
                 pending_approval = _pending_approval_from_rows(connection, session_id, tool_rows)
-                interrupted = connection.execute(
-                    """
-                    SELECT id, stop_reason FROM runs
-                    WHERE session_id = ? AND state = ?
-                    ORDER BY started_at DESC LIMIT 1
-                    """,
-                    (session_id, RunState.INTERRUPTED.value),
-                ).fetchone()
+                # The recovery banner names the session's most recent run only while
+                # that run is the one the restart interrupted and no new run has begun:
+                # continuing the conversation (a new active run, or a later terminal
+                # run) retires the historical notice instead of leaving it pinned forever.
                 interrupted_banner = (
                     InterruptedRunNotice(
-                        run_id=interrupted["id"],
-                        stop_reason=StopReason(interrupted["stop_reason"]),
+                        run_id=last_finished_run.id,
+                        stop_reason=last_finished_run.stop_reason,
                         requires_recovery_ack=session.requires_recovery_ack,
                     )
-                    if interrupted is not None
+                    if (
+                        active_run is None
+                        and last_finished_run is not None
+                        and last_finished_run.state is RunState.INTERRUPTED
+                        and last_finished_run.stop_reason is not None
+                    )
                     else None
                 )
                 snapshot_seq = connection.execute(
@@ -366,6 +367,7 @@ class SQLiteStore:
                     """
                     SELECT COUNT(*) AS run_count,
                            coalesce(sum(round_count), 0) AS round_count,
+                           coalesce(sum(retry_count), 0) AS retry_count,
                            coalesce(sum(input_tokens), 0) AS input_tokens,
                            coalesce(sum(output_tokens), 0) AS output_tokens,
                            coalesce(sum(cache_creation_input_tokens), 0)
@@ -380,6 +382,7 @@ class SQLiteStore:
                     SessionTotals(
                         run_count=int(totals_row["run_count"]),
                         round_count=int(totals_row["round_count"]),
+                        retry_count=int(totals_row["retry_count"]),
                         input_tokens=int(totals_row["input_tokens"]),
                         output_tokens=int(totals_row["output_tokens"]),
                         cache_creation_input_tokens=int(
@@ -392,10 +395,12 @@ class SQLiteStore:
                     if totals_row["run_count"]
                     else None
                 )
-                focus_run = active_run if active_run is not None else last_finished_run
+                # The context-load projection is session-scoped: it exists as
+                # soon as the session has any run, and a new run can only add
+                # to it — never wipe what earlier runs loaded.
                 context_load = (
-                    _context_load_from_rows(connection, session_id, focus_run, tool_rows)
-                    if focus_run is not None
+                    _context_load_from_rows(connection, session_id, tool_rows)
+                    if totals_row["run_count"]
                     else None
                 )
                 connection.commit()
@@ -2225,33 +2230,34 @@ def _tool_execution_from_row(row: sqlite3.Row) -> ToolExecution:
 def _context_load_from_rows(
     connection: sqlite3.Connection,
     session_id: str,
-    focus_run: Run,
     tool_rows: Sequence[sqlite3.Row],
 ) -> ContextLoad:
-    """Assemble the focus run's context-load projection from durable evidence only.
+    """Assemble the session's context-load projection from durable evidence only.
 
-    The AGENTS.md path comes from the run's ``run.context_loaded`` event the loop wrote
-    at run start; the skills come from that run's settled ``skill`` tool executions, so a
-    skill appears here only after the model actually read it (spec 13.5), never because
-    discovery indexed it.
+    The AGENTS.md path comes from the most recent ``run.context_loaded`` event in
+    the session that actually names one, so a path read by any earlier run stays
+    visible; the skills are the union of every run's settled ``skill`` tool
+    executions, so a skill appears here only after the model actually read it
+    (spec 13.5), never because discovery indexed it.
     """
-    event_row = connection.execute(
+    event_rows = connection.execute(
         """
         SELECT payload_json FROM events
-        WHERE session_id = ? AND run_id = ? AND type = 'run.context_loaded'
-        ORDER BY seq DESC LIMIT 1
+        WHERE session_id = ? AND type = 'run.context_loaded'
+        ORDER BY seq DESC
         """,
-        (session_id, focus_run.id),
-    ).fetchone()
+        (session_id,),
+    ).fetchall()
     agents_md_path: str | None = None
-    if event_row is not None:
+    for event_row in event_rows:
         value = json.loads(event_row["payload_json"]).get("agents_md_path")
-        agents_md_path = value if isinstance(value, str) and value else None
+        if isinstance(value, str) and value:
+            agents_md_path = value
+            break
     skills: list[str] = []
     for row in tool_rows:
         if (
-            row["run_id"] != focus_run.id
-            or row["name"] != "skill"
+            row["name"] != "skill"
             or row["execution_state"] != ToolExecutionState.SUCCEEDED.value
         ):
             continue

@@ -365,6 +365,28 @@ test("shows a non-blocking historical interruption banner when acknowledgement i
   ).toBeNull();
 });
 
+test("dismisses the non-blocking interruption banner on request", async () => {
+  const user = userEvent.setup();
+
+  render(
+    <ConversationTimeline
+      messages={[]}
+      tools={[]}
+      assistantDrafts={{}}
+      thinkingDrafts={{}}
+      toolOutputDrafts={{}}
+      interruptedBanner={{
+        run_id: "run-1",
+        stop_reason: "server_restart",
+        requires_recovery_ack: false,
+      }}
+    />,
+  );
+
+  await user.click(screen.getByRole("button", { name: "关闭提示" }));
+  expect(screen.queryByRole("alert")).toBeNull();
+});
+
 const failedRun: RunDto = {
   id: "run-failed",
   session_id: "session-1",

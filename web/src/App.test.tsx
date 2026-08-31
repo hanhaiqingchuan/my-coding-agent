@@ -343,11 +343,12 @@ test("the approval toggle sends the persisted mode change for the session", asyn
   const user = userEvent.setup();
   render(<App />);
 
+  // The label names the mode the session is in: interactive approval first.
   await waitFor(() =>
-    expect(screen.getByRole("button", { name: "自动批准" })).toBeTruthy(),
+    expect(screen.getByRole("button", { name: "人工审批" })).toBeTruthy(),
   );
 
-  await user.click(screen.getByRole("button", { name: "自动批准" }));
+  await user.click(screen.getByRole("button", { name: "人工审批" }));
 
   expect(mocks.send).toHaveBeenCalledWith(
     expect.objectContaining({

@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type WheelEvent } from "react";
 
 type ThinkingDisclosureProps = {
   text: string;
@@ -33,22 +33,44 @@ export function ThinkingDisclosure({
   // reports what it is — finished reasoning.
   const displayLabel = label ?? (live && !closed ? "思考中" : "思考完成");
 
-  // While the block streams open, the newest line stays in view; a reader who
-  // scrolls up unpins the follow until they return to the bottom.
+  // While the block streams open, the newest line stays in view. Only the
+  // reader's own gestures — an upward wheel or a touch drag — unpin the follow,
+  // and returning to the bottom re-pins it. Scroll events alone never unpin:
+  // the browser also fires them for the follow's own jumps, and under a fast
+  // stream one can land after further text grew, reading far from the bottom,
+  // which used to strand the box mid-stream on long reasoning.
   const textRef = useRef<HTMLPreElement>(null);
   const pinnedToBottom = useRef(true);
+  useEffect(() => {
+    // A fresh block starts a fresh stream: re-pin before the scroll effect below
+    // reads the flag, so a reader who left the previous block's tail is followed
+    // again on the next block.
+    if (!closed) {
+      pinnedToBottom.current = true;
+    }
+  }, [closed]);
   useEffect(() => {
     const element = textRef.current;
     if (element !== null && open && pinnedToBottom.current) {
       element.scrollTop = element.scrollHeight;
     }
-  }, [text, open]);
+  }, [text, open, closed]);
+  const handleWheel = (event: WheelEvent<HTMLPreElement>) => {
+    if (event.deltaY < 0) {
+      pinnedToBottom.current = false;
+    }
+  };
+  const handleTouchMove = () => {
+    pinnedToBottom.current = false;
+  };
   const handleScroll = () => {
     const element = textRef.current;
     if (element === null) return;
     const distanceFromBottom =
       element.scrollHeight - element.scrollTop - element.clientHeight;
-    pinnedToBottom.current = distanceFromBottom < 24;
+    if (distanceFromBottom < 24) {
+      pinnedToBottom.current = true;
+    }
   };
 
   return (
@@ -69,7 +91,13 @@ export function ThinkingDisclosure({
       {/* The body stays mounted so the collapse runs as a CSS transition on
           grid-template-rows; the global prefers-reduced-motion rule removes it. */}
       <div className="thinking-body" id={bodyId}>
-        <pre className="thinking-text" ref={textRef} onScroll={handleScroll}>
+        <pre
+          className="thinking-text"
+          ref={textRef}
+          onScroll={handleScroll}
+          onWheel={handleWheel}
+          onTouchMove={handleTouchMove}
+        >
           {text}
         </pre>
       </div>
