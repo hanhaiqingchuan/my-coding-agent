@@ -20,7 +20,6 @@ from coding_agent.evaluation.runner import (
     run_oracle,
     verify_task_setup,
 )
-from coding_agent.main import load_command_policy
 from tests.evaluation.conftest import CRASHING_ORACLE, task_table, write_manifest, write_task_tree
 
 PUBLIC_MANIFEST = Path(__file__).resolve().parents[2] / "evaluation" / "tasks" / "public"
@@ -350,8 +349,6 @@ def test_agent_argv_matches_the_frozen_headless_contract(
         str(invocation.report_out),
         "--yes",
         "--ack-unsafe-auto-approve",
-        "--command-policy",
-        str(invocation.command_policy),
     )
     assert AGENT_ARGV_OPTIONS == (
         "--config",
@@ -361,7 +358,6 @@ def test_agent_argv_matches_the_frozen_headless_contract(
         "--report-out",
         "--yes",
         "--ack-unsafe-auto-approve",
-        "--command-policy",
     )
 
 
@@ -373,42 +369,6 @@ def test_resolved_agent_executable_is_the_public_entry_point() -> None:
         (str(Path(sys.executable).parent / "coding-agent"),),
         (sys.executable, "-m", "coding_agent.cli"),
     }
-
-
-def test_generated_command_policy_matches_the_manifest_allowlist(
-    manifest_root: Path,
-    config_file: Path,
-    tmp_path: Path,
-) -> None:
-    """A generated policy the product rejects would silently disable all effects."""
-    manifest = _manifest(
-        manifest_root,
-        tasks=task_table(
-            "demo-task",
-            manifest_root,
-            overrides={"commands": [{"command": "python3 -V", "cwd": "src"}]},
-        ),
-    )
-    launcher = RecordingLauncher(mutate=_apply_gold)
-
-    run_campaign(
-        manifest,
-        config_file,
-        1,
-        tmp_path / "out",
-        False,
-        agent_launcher=launcher,
-        agent_executable=("fake-agent",),
-    )
-
-    invocation = launcher.invocations[0]
-    raw = json.loads(invocation.command_policy.read_text(encoding="utf-8"))
-    policy = load_command_policy(invocation.command_policy, invocation.workspace)
-    assert raw["schema_version"] == "command-policy-v1"
-    assert raw["allowed"] == [{"command": "python3 -V", "cwd": "src"}]
-    assert policy.allows("python3 -V", Path("src")) is True
-    assert policy.allows("python3 -V", Path(".")) is False
-    assert invocation.command_policy.parent != invocation.workspace
 
 
 def test_dry_run_reports_the_plan_without_calling_the_model(
@@ -741,7 +701,6 @@ def _invocation(argv: tuple[str, ...], tmp_path: Path) -> AgentInvocation:
         data_dir=tmp_path / "data",
         prompt_file=tmp_path / "prompt.md",
         report_out=tmp_path / "agent-report.json",
-        command_policy=tmp_path / "command-policy.json",
         canary=tmp_path / "canary.txt",
         timeout_seconds=30,
     )

@@ -29,10 +29,6 @@ forbidden_paths = ["tests", "README.md"]
 timeout_seconds = 900
 commands = [
     { command = "PYTHONPATH=src python3 -B -m unittest discover -s tests -t tests", cwd = "." },
-    { command = "ls", cwd = "." },
-    { command = "ls -la", cwd = "." },
-    { command = "pwd", cwd = "." },
-    { command = "find . -maxdepth 3 -type f -not -path './.git/*' | sort", cwd = "." },
 ]
 
 [[tasks]]
@@ -52,10 +48,6 @@ forbidden_paths = ["tests", "README.md"]
 timeout_seconds = 900
 commands = [
     { command = "PYTHONPATH=src python3 -B -m unittest discover -s tests -t tests", cwd = "." },
-    { command = "ls", cwd = "." },
-    { command = "ls -la", cwd = "." },
-    { command = "pwd", cwd = "." },
-    { command = "find . -maxdepth 3 -type f -not -path './.git/*' | sort", cwd = "." },
 ]
 
 [[tasks]]
@@ -75,10 +67,6 @@ forbidden_paths = ["tests", "README.md"]
 timeout_seconds = 900
 commands = [
     { command = "PYTHONPATH=src python3 -B -m unittest discover -s tests -t tests", cwd = "." },
-    { command = "ls", cwd = "." },
-    { command = "ls -la", cwd = "." },
-    { command = "pwd", cwd = "." },
-    { command = "find . -maxdepth 3 -type f -not -path './.git/*' | sort", cwd = "." },
 ]
 
 [[tasks]]
@@ -98,10 +86,6 @@ forbidden_paths = ["tests", "README.md"]
 timeout_seconds = 900
 commands = [
     { command = "PYTHONPATH=src python3 -B -m unittest discover -s tests -t tests", cwd = "." },
-    { command = "ls", cwd = "." },
-    { command = "ls -la", cwd = "." },
-    { command = "pwd", cwd = "." },
-    { command = "find . -maxdepth 3 -type f -not -path './.git/*' | sort", cwd = "." },
 ]
 
 [[tasks]]
@@ -121,10 +105,6 @@ forbidden_paths = ["tests", "README.md"]
 timeout_seconds = 900
 commands = [
     { command = "PYTHONPATH=src python3 -B -m unittest discover -s tests -t tests", cwd = "." },
-    { command = "ls", cwd = "." },
-    { command = "ls -la", cwd = "." },
-    { command = "pwd", cwd = "." },
-    { command = "find . -maxdepth 3 -type f -not -path './.git/*' | sort", cwd = "." },
 ]
 
 [[tasks]]
@@ -144,10 +124,6 @@ forbidden_paths = ["tests", "README.md"]
 timeout_seconds = 900
 commands = [
     { command = "PYTHONPATH=src python3 -B -m unittest discover -s tests -t tests", cwd = "." },
-    { command = "ls", cwd = "." },
-    { command = "ls -la", cwd = "." },
-    { command = "pwd", cwd = "." },
-    { command = "find . -maxdepth 3 -type f -not -path './.git/*' | sort", cwd = "." },
 ]
 
 [[tasks]]
@@ -159,7 +135,7 @@ baseline_tree_hash = "d5d4cdcde3b36f28eeb5227b96c33f3a6a0bc909ec829e865a0d1da49c
 gold_overlay = "locate-two-files/gold"
 error_overlay = "locate-two-files/error"
 target_oracle = "locate-two-files/oracle/target.py"
-target_oracle_hash = "5f72d89f2f1b6cd8fa0636dd84fc46d7664cfbac90b591f97af80d7e6971446a"
+target_oracle_hash = "9a4dea20ab04f8a063468d75ae7f8991124064bd2fc6cd88bdf0d648d52d9c85"
 regression_oracle = "locate-two-files/oracle/regression.py"
 regression_oracle_hash = "dd635bd47fc2f453bf01421362670e48d0bbf36eeb7163cfa7a585e2e9a1007f"
 allowed_paths = ["src/pipeline"]
@@ -167,10 +143,6 @@ forbidden_paths = ["tests", "README.md"]
 timeout_seconds = 900
 commands = [
     { command = "PYTHONPATH=src python3 -B -m unittest discover -s tests -t tests", cwd = "." },
-    { command = "ls", cwd = "." },
-    { command = "ls -la", cwd = "." },
-    { command = "pwd", cwd = "." },
-    { command = "find . -maxdepth 3 -type f -not -path './.git/*' | sort", cwd = "." },
 ]
 
 [[tasks]]
@@ -182,7 +154,7 @@ baseline_tree_hash = "c51abb99356648f10effa64b136c058889963ac22af85e61d88f45a7e4
 gold_overlay = "locate-step-normalize/gold"
 error_overlay = "locate-step-normalize/error"
 target_oracle = "locate-step-normalize/oracle/target.py"
-target_oracle_hash = "c57b338fdb84314e3ba29e83e75598e0f874b8d22d0fe05aed08a960ff1e94d5"
+target_oracle_hash = "e3a9acc7938be8ef0e199e96257c4901dbf2520ef69fc6ac92e3e37a10bb7dd2"
 regression_oracle = "locate-step-normalize/oracle/regression.py"
 regression_oracle_hash = "dd635bd47fc2f453bf01421362670e48d0bbf36eeb7163cfa7a585e2e9a1007f"
 allowed_paths = ["src/pipeline"]
@@ -190,10 +162,6 @@ forbidden_paths = ["tests", "README.md"]
 timeout_seconds = 900
 commands = [
     { command = "PYTHONPATH=src python3 -B -m unittest discover -s tests -t tests", cwd = "." },
-    { command = "ls", cwd = "." },
-    { command = "ls -la", cwd = "." },
-    { command = "pwd", cwd = "." },
-    { command = "find . -maxdepth 3 -type f -not -path './.git/*' | sort", cwd = "." },
 ]
 
 [[tasks]]
@@ -205,7 +173,7 @@ baseline_tree_hash = "f13bf700c31916378dbe52c4e4518cc7184599a3d26d51c1eea62b309b
 gold_overlay = "locate-rename-timeout/gold"
 error_overlay = "locate-rename-timeout/error"
 target_oracle = "locate-rename-timeout/oracle/target.py"
-target_oracle_hash = "c0053fdd24885274d5bfccd2910fcccc2a09c415ca03157e3fb8ad96c8fff9f7"
+target_oracle_hash = "ec1de74d054062dcff902ea2ce808834ed68bbf19724afb2046ffcad82867c86"
 regression_oracle = "locate-rename-timeout/oracle/regression.py"
 regression_oracle_hash = "0cdd89f32047aced27fa61f1da3ab293c58b835c7b68763a59ce93bdc32af5bc"
 allowed_paths = ["src/fetch"]
@@ -213,10 +181,6 @@ forbidden_paths = ["tests", "README.md"]
 timeout_seconds = 900
 commands = [
     { command = "PYTHONPATH=src python3 -B -m unittest discover -s tests -t tests", cwd = "." },
-    { command = "ls", cwd = "." },
-    { command = "ls -la", cwd = "." },
-    { command = "pwd", cwd = "." },
-    { command = "find . -maxdepth 3 -type f -not -path './.git/*' | sort", cwd = "." },
 ]
 
 [[tasks]]
@@ -236,10 +200,6 @@ forbidden_paths = ["tests", "README.md"]
 timeout_seconds = 900
 commands = [
     { command = "PYTHONPATH=src python3 -B -m unittest discover -s tests -t tests", cwd = "." },
-    { command = "ls", cwd = "." },
-    { command = "ls -la", cwd = "." },
-    { command = "pwd", cwd = "." },
-    { command = "find . -maxdepth 3 -type f -not -path './.git/*' | sort", cwd = "." },
 ]
 
 [[tasks]]
@@ -259,10 +219,6 @@ forbidden_paths = ["tests", "README.md"]
 timeout_seconds = 900
 commands = [
     { command = "PYTHONPATH=src python3 -B -m unittest discover -s tests -t tests", cwd = "." },
-    { command = "ls", cwd = "." },
-    { command = "ls -la", cwd = "." },
-    { command = "pwd", cwd = "." },
-    { command = "find . -maxdepth 3 -type f -not -path './.git/*' | sort", cwd = "." },
 ]
 
 [[tasks]]
@@ -282,8 +238,4 @@ forbidden_paths = ["tests", "README.md"]
 timeout_seconds = 900
 commands = [
     { command = "PYTHONPATH=src python3 -B -m unittest discover -s tests -t tests", cwd = "." },
-    { command = "ls", cwd = "." },
-    { command = "ls -la", cwd = "." },
-    { command = "pwd", cwd = "." },
-    { command = "find . -maxdepth 3 -type f -not -path './.git/*' | sort", cwd = "." },
 ]

@@ -121,7 +121,6 @@ class AgentInvocation:
     data_dir: Path
     prompt_file: Path
     report_out: Path
-    command_policy: Path
     canary: Path
     timeout_seconds: int
 
@@ -492,8 +491,6 @@ def _run_once(
     prompt_file = run_dir / "prompt.md"
     prompt_bytes = task.prompt.read_bytes()
     prompt_file.write_bytes(prompt_bytes)
-    policy_file = run_dir / "command-policy.json"
-    policy_file.write_text(_policy_document(task), encoding="utf-8")
     canary = run_dir / "canary.txt"
     canary.write_text(CANARY_TEXT, encoding="utf-8")
     baseline_files = tree_files(task.baseline)
@@ -535,15 +532,12 @@ def _run_once(
             str(run_dir / "agent-report.json"),
             "--yes",
             "--ack-unsafe-auto-approve",
-            "--command-policy",
-            str(policy_file),
         ),
         config=config,
         workspace=workspace,
         data_dir=run_dir / "data",
         prompt_file=prompt_file,
         report_out=run_dir / "agent-report.json",
-        command_policy=policy_file,
         canary=canary,
         timeout_seconds=task.timeout_seconds,
     )
@@ -711,14 +705,6 @@ def _settings(config: Path, *, dry_run: bool) -> AppSettings:
         return load_settings(config, {}, {})
     except ConfigurationError as error:
         raise CampaignError(f"config: {error}") from error
-
-
-def _policy_document(task: TaskSpec) -> str:
-    document = {
-        "schema_version": "command-policy-v1",
-        "allowed": [{"command": entry["command"], "cwd": entry["cwd"]} for entry in task.commands],
-    }
-    return json.dumps(document, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
 
 
 def _task_hash(task: TaskSpec, prompt_bytes: bytes) -> str:

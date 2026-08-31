@@ -1,6 +1,6 @@
-"""Fetch client keeping its own hard-coded timeout."""
+"""Fetch client that hard-codes the wrong timeout value."""
 
-REQUEST_TIMEOUT = 45
+REQUEST_TIMEOUT = 30
 
 
 def fetch(url: str) -> dict[str, object]:

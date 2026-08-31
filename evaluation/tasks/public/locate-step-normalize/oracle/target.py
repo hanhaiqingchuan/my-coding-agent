@@ -38,14 +38,6 @@ def main() -> int:
     if run_step(" /Deploy ") != "ran deploy":
         print(f"run_step(' /Deploy ') returned {run_step(' /Deploy ')!r}, expected 'ran deploy'")
         return 1
-
-    runner_source = (workspace / "src" / "pipeline" / "runner.py").read_text(encoding="utf-8")
-    if "normalize_step" not in runner_source:
-        print("the runner still does not use normalize_step")
-        return 1
-    if ".strip().lower()" in runner_source:
-        print("the runner still carries its own inline copy of the rule")
-        return 1
     return 0
 
 

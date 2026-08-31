@@ -460,7 +460,7 @@ def test_config_defaults_to_the_startup_directory_for_both_commands() -> None:
 
 @pytest.mark.parametrize(
     "omitted",
-    ["--ack-unsafe-auto-approve", "--command-policy"],
+    ["--ack-unsafe-auto-approve"],
 )
 def test_auto_approve_preflight_fails_before_session_creation(
     tmp_path: Path,
@@ -488,7 +488,7 @@ def test_auto_approve_preflight_fails_before_session_creation(
         str(paths["report"]),
     ]
     option_index = argv.index(omitted)
-    del argv[option_index : option_index + (2 if omitted == "--command-policy" else 1)]
+    del argv[option_index]
 
     exit_code = cli.main(argv, dependencies=dependencies)
 

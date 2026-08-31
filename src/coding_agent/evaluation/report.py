@@ -31,7 +31,6 @@ AGENT_ARGV_OPTIONS = (
     "--report-out",
     "--yes",
     "--ack-unsafe-auto-approve",
-    "--command-policy",
 )
 OUTCOME_OK = "OK"
 OUTCOME_HARNESS_SETUP = "HARNESS_SETUP"

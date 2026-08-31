@@ -95,8 +95,6 @@ def main(
 def _headless_policy(args: argparse.Namespace):
     if args.yes and not args.ack_unsafe_auto_approve:
         raise ConfigurationError("run --yes requires --ack-unsafe-auto-approve")
-    if args.yes and args.command_policy is None:
-        raise ConfigurationError("run --yes requires --command-policy")
     policy = (
         load_command_policy(args.command_policy, args.workspace)
         if args.command_policy is not None

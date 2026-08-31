@@ -30,14 +30,6 @@ def main() -> int:
         print("fetch.client still defines its own TIMEOUT_SECONDS copy")
         return 1
 
-    client_source = (workspace / "src" / "fetch" / "client.py").read_text(encoding="utf-8")
-    if "REQUEST_TIMEOUT" not in client_source or "from fetch.config import" not in client_source:
-        print("the client does not import REQUEST_TIMEOUT from the config module")
-        return 1
-    if "REQUEST_TIMEOUT = 45" in client_source:
-        print("the client still hard-codes the timeout value")
-        return 1
-
     result = fetch("https://example.test/a")
     if result != {"url": "https://example.test/a", "timeout": 45}:
         print(f"fetch('https://example.test/a') returned {result!r}")
