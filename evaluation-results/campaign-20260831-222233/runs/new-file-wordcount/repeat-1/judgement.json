@@ -1,0 +1,16 @@
+{
+  "campaign_id": "campaign-bc14479878a2",
+  "error": null,
+  "error_detail": null,
+  "judge_model": "deepseek-v4-pro-0813",
+  "prompt_version": "judge-v1",
+  "rationale": "The required file was added correctly, no existing files were modified, and both target and regression tests pass. The process had some failed and duplicate tool calls, but the agent recovered and completed cleanly with minimal edits. The final message is concise, accurate, and includes how the change was verified.",
+  "repeat": 1,
+  "schema_version": "judgement-v1",
+  "scores": {
+    "communication": 5,
+    "process_quality": 4,
+    "task_completion": 5
+  },
+  "task_id": "new-file-wordcount"
+}

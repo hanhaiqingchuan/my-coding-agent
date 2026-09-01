@@ -1,0 +1,16 @@
+{
+  "campaign_id": "campaign-392c037679a1",
+  "error": null,
+  "error_detail": null,
+  "judge_model": "deepseek-v4-pro-0813",
+  "prompt_version": "judge-v1",
+  "rationale": "The target edit was correct and all oracle checks passed, so completion is fully satisfied. The run followed a sensible read-edit-test-verify flow and recovered cleanly from one failed tool call, though one duplicate call is a minor inefficiency. The final message accurately and concisely reports the change, scope, and verification results.",
+  "repeat": 1,
+  "schema_version": "judgement-v1",
+  "scores": {
+    "communication": 5,
+    "process_quality": 4,
+    "task_completion": 5
+  },
+  "task_id": "local-edit-clamp"
+}

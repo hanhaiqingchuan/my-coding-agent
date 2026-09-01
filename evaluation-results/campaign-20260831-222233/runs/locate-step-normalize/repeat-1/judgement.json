@@ -1,0 +1,16 @@
+{
+  "campaign_id": "campaign-bc14479878a2",
+  "error": null,
+  "error_detail": null,
+  "judge_model": "deepseek-v4-pro-0813",
+  "prompt_version": "judge-v1",
+  "rationale": "The run modified the intended files and kept the existing regression suite passing, but the oracle target test failed and artifact_correct is false, so the goal was not fully achieved. The process was mostly sensible: tests were run, an ImportError was caught and corrected, and the suite was rerun, though two duplicate calls occurred. The final message is brief and states verification, but its 'complete and verified' claim overstates success given the failed target test.",
+  "repeat": 1,
+  "schema_version": "judgement-v1",
+  "scores": {
+    "communication": 2,
+    "process_quality": 4,
+    "task_completion": 2
+  },
+  "task_id": "locate-step-normalize"
+}

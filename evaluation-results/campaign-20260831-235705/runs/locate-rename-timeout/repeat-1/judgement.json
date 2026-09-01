@@ -1,0 +1,16 @@
+{
+  "campaign_id": "campaign-f1f83b561e2e",
+  "error": null,
+  "error_detail": null,
+  "judge_model": "deepseek-v4-pro-0813",
+  "prompt_version": "judge-v1",
+  "rationale": "The run achieved its goal: the oracle confirms both target and regression tests passed, the artifact is correct, and the outcome is OK with strict success. Tool usage was clean and economical, with all 7 calls succeeded, no failures, and no duplicate calls, indicating sensible sequencing and recovery-free execution. The final message accurately and concisely summarizes both coordinated edits and the verification performed, including grep checks, runtime output, and the passing test suite.",
+  "repeat": 1,
+  "schema_version": "judgement-v1",
+  "scores": {
+    "communication": 5,
+    "process_quality": 5,
+    "task_completion": 5
+  },
+  "task_id": "locate-rename-timeout"
+}

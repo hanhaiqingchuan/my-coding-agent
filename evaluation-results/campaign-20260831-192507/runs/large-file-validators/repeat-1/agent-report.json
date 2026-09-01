@@ -1,0 +1,157 @@
+{
+  "compaction": {
+    "above_target": false,
+    "count": 0,
+    "estimate_error": {
+      "estimated_minus_provider_tokens": null,
+      "estimated_summary_tokens": null,
+      "provider_summary_output_tokens": null
+    },
+    "estimator_id": null,
+    "input_tokens_after": null,
+    "input_tokens_before": null,
+    "requests": 0
+  },
+  "durations": {
+    "agent_monotonic_ms": 30562,
+    "compaction_request_elapsed_ms": 0,
+    "model_request_elapsed_ms": 27099,
+    "retry_wait_monotonic_ms": 0,
+    "tool_execution_monotonic_ms": 61
+  },
+  "error_kind": null,
+  "final_assistant_text": "Fixed `validate_77` in `src/checks/limits.py`:\n\n- Changed `return 0 <= value <= limit` to `return 0 <= value < limit`, so the limit `87` is now rejected exactly like its neighbors.\n\nVerification:\n- The file now reads correctly around entry 77 (confirmed via `read_file`).\n- Full suite passes: `Ran 3 tests ... OK`.\n- No other files were touched.",
+  "finished_at": "2026-08-31T11:49:44.907021+00:00",
+  "model": {
+    "compaction": {
+      "attempts": 0,
+      "elapsed_ms": 0,
+      "network_retries": 0,
+      "requests": 0,
+      "results": {},
+      "usage": {
+        "cache_creation_input_tokens": null,
+        "cache_read_input_tokens": null,
+        "input_tokens": null,
+        "output_tokens": null
+      },
+      "usage_coverage": null
+    },
+    "main": {
+      "attempts": 7,
+      "elapsed_ms": 27099,
+      "network_retries": 0,
+      "requests": 7,
+      "results": {
+        "succeeded": 7
+      },
+      "usage": {
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 36864,
+        "input_tokens": 10937,
+        "output_tokens": 1032
+      },
+      "usage_coverage": 1.0
+    }
+  },
+  "model_identity": {
+    "context_window": 1000000,
+    "max_output_tokens": 32768,
+    "name": "deepseek-v4-pro-0813",
+    "stream": true
+  },
+  "run_id": "d9c4a663-521c-4202-a7fa-044d83d92f9a",
+  "schema_version": "run-report-v1",
+  "session_id": "da285f43-99ab-4939-b58d-b3bd7c5e498d",
+  "started_at": "2026-08-31T11:49:16.877952+00:00",
+  "state": "COMPLETED",
+  "stop_reason": "COMPLETED",
+  "tool_schema_hash": "402004785c5bd2b7efdab9a9aca21060e10d9fd397e299a1c466567fe674904a",
+  "tools": {
+    "by_name": {
+      "read_file": {
+        "failed": 0,
+        "proposed": 3,
+        "succeeded": 3
+      },
+      "run_command": {
+        "failed": 1,
+        "proposed": 2,
+        "succeeded": 1
+      },
+      "write_file": {
+        "failed": 0,
+        "proposed": 1,
+        "succeeded": 1
+      }
+    },
+    "calls": [
+      {
+        "args_hash": "7e35474361e84b9f553a6adebe3b6e4ee08cebcc0012c16a697aee50862009f2",
+        "duration_ms": 0,
+        "executed": true,
+        "name": "read_file",
+        "output_bytes": null,
+        "state": "succeeded",
+        "truncated": false
+      },
+      {
+        "args_hash": "81fc87cc34a811f5c90eb4d00401b510de0ce2b97c3c304547cda70e57176415",
+        "duration_ms": 10,
+        "executed": true,
+        "name": "write_file",
+        "output_bytes": null,
+        "state": "succeeded",
+        "truncated": false
+      },
+      {
+        "args_hash": "b2479b3b60558acf56229f54a36d08ebfb6d3fb0b328d441cf982d50b2e7688a",
+        "duration_ms": 51,
+        "executed": true,
+        "name": "run_command",
+        "output_bytes": 101,
+        "state": "succeeded",
+        "truncated": false
+      },
+      {
+        "args_hash": "4af3b1852c7e5f9859c21646e2d84f0bb27ee6d54f06d2aa05be4f904d90166e",
+        "duration_ms": 0,
+        "executed": false,
+        "name": "run_command",
+        "output_bytes": null,
+        "state": "failed",
+        "truncated": false
+      },
+      {
+        "args_hash": "24eb569cb3079e50b7c6ff03da0ff4cee6a4be7fef85f8723e909a33fd6c0371",
+        "duration_ms": 0,
+        "executed": true,
+        "name": "read_file",
+        "output_bytes": null,
+        "state": "succeeded",
+        "truncated": true
+      },
+      {
+        "args_hash": "abfd8e9edd554182c45d00cab78afa161932e6bff333874f89e60bf7526139b7",
+        "duration_ms": 0,
+        "executed": true,
+        "name": "read_file",
+        "output_bytes": null,
+        "state": "succeeded",
+        "truncated": true
+      }
+    ],
+    "cancelled": 0,
+    "duplicate_calls": 0,
+    "duration_ms": 61,
+    "executed": 5,
+    "failed": 1,
+    "output_bytes": 101,
+    "proposed": 6,
+    "rejected": 0,
+    "skipped": 0,
+    "succeeded": 5,
+    "truncated": 2,
+    "unknown": 0
+  }
+}

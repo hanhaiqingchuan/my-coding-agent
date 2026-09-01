@@ -1,0 +1,287 @@
+{
+  "agent_argv_options": [
+    "--config",
+    "--workspace",
+    "--data-dir",
+    "--prompt-file",
+    "--report-out",
+    "--yes",
+    "--ack-unsafe-auto-approve"
+  ],
+  "agent_commit": "2ef8da8bd0c8cdbc9592fcb767214c0ea518e5be",
+  "agent_exit_code": 0,
+  "agent_report": {
+    "compaction": {
+      "above_target": false,
+      "count": 0,
+      "estimate_error": {
+        "estimated_minus_provider_tokens": null,
+        "estimated_summary_tokens": null,
+        "provider_summary_output_tokens": null
+      },
+      "estimator_id": null,
+      "input_tokens_after": null,
+      "input_tokens_before": null,
+      "requests": 0
+    },
+    "durations": {
+      "agent_monotonic_ms": 41969,
+      "compaction_request_elapsed_ms": 0,
+      "model_request_elapsed_ms": 39540,
+      "retry_wait_monotonic_ms": 0,
+      "tool_execution_monotonic_ms": 143
+    },
+    "error_kind": null,
+    "final_assistant_text": "Fixed and verified.\n\n**Change made** (only `src/checks/limits.py`, only `validate_77`):\n```python\ndef validate_77(value: int) -> bool:\n    \"\"\"Return whether value fits the limit for entry 77.\"\"\"\n    limit = 87\n    return 0 <= value < limit\n```\n\n**Verification:**\n- Sanity check: `validate_77(86)` → `True`, `validate_77(87)` → `False`, `validate_77(88)` → `False` (the limit itself is now rejected, matching neighbours `validate_76(86)` → `False` and `validate_78(88)` → `False`).\n- Test suite: `PYTHONPATH=src python3 -B -m unittest discover -s tests -t tests` → **3 tests, OK**.\n- `grep 'value <='` finds no remaining off-by-one comparison; all 120 validators now use `return 0 <= value < limit`.\n- `README.md` and `tests/` were left untouched; only the one targeted replacement in `limits.py` was made.\n\n(Note: the workspace has no committed git history, so I verified via file-content checks rather than `git diff`.)",
+    "finished_at": "2026-08-31T16:05:43.317046+00:00",
+    "model": {
+      "compaction": {
+        "attempts": 0,
+        "elapsed_ms": 0,
+        "network_retries": 0,
+        "requests": 0,
+        "results": {},
+        "usage": {
+          "cache_creation_input_tokens": null,
+          "cache_read_input_tokens": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        "usage_coverage": null
+      },
+      "main": {
+        "attempts": 8,
+        "elapsed_ms": 39540,
+        "network_retries": 0,
+        "requests": 8,
+        "results": {
+          "succeeded": 8
+        },
+        "usage": {
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 49152,
+          "input_tokens": 11551,
+          "output_tokens": 1977
+        },
+        "usage_coverage": 1.0
+      }
+    },
+    "model_identity": {
+      "context_window": 1000000,
+      "max_output_tokens": 32768,
+      "name": "deepseek-v4-pro-0813",
+      "stream": true
+    },
+    "run_id": "1769cf65-ce26-4708-966c-2c753e180e7b",
+    "schema_version": "run-report-v1",
+    "session_id": "3f6b8eac-b150-4399-9240-fcd21810617e",
+    "started_at": "2026-08-31T16:05:02.481359+00:00",
+    "state": "COMPLETED",
+    "stop_reason": "COMPLETED",
+    "tool_schema_hash": "2d824d77ddcd143d5686b350c0415ee1e599371e4468a0a0c899001622cd3834",
+    "tools": {
+      "by_name": {
+        "read_file": {
+          "failed": 0,
+          "proposed": 1,
+          "succeeded": 1
+        },
+        "run_command": {
+          "failed": 1,
+          "proposed": 6,
+          "succeeded": 5
+        },
+        "write_file": {
+          "failed": 0,
+          "proposed": 1,
+          "succeeded": 1
+        }
+      },
+      "calls": [
+        {
+          "args_hash": "7e35474361e84b9f553a6adebe3b6e4ee08cebcc0012c16a697aee50862009f2",
+          "duration_ms": 0,
+          "executed": true,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "succeeded",
+          "truncated": false
+        },
+        {
+          "args_hash": "81fc87cc34a811f5c90eb4d00401b510de0ce2b97c3c304547cda70e57176415",
+          "duration_ms": 9,
+          "executed": true,
+          "name": "write_file",
+          "output_bytes": null,
+          "state": "succeeded",
+          "truncated": false
+        },
+        {
+          "args_hash": "79e2b086aa5e2b5785ac7492b98c1eee18a1de201af00095e76b6e7f5dc9cf2b",
+          "duration_ms": 45,
+          "executed": true,
+          "name": "run_command",
+          "output_bytes": 101,
+          "state": "succeeded",
+          "truncated": false
+        },
+        {
+          "args_hash": "89035e5d481afc30946eb4a9afeee6877bc64eedba3f6812e463a29555800ced",
+          "duration_ms": 17,
+          "executed": true,
+          "name": "run_command",
+          "output_bytes": 29,
+          "state": "succeeded",
+          "truncated": false
+        },
+        {
+          "args_hash": "ab96c71584152363a98c443707a4071d8dc8e10ec7d4b12af0ab88328223182d",
+          "duration_ms": 3,
+          "executed": true,
+          "name": "run_command",
+          "output_bytes": 41,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "16be6b71ddab186228bcb9724f9bd0844d6f4aef904a5811cac4a4cfad3c92c5",
+          "duration_ms": 3,
+          "executed": true,
+          "name": "run_command",
+          "output_bytes": 0,
+          "state": "succeeded",
+          "truncated": false
+        },
+        {
+          "args_hash": "cbf2a9aa5b8b19104d3de99b868a61f161c84a46b3b957ba48dc8b89c059a27b",
+          "duration_ms": 61,
+          "executed": true,
+          "name": "run_command",
+          "output_bytes": 177,
+          "state": "succeeded",
+          "truncated": false
+        },
+        {
+          "args_hash": "9392ba3d72227a41ad1b6a3d4e563e994a94a5e5ae3d9e2af141edc60cd256a4",
+          "duration_ms": 5,
+          "executed": true,
+          "name": "run_command",
+          "output_bytes": 11,
+          "state": "succeeded",
+          "truncated": false
+        }
+      ],
+      "cancelled": 0,
+      "duplicate_calls": 0,
+      "duration_ms": 143,
+      "executed": 8,
+      "failed": 1,
+      "output_bytes": 359,
+      "proposed": 8,
+      "rejected": 0,
+      "skipped": 0,
+      "succeeded": 7,
+      "truncated": 0,
+      "unknown": 0
+    }
+  },
+  "agent_timed_out": false,
+  "artifact_correct": true,
+  "campaign_id": "campaign-f1f83b561e2e",
+  "category": "large_file_edit",
+  "compaction": {
+    "above_target": false,
+    "count": 0,
+    "estimated_minus_provider_tokens": null,
+    "estimated_summary_tokens": null,
+    "input_tokens_after": null,
+    "input_tokens_before": null,
+    "provider_summary_output_tokens": null,
+    "requests": 0
+  },
+  "durations": {
+    "agent_monotonic_ms": 41969,
+    "agent_process_ms": 43036,
+    "oracle_ms": 69,
+    "retry_wait_monotonic_ms": 0,
+    "tool_execution_monotonic_ms": 143,
+    "total_ms": 43110,
+    "workspace_prepare_ms": 4
+  },
+  "error_kind": null,
+  "failure_kind": null,
+  "failure_stage": null,
+  "finished_at": "2026-08-31T16:05:43.606341+00:00",
+  "harness_detail": null,
+  "hashes": {
+    "baseline_tree": "422ec701c1d191102dfa703d1cbe3cbdb64d7a1c1e62f635c5c6fe07c805d4d3",
+    "config": "865d5de5591602edebc5aa79b3440ba586dc45182c945540532450b14c4249ed",
+    "diff": "e9cfd2adc590a5a1158702e3d7446743e05875c4473103a8b83c8bffab8c1f31",
+    "prompt": "d60f80f2c6fed70948a1111d50aafbf8986ba773645c1c958133c6dcc82730dd",
+    "task": "d27e2a86d27d9906e6e73db6c6f2c71c536611cd66c2c10f30771c426c8ff828",
+    "tool_schema": "2d824d77ddcd143d5686b350c0415ee1e599371e4468a0a0c899001622cd3834",
+    "workspace_tree": "9db4c3227dfd6d93db4d15a148d0cb641f1091fdb74c4daaa0b6ff72cdc4ca1e"
+  },
+  "model": {
+    "attempts": 8,
+    "compaction_requests": 0,
+    "main_requests": 8,
+    "network_retries": 0,
+    "usage": {
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 49152,
+      "input_tokens": 11551,
+      "output_tokens": 1977
+    },
+    "usage_coverage": 1.0
+  },
+  "model_identity": {
+    "context_window": 1000000,
+    "max_output_tokens": 32768,
+    "name": "deepseek-v4-pro-0813",
+    "stream": true
+  },
+  "modifications": {
+    "detected_workspace_escape": false,
+    "files_added": 0,
+    "files_deleted": 0,
+    "files_modified": 1,
+    "forbidden_paths_modified": [],
+    "lines_added": 1,
+    "lines_removed": 1,
+    "out_of_scope_paths": []
+  },
+  "oracle": {
+    "regression": {
+      "duration_ms": 39,
+      "errored": false,
+      "exit_code": 0,
+      "passed": true
+    },
+    "target": {
+      "duration_ms": 26,
+      "errored": false,
+      "exit_code": 0,
+      "passed": true
+    }
+  },
+  "outcome": "OK",
+  "provider": "anthropic_messages",
+  "repeat": 1,
+  "schema_version": "run-v1",
+  "started_at": "2026-08-31T16:05:01.613476+00:00",
+  "state": "COMPLETED",
+  "stop_reason": "COMPLETED",
+  "strict_success": true,
+  "task_id": "large-file-validators",
+  "tools": {
+    "duplicate_calls": 0,
+    "executed": 8,
+    "failed": 1,
+    "output_bytes": 359,
+    "proposed": 8,
+    "skipped": 0,
+    "succeeded": 7,
+    "truncated": 0
+  }
+}

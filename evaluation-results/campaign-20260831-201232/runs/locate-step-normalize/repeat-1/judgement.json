@@ -1,0 +1,16 @@
+{
+  "campaign_id": "campaign-392c037679a1",
+  "error": null,
+  "error_detail": null,
+  "judge_model": "deepseek-v4-pro-0813",
+  "prompt_version": "judge-v1",
+  "rationale": "The oracle confirms target and regression tests passed with strict success, so completion is full. The agent modified only the intended files and re-read them for verification, but the tool stats show some duplicate and blocked/failed calls, preventing a perfect process score. The final message honestly reports what was changed, notes that tests could not be run due policy, and explains verification via re-reading and code tracing.",
+  "repeat": 1,
+  "schema_version": "judgement-v1",
+  "scores": {
+    "communication": 5,
+    "process_quality": 4,
+    "task_completion": 5
+  },
+  "task_id": "locate-step-normalize"
+}

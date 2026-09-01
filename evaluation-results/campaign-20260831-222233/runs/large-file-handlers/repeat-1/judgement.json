@@ -1,0 +1,16 @@
+{
+  "campaign_id": "campaign-bc14479878a2",
+  "error": null,
+  "error_detail": null,
+  "judge_model": "deepseek-v4-pro-0813",
+  "prompt_version": "judge-v1",
+  "rationale": "The run achieved the intended change exactly: oracle target and regression tests passed, strict_success is true, and only the one intended line was modified. Process was generally sensible and non-redundant (no duplicate calls, no workspace escape, successful recovery to a clean outcome), though several failed/truncated tool calls indicate some inefficiency or environment friction. The final message accurately describes the confined edit, testing results, and an honest caveat about the rejected direct check, so communication is excellent.",
+  "repeat": 1,
+  "schema_version": "judgement-v1",
+  "scores": {
+    "communication": 5,
+    "process_quality": 4,
+    "task_completion": 5
+  },
+  "task_id": "large-file-handlers"
+}

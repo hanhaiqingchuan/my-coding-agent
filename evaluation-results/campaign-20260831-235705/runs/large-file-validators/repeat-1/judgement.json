@@ -1,0 +1,16 @@
+{
+  "campaign_id": "campaign-f1f83b561e2e",
+  "error": null,
+  "error_detail": null,
+  "judge_model": "deepseek-v4-pro-0813",
+  "prompt_version": "judge-v1",
+  "rationale": "The run strictly succeeded with the artifact correct and both oracle regression and target tests passing; only the intended file and function were modified, with no redundant or duplicative tool calls. The final message honestly and concisely reports the precise change and multiple verification steps, so all three axes merit full marks.",
+  "repeat": 1,
+  "schema_version": "judgement-v1",
+  "scores": {
+    "communication": 5,
+    "process_quality": 5,
+    "task_completion": 5
+  },
+  "task_id": "large-file-validators"
+}

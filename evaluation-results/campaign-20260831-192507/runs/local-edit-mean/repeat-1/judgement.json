@@ -1,0 +1,16 @@
+{
+  "campaign_id": "campaign-2f42ac021179",
+  "error": null,
+  "error_detail": null,
+  "judge_model": "deepseek-v4-pro-0813",
+  "prompt_version": "judge-v1",
+  "rationale": "The edit is correct per the oracle: both target and regression tests pass, only the intended file was modified with two added lines, and the run completed successfully. Process quality is slightly reduced by one duplicate call and two failed tool calls, though failures were recovered. The final message is honest and concise, clearly stating the minimal change, untouched files, and successful test verification.",
+  "repeat": 1,
+  "schema_version": "judgement-v1",
+  "scores": {
+    "communication": 5,
+    "process_quality": 4,
+    "task_completion": 5
+  },
+  "task_id": "local-edit-mean"
+}

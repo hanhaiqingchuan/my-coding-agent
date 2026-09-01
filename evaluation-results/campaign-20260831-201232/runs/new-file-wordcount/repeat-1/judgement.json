@@ -1,0 +1,16 @@
+{
+  "campaign_id": "campaign-392c037679a1",
+  "error": null,
+  "error_detail": null,
+  "judge_model": "deepseek-v4-pro-0813",
+  "prompt_version": "judge-v1",
+  "rationale": "The artifact is correct and both target and regression tests pass, leaving existing files untouched. Process was generally sensible with a fresh read and test verification, though one duplicate call and four failed tool attempts suggest minor inefficiency. The final message is honest, concise, and clearly states how the change was verified.",
+  "repeat": 1,
+  "schema_version": "judgement-v1",
+  "scores": {
+    "communication": 5,
+    "process_quality": 4,
+    "task_completion": 5
+  },
+  "task_id": "new-file-wordcount"
+}

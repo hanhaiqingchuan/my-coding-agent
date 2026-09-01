@@ -1,0 +1,16 @@
+{
+  "campaign_id": "campaign-2f42ac021179",
+  "error": null,
+  "error_detail": null,
+  "judge_model": "deepseek-v4-pro-0813",
+  "prompt_version": "judge-v1",
+  "rationale": "The artifact passes all oracle checks and the run completed successfully, so completion is full credit. Tool use was efficient with no duplicate calls and the agent recovered from rejected commands, though several failed/rejected tool calls slightly reduce process quality. The final message accurately and briefly reports the implementation, the passing test command, and the rejected extra check.",
+  "repeat": 1,
+  "schema_version": "judgement-v1",
+  "scores": {
+    "communication": 5,
+    "process_quality": 4,
+    "task_completion": 5
+  },
+  "task_id": "new-file-wordcount"
+}

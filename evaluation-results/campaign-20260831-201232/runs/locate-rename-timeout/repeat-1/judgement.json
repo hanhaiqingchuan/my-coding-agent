@@ -1,0 +1,16 @@
+{
+  "campaign_id": "campaign-392c037679a1",
+  "error": null,
+  "error_detail": null,
+  "judge_model": "deepseek-v4-pro-0813",
+  "prompt_version": "judge-v1",
+  "rationale": "The artifact is correct and both target and regression tests pass, so task completion is full. Process was mostly sensible with file inspection and recovery after command restrictions, though duplicate tool calls and blocked commands keep it from a perfect score. The final message accurately summarizes the changes and verification and honestly discloses the blocked test run.",
+  "repeat": 1,
+  "schema_version": "judgement-v1",
+  "scores": {
+    "communication": 5,
+    "process_quality": 4,
+    "task_completion": 5
+  },
+  "task_id": "locate-rename-timeout"
+}

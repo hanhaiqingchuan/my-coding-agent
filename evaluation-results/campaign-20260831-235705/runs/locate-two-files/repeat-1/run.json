@@ -1,0 +1,305 @@
+{
+  "agent_argv_options": [
+    "--config",
+    "--workspace",
+    "--data-dir",
+    "--prompt-file",
+    "--report-out",
+    "--yes",
+    "--ack-unsafe-auto-approve"
+  ],
+  "agent_commit": "2ef8da8bd0c8cdbc9592fcb767214c0ea518e5be",
+  "agent_exit_code": 0,
+  "agent_report": {
+    "compaction": {
+      "above_target": false,
+      "count": 0,
+      "estimate_error": {
+        "estimated_minus_provider_tokens": null,
+        "estimated_summary_tokens": null,
+        "provider_summary_output_tokens": null
+      },
+      "estimator_id": null,
+      "input_tokens_after": null,
+      "input_tokens_before": null,
+      "requests": 0
+    },
+    "durations": {
+      "agent_monotonic_ms": 31616,
+      "compaction_request_elapsed_ms": 0,
+      "model_request_elapsed_ms": 29424,
+      "retry_wait_monotonic_ms": 0,
+      "tool_execution_monotonic_ms": 78
+    },
+    "error_kind": null,
+    "final_assistant_text": "Done. Both coordinated edits are in place and verified:\n\n1. **`src/pipeline/settings.py`** — `MAX_BATCH_SIZE = 200`.\n2. **`src/pipeline/batcher.py`** — the splitter now does `from .settings import MAX_BATCH_SIZE` and uses it, with its own `50` literals removed.\n\nVerification:\n- `grep` for `50`/`200` under `src/pipeline/` matches only the single declaration in the settings module; no other module contains the batch size as a literal.\n- The suite passes: `PYTHONPATH=src python3 -B -m unittest discover -s tests -t tests` → `Ran 4 tests ... OK`.\n- `README.md` and `tests/` were not touched.",
+    "finished_at": "2026-08-31T16:00:48.557387+00:00",
+    "model": {
+      "compaction": {
+        "attempts": 0,
+        "elapsed_ms": 0,
+        "network_retries": 0,
+        "requests": 0,
+        "results": {},
+        "usage": {
+          "cache_creation_input_tokens": null,
+          "cache_read_input_tokens": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        "usage_coverage": null
+      },
+      "main": {
+        "attempts": 6,
+        "elapsed_ms": 29424,
+        "network_retries": 0,
+        "requests": 6,
+        "results": {
+          "succeeded": 6
+        },
+        "usage": {
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 9216,
+          "input_tokens": 5342,
+          "output_tokens": 1642
+        },
+        "usage_coverage": 1.0
+      }
+    },
+    "model_identity": {
+      "context_window": 1000000,
+      "max_output_tokens": 32768,
+      "name": "deepseek-v4-pro-0813",
+      "stream": true
+    },
+    "run_id": "8ecd7ec4-092a-4bd2-ac5a-9d5b1bb30a70",
+    "schema_version": "run-report-v1",
+    "session_id": "cb0dcecb-3bb4-4206-8161-6550f74fdf87",
+    "started_at": "2026-08-31T16:00:18.012425+00:00",
+    "state": "COMPLETED",
+    "stop_reason": "COMPLETED",
+    "tool_schema_hash": "2d824d77ddcd143d5686b350c0415ee1e599371e4468a0a0c899001622cd3834",
+    "tools": {
+      "by_name": {
+        "read_file": {
+          "failed": 0,
+          "proposed": 5,
+          "succeeded": 5
+        },
+        "run_command": {
+          "failed": 0,
+          "proposed": 3,
+          "succeeded": 3
+        },
+        "write_file": {
+          "failed": 0,
+          "proposed": 2,
+          "succeeded": 2
+        }
+      },
+      "calls": [
+        {
+          "args_hash": "ea0609bf8e8743f0d37c79f55b13879f97dfbb7423bd5715962bde03368cfaf1",
+          "duration_ms": 6,
+          "executed": true,
+          "name": "run_command",
+          "output_bytes": 266,
+          "state": "succeeded",
+          "truncated": false
+        },
+        {
+          "args_hash": "12e2d60123ab641400f3a8b77f000024de97e5d62b9458dd7a72266e917d8ace",
+          "duration_ms": 0,
+          "executed": true,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "succeeded",
+          "truncated": false
+        },
+        {
+          "args_hash": "02298f7a131439bbf79e2bffa3f43ade874c344d32f7037eb928ea864301d7d9",
+          "duration_ms": 0,
+          "executed": true,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "succeeded",
+          "truncated": false
+        },
+        {
+          "args_hash": "7ffdc4df5f015e53dc654811029b03cb4353bd4a6cb485f7ac58237cd10371f9",
+          "duration_ms": 0,
+          "executed": true,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "succeeded",
+          "truncated": false
+        },
+        {
+          "args_hash": "f355546a49610bf30c9caa0ddde44d9b579667c83bf2925b48e2d7dd05f4e2c5",
+          "duration_ms": 9,
+          "executed": true,
+          "name": "write_file",
+          "output_bytes": null,
+          "state": "succeeded",
+          "truncated": false
+        },
+        {
+          "args_hash": "7338f5e3ebaec7f98e0661380ec50d80fcc669ea134fba7d0ed91ac0cdda4947",
+          "duration_ms": 9,
+          "executed": true,
+          "name": "write_file",
+          "output_bytes": null,
+          "state": "succeeded",
+          "truncated": false
+        },
+        {
+          "args_hash": "5fc435d55a16bb8dcf7b74b9f42cc9d75424bca77f26500a9d56655cca7781fa",
+          "duration_ms": 3,
+          "executed": true,
+          "name": "run_command",
+          "output_bytes": 60,
+          "state": "succeeded",
+          "truncated": false
+        },
+        {
+          "args_hash": "300313eaae39c9d758dce978a88b6d9f9a555c4d6c9d17b7a83cd941862c318b",
+          "duration_ms": 51,
+          "executed": true,
+          "name": "run_command",
+          "output_bytes": 102,
+          "state": "succeeded",
+          "truncated": false
+        },
+        {
+          "args_hash": "12e2d60123ab641400f3a8b77f000024de97e5d62b9458dd7a72266e917d8ace",
+          "duration_ms": 0,
+          "executed": true,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "succeeded",
+          "truncated": false
+        },
+        {
+          "args_hash": "02298f7a131439bbf79e2bffa3f43ade874c344d32f7037eb928ea864301d7d9",
+          "duration_ms": 0,
+          "executed": true,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "succeeded",
+          "truncated": false
+        }
+      ],
+      "cancelled": 0,
+      "duplicate_calls": 2,
+      "duration_ms": 78,
+      "executed": 10,
+      "failed": 0,
+      "output_bytes": 428,
+      "proposed": 10,
+      "rejected": 0,
+      "skipped": 0,
+      "succeeded": 10,
+      "truncated": 0,
+      "unknown": 0
+    }
+  },
+  "agent_timed_out": false,
+  "artifact_correct": true,
+  "campaign_id": "campaign-f1f83b561e2e",
+  "category": "locate_and_modify",
+  "compaction": {
+    "above_target": false,
+    "count": 0,
+    "estimated_minus_provider_tokens": null,
+    "estimated_summary_tokens": null,
+    "input_tokens_after": null,
+    "input_tokens_before": null,
+    "provider_summary_output_tokens": null,
+    "requests": 0
+  },
+  "durations": {
+    "agent_monotonic_ms": 31616,
+    "agent_process_ms": 33006,
+    "oracle_ms": 71,
+    "retry_wait_monotonic_ms": 0,
+    "tool_execution_monotonic_ms": 78,
+    "total_ms": 33082,
+    "workspace_prepare_ms": 5
+  },
+  "error_kind": null,
+  "failure_kind": null,
+  "failure_stage": null,
+  "finished_at": "2026-08-31T16:00:48.970439+00:00",
+  "harness_detail": null,
+  "hashes": {
+    "baseline_tree": "d5d4cdcde3b36f28eeb5227b96c33f3a6a0bc909ec829e865a0d1da49cc8662c",
+    "config": "865d5de5591602edebc5aa79b3440ba586dc45182c945540532450b14c4249ed",
+    "diff": "b4817da1fe50be220cafa6e527f0589b116daaa153269c3136571a1715e419c8",
+    "prompt": "65d6d696f6f0d0345a3f11bc5d2016272d573373b56f14e9e674114620e42d0e",
+    "task": "94b8eed40639367ac702db01f6b3ae7da91f4dee048b5b97474f488e17b5aa99",
+    "tool_schema": "2d824d77ddcd143d5686b350c0415ee1e599371e4468a0a0c899001622cd3834",
+    "workspace_tree": "c5a66c974df803c6eaf8e3d99f580ed8d20ac1952065fb4e0ec095f64b7385ba"
+  },
+  "model": {
+    "attempts": 6,
+    "compaction_requests": 0,
+    "main_requests": 6,
+    "network_retries": 0,
+    "usage": {
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 9216,
+      "input_tokens": 5342,
+      "output_tokens": 1642
+    },
+    "usage_coverage": 1.0
+  },
+  "model_identity": {
+    "context_window": 1000000,
+    "max_output_tokens": 32768,
+    "name": "deepseek-v4-pro-0813",
+    "stream": true
+  },
+  "modifications": {
+    "detected_workspace_escape": false,
+    "files_added": 0,
+    "files_deleted": 0,
+    "files_modified": 2,
+    "forbidden_paths_modified": [],
+    "lines_added": 8,
+    "lines_removed": 4,
+    "out_of_scope_paths": []
+  },
+  "oracle": {
+    "regression": {
+      "duration_ms": 43,
+      "errored": false,
+      "exit_code": 0,
+      "passed": true
+    },
+    "target": {
+      "duration_ms": 26,
+      "errored": false,
+      "exit_code": 0,
+      "passed": true
+    }
+  },
+  "outcome": "OK",
+  "provider": "anthropic_messages",
+  "repeat": 1,
+  "schema_version": "run-v1",
+  "started_at": "2026-08-31T16:00:16.942416+00:00",
+  "state": "COMPLETED",
+  "stop_reason": "COMPLETED",
+  "strict_success": true,
+  "task_id": "locate-two-files",
+  "tools": {
+    "duplicate_calls": 2,
+    "executed": 10,
+    "failed": 0,
+    "output_bytes": 428,
+    "proposed": 10,
+    "skipped": 0,
+    "succeeded": 10,
+    "truncated": 0
+  }
+}

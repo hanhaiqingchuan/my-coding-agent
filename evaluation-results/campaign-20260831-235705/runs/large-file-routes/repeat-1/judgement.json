@@ -1,0 +1,16 @@
+{
+  "campaign_id": "campaign-f1f83b561e2e",
+  "error": null,
+  "error_detail": null,
+  "judge_model": "deepseek-v4-pro-0813",
+  "prompt_version": "judge-v1",
+  "rationale": "The run achieved strict success with both target and regression tests passing, modified exactly one file with no workspace escape, and used seven successful tool calls with no duplicates or failures. The final message accurately describes the fix and reports concrete verification steps, so it is honest, brief, and evidence-backed despite a minor formatting typo in the quoted output.",
+  "repeat": 1,
+  "schema_version": "judgement-v1",
+  "scores": {
+    "communication": 5,
+    "process_quality": 5,
+    "task_completion": 5
+  },
+  "task_id": "large-file-routes"
+}

@@ -1,0 +1,16 @@
+{
+  "campaign_id": "campaign-392c037679a1",
+  "error": null,
+  "error_detail": null,
+  "judge_model": "deepseek-v4-pro-0813",
+  "prompt_version": "judge-v1",
+  "rationale": "The artifact is correct, regression and target tests pass, and only the required new file was added, so task completion is full. Communication is honest, concise, and clearly states how verification was done. However, the run shows 12 failed tool calls out of 18 proposed, indicating many poor or invalid tool choices despite eventual recovery, so process quality is weak.",
+  "repeat": 1,
+  "schema_version": "judgement-v1",
+  "scores": {
+    "communication": 5,
+    "process_quality": 2,
+    "task_completion": 5
+  },
+  "task_id": "new-file-slugify"
+}

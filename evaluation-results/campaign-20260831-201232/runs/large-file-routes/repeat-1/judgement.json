@@ -1,0 +1,16 @@
+{
+  "campaign_id": "campaign-392c037679a1",
+  "error": null,
+  "error_detail": null,
+  "judge_model": "deepseek-v4-pro-0813",
+  "prompt_version": "judge-v1",
+  "rationale": "The run achieved strict success with both target and regression tests passing, modified only the intended file by one line, used no duplicate calls, and reported the minimal edit and verification clearly.",
+  "repeat": 1,
+  "schema_version": "judgement-v1",
+  "scores": {
+    "communication": 5,
+    "process_quality": 5,
+    "task_completion": 5
+  },
+  "task_id": "large-file-routes"
+}

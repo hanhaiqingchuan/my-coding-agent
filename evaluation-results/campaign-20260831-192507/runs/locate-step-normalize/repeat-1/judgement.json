@@ -1,0 +1,16 @@
+{
+  "campaign_id": "campaign-2f42ac021179",
+  "error": null,
+  "error_detail": null,
+  "judge_model": "deepseek-v4-pro-0813",
+  "prompt_version": "judge-v1",
+  "rationale": "The run achieved the task deterministically: the artifact is correct, both oracle checks passed, and strict_success is true. Process quality is strong but not perfect due to some duplicate and failed tool calls, though no forbidden modifications occurred and the agent recovered sensibly by inspecting files when command execution was blocked. The final message honestly and clearly describes both changes, notes untouched files, and transparently explains what verification was and was not possible.",
+  "repeat": 1,
+  "schema_version": "judgement-v1",
+  "scores": {
+    "communication": 5,
+    "process_quality": 4,
+    "task_completion": 5
+  },
+  "task_id": "locate-step-normalize"
+}

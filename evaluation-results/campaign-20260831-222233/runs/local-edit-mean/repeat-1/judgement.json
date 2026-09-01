@@ -1,0 +1,16 @@
+{
+  "campaign_id": "campaign-bc14479878a2",
+  "error": null,
+  "error_detail": null,
+  "judge_model": "deepseek-v4-pro-0813",
+  "prompt_version": "judge-v1",
+  "rationale": "The oracle confirms the target and regression tests passed, the correct file was modified locally, and the run completed with strict success, so task completion is full. Process quality is slightly reduced by one failed and one duplicate tool call despite overall sensible recovery and a small, focused edit. The final message is concise, honestly describes the guard added to `mean`, and clearly reports how verification was performed.",
+  "repeat": 1,
+  "schema_version": "judgement-v1",
+  "scores": {
+    "communication": 5,
+    "process_quality": 4,
+    "task_completion": 5
+  },
+  "task_id": "local-edit-mean"
+}

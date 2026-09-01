@@ -1,0 +1,16 @@
+{
+  "campaign_id": "campaign-2f42ac021179",
+  "error": null,
+  "error_detail": null,
+  "judge_model": "deepseek-v4-pro-0813",
+  "prompt_version": "judge-v1",
+  "rationale": "The artifact is correct and both target and regression tests pass, so task completion is fully satisfied. Process quality is moderate: the run eventually wrote and re-read the file without duplicate calls, but it made 14 failed tool invocations and 13 model requests for a small new-file task, suggesting repeated blocked run_command attempts. The final message is honest, concise, and clearly notes the verification limitation.",
+  "repeat": 1,
+  "schema_version": "judgement-v1",
+  "scores": {
+    "communication": 5,
+    "process_quality": 3,
+    "task_completion": 5
+  },
+  "task_id": "new-file-slugify"
+}

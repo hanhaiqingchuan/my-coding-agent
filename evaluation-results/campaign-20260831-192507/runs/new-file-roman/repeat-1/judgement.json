@@ -1,0 +1,16 @@
+{
+  "campaign_id": "campaign-2f42ac021179",
+  "error": null,
+  "error_detail": null,
+  "judge_model": "deepseek-v4-pro-0813",
+  "prompt_version": "judge-v1",
+  "rationale": "The new file was created correctly and both target and regression checks passed, so the task was fully achieved. Tool use was mostly sensible and recovered well after the command rejection, though one duplicate call and one failed attempt prevent a perfect process score. The final message is honest, concise, and clearly states what was verified manually and why runtime tests could not be run.",
+  "repeat": 1,
+  "schema_version": "judgement-v1",
+  "scores": {
+    "communication": 5,
+    "process_quality": 4,
+    "task_completion": 5
+  },
+  "task_id": "new-file-roman"
+}

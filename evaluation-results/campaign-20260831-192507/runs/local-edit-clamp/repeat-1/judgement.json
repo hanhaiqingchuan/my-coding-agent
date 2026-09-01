@@ -1,0 +1,16 @@
+{
+  "campaign_id": "campaign-2f42ac021179",
+  "error": null,
+  "error_detail": null,
+  "judge_model": "deepseek-v4-pro-0813",
+  "prompt_version": "judge-v1",
+  "rationale": "The oracle confirms the target and regression tests passed, only the intended file was modified, and the edit stayed within the line limit, so the task was fully achieved. The process had some failed and duplicated tool calls, which suggests minor inefficiency, though the agent recovered and completed successfully. The final message is concise, accurate about the change and untouched files, and clearly states how verification was performed.",
+  "repeat": 1,
+  "schema_version": "judgement-v1",
+  "scores": {
+    "communication": 5,
+    "process_quality": 4,
+    "task_completion": 5
+  },
+  "task_id": "local-edit-clamp"
+}

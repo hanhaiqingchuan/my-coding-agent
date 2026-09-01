@@ -1,0 +1,16 @@
+{
+  "campaign_id": "campaign-bc14479878a2",
+  "error": null,
+  "error_detail": null,
+  "judge_model": "deepseek-v4-pro-0813",
+  "prompt_version": "judge-v1",
+  "rationale": "The oracle shows artifact_correct false and target_passed false, so the required modification was not actually achieved despite the agent's claim. The process included re-reading files, running the existing suite, and no forbidden edits, but had several failed/redundant tool calls. The final message is detailed about changes and verification, yet overstates that the required edits are complete and verified when the target check failed.",
+  "repeat": 1,
+  "schema_version": "judgement-v1",
+  "scores": {
+    "communication": 2,
+    "process_quality": 3,
+    "task_completion": 1
+  },
+  "task_id": "locate-rename-timeout"
+}

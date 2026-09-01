@@ -1,0 +1,260 @@
+{
+  "agent_argv_options": [
+    "--config",
+    "--workspace",
+    "--data-dir",
+    "--prompt-file",
+    "--report-out",
+    "--yes",
+    "--ack-unsafe-auto-approve"
+  ],
+  "agent_commit": "2ef8da8bd0c8cdbc9592fcb767214c0ea518e5be",
+  "agent_exit_code": 0,
+  "agent_report": {
+    "compaction": {
+      "above_target": false,
+      "count": 0,
+      "estimate_error": {
+        "estimated_minus_provider_tokens": null,
+        "estimated_summary_tokens": null,
+        "provider_summary_output_tokens": null
+      },
+      "estimator_id": null,
+      "input_tokens_after": null,
+      "input_tokens_before": null,
+      "requests": 0
+    },
+    "durations": {
+      "agent_monotonic_ms": 18858,
+      "compaction_request_elapsed_ms": 0,
+      "model_request_elapsed_ms": 16916,
+      "retry_wait_monotonic_ms": 0,
+      "tool_execution_monotonic_ms": 57
+    },
+    "error_kind": null,
+    "final_assistant_text": "Done. `clamp` in `src/mathkit/ranges.py` now raises `ValueError(\"lower must not exceed upper\")` when `lower > upper`, before any clamping:\n\n```python\ndef clamp(value: int, lower: int, upper: int) -> int:\n    \"\"\"Return ``value`` limited to the inclusive range ``[lower, upper]``.\"\"\"\n    if lower > upper:\n        raise ValueError(\"lower must not exceed upper\")\n    if value < lower:\n        return lower\n    if value > upper:\n        return upper\n    return value\n```\n\n- Only `clamp` changed (two new lines); `midpoint` untouched.\n- Equal bounds (`lower == upper`) still clamp normally as before.\n- Verified with the existing suite: `PYTHONPATH=src python3 -B -m unittest discover -s tests -t tests` — 4 tests, all pass.",
+    "finished_at": "2026-08-31T15:59:11.151933+00:00",
+    "model": {
+      "compaction": {
+        "attempts": 0,
+        "elapsed_ms": 0,
+        "network_retries": 0,
+        "requests": 0,
+        "results": {},
+        "usage": {
+          "cache_creation_input_tokens": null,
+          "cache_read_input_tokens": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        "usage_coverage": null
+      },
+      "main": {
+        "attempts": 6,
+        "elapsed_ms": 16916,
+        "network_retries": 0,
+        "requests": 6,
+        "results": {
+          "succeeded": 6
+        },
+        "usage": {
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 6144,
+          "input_tokens": 5101,
+          "output_tokens": 916
+        },
+        "usage_coverage": 1.0
+      }
+    },
+    "model_identity": {
+      "context_window": 1000000,
+      "max_output_tokens": 32768,
+      "name": "deepseek-v4-pro-0813",
+      "stream": true
+    },
+    "run_id": "9f69e81c-92c0-4961-87db-1018f7764be7",
+    "schema_version": "run-report-v1",
+    "session_id": "f082590b-f4a9-4396-8be2-d2e8393c4f3f",
+    "started_at": "2026-08-31T15:58:53.392969+00:00",
+    "state": "COMPLETED",
+    "stop_reason": "COMPLETED",
+    "tool_schema_hash": "2d824d77ddcd143d5686b350c0415ee1e599371e4468a0a0c899001622cd3834",
+    "tools": {
+      "by_name": {
+        "read_file": {
+          "failed": 0,
+          "proposed": 2,
+          "succeeded": 2
+        },
+        "run_command": {
+          "failed": 0,
+          "proposed": 1,
+          "succeeded": 1
+        },
+        "write_file": {
+          "failed": 1,
+          "proposed": 2,
+          "succeeded": 1
+        }
+      },
+      "calls": [
+        {
+          "args_hash": "97da93b5137beaa9f79a586ec5e92b56a3a52ae980c0e8f9bd1d7ef45c08b89d",
+          "duration_ms": 0,
+          "executed": true,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "succeeded",
+          "truncated": false
+        },
+        {
+          "args_hash": "79da447a34276f189ec03f85172badaf13559f9ae126cfd0fae6a6637bafa510",
+          "duration_ms": 0,
+          "executed": false,
+          "name": "write_file",
+          "output_bytes": null,
+          "state": "failed",
+          "truncated": false
+        },
+        {
+          "args_hash": "5146e287bddf2333efe0ae93ebc37cba4cb69d2e3729d45a83ccff9e492e9d84",
+          "duration_ms": 13,
+          "executed": true,
+          "name": "write_file",
+          "output_bytes": null,
+          "state": "succeeded",
+          "truncated": false
+        },
+        {
+          "args_hash": "15343836d373e17c38fb5be1380d3010327e6b0e7af02929ca66987a333701f3",
+          "duration_ms": 44,
+          "executed": true,
+          "name": "run_command",
+          "output_bytes": 102,
+          "state": "succeeded",
+          "truncated": false
+        },
+        {
+          "args_hash": "97da93b5137beaa9f79a586ec5e92b56a3a52ae980c0e8f9bd1d7ef45c08b89d",
+          "duration_ms": 0,
+          "executed": true,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "succeeded",
+          "truncated": false
+        }
+      ],
+      "cancelled": 0,
+      "duplicate_calls": 1,
+      "duration_ms": 57,
+      "executed": 4,
+      "failed": 1,
+      "output_bytes": 102,
+      "proposed": 5,
+      "rejected": 0,
+      "skipped": 0,
+      "succeeded": 4,
+      "truncated": 0,
+      "unknown": 0
+    }
+  },
+  "agent_timed_out": false,
+  "artifact_correct": true,
+  "campaign_id": "campaign-f1f83b561e2e",
+  "category": "local_edit",
+  "compaction": {
+    "above_target": false,
+    "count": 0,
+    "estimated_minus_provider_tokens": null,
+    "estimated_summary_tokens": null,
+    "input_tokens_after": null,
+    "input_tokens_before": null,
+    "provider_summary_output_tokens": null,
+    "requests": 0
+  },
+  "durations": {
+    "agent_monotonic_ms": 18858,
+    "agent_process_ms": 20168,
+    "oracle_ms": 70,
+    "retry_wait_monotonic_ms": 0,
+    "tool_execution_monotonic_ms": 57,
+    "total_ms": 20243,
+    "workspace_prepare_ms": 5
+  },
+  "error_kind": null,
+  "failure_kind": null,
+  "failure_stage": null,
+  "finished_at": "2026-08-31T15:59:11.547210+00:00",
+  "harness_detail": null,
+  "hashes": {
+    "baseline_tree": "08608de3259c427b37a71c28f675fad3b912da1c8ebd72e443d184d2341575c8",
+    "config": "865d5de5591602edebc5aa79b3440ba586dc45182c945540532450b14c4249ed",
+    "diff": "7444368cb92994c587c6d8f38b81d9f99158a362f5e438c81616a342e6e593eb",
+    "prompt": "9964869e40e5d5bc35c71a24ee4e34bfcc52c09efee81a7574d3b59040c18d43",
+    "task": "7e41e4925e752b0f21e2ef4a3fb7ad373bf74d7a53f16f0d5135bba3bff7d0ef",
+    "tool_schema": "2d824d77ddcd143d5686b350c0415ee1e599371e4468a0a0c899001622cd3834",
+    "workspace_tree": "2155f09bb9599b85362ce6e8cf5f5bd8b4dbc1b1faa3dbc77eb2ff05a3393e18"
+  },
+  "model": {
+    "attempts": 6,
+    "compaction_requests": 0,
+    "main_requests": 6,
+    "network_retries": 0,
+    "usage": {
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 6144,
+      "input_tokens": 5101,
+      "output_tokens": 916
+    },
+    "usage_coverage": 1.0
+  },
+  "model_identity": {
+    "context_window": 1000000,
+    "max_output_tokens": 32768,
+    "name": "deepseek-v4-pro-0813",
+    "stream": true
+  },
+  "modifications": {
+    "detected_workspace_escape": false,
+    "files_added": 0,
+    "files_deleted": 0,
+    "files_modified": 1,
+    "forbidden_paths_modified": [],
+    "lines_added": 2,
+    "lines_removed": 0,
+    "out_of_scope_paths": []
+  },
+  "oracle": {
+    "regression": {
+      "duration_ms": 43,
+      "errored": false,
+      "exit_code": 0,
+      "passed": true
+    },
+    "target": {
+      "duration_ms": 23,
+      "errored": false,
+      "exit_code": 0,
+      "passed": true
+    }
+  },
+  "outcome": "OK",
+  "provider": "anthropic_messages",
+  "repeat": 1,
+  "schema_version": "run-v1",
+  "started_at": "2026-08-31T15:58:52.383794+00:00",
+  "state": "COMPLETED",
+  "stop_reason": "COMPLETED",
+  "strict_success": true,
+  "task_id": "local-edit-clamp",
+  "tools": {
+    "duplicate_calls": 1,
+    "executed": 4,
+    "failed": 1,
+    "output_bytes": 102,
+    "proposed": 5,
+    "skipped": 0,
+    "succeeded": 4,
+    "truncated": 0
+  }
+}

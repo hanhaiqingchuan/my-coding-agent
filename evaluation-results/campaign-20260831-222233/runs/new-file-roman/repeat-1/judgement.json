@@ -1,0 +1,16 @@
+{
+  "campaign_id": "campaign-bc14479878a2",
+  "error": null,
+  "error_detail": null,
+  "judge_model": "deepseek-v4-pro-0813",
+  "prompt_version": "judge-v1",
+  "rationale": "The artifact is correct and all oracle tests pass, so task completion is a clear 5. Tool use was mostly sensible—reading the written file and attempting verification—but the run recorded 3 failed tool calls out of 6 and one duplicate call, indicating some redundancy around the blocked command runner, so process quality is 4. The final message honestly notes the test suite could not be run, describes manual verification, and reports exactly what was changed, making communication a 5.",
+  "repeat": 1,
+  "schema_version": "judgement-v1",
+  "scores": {
+    "communication": 5,
+    "process_quality": 4,
+    "task_completion": 5
+  },
+  "task_id": "new-file-roman"
+}

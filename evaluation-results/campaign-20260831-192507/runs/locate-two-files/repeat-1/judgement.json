@@ -1,0 +1,16 @@
+{
+  "campaign_id": "campaign-2f42ac021179",
+  "error": null,
+  "error_detail": null,
+  "judge_model": "deepseek-v4-pro-0813",
+  "prompt_version": "judge-v1",
+  "rationale": "The artifact is correct and both target and regression tests passed, so the task goal was fully achieved. The process was ultimately successful and only the two intended files were changed, but 37 of 48 proposed tool calls failed and there were duplicate calls, indicating notable inefficiency despite recovery. The final message is concise, accurately reports both edits, and states verification through re-reading files and running the test suite.",
+  "repeat": 1,
+  "schema_version": "judgement-v1",
+  "scores": {
+    "communication": 5,
+    "process_quality": 3,
+    "task_completion": 5
+  },
+  "task_id": "locate-two-files"
+}

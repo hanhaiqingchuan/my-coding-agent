@@ -1,0 +1,278 @@
+{
+  "agent_argv_options": [
+    "--config",
+    "--workspace",
+    "--data-dir",
+    "--prompt-file",
+    "--report-out",
+    "--yes",
+    "--ack-unsafe-auto-approve"
+  ],
+  "agent_commit": "2ef8da8bd0c8cdbc9592fcb767214c0ea518e5be",
+  "agent_exit_code": 0,
+  "agent_report": {
+    "compaction": {
+      "above_target": false,
+      "count": 0,
+      "estimate_error": {
+        "estimated_minus_provider_tokens": null,
+        "estimated_summary_tokens": null,
+        "provider_summary_output_tokens": null
+      },
+      "estimator_id": null,
+      "input_tokens_after": null,
+      "input_tokens_before": null,
+      "requests": 0
+    },
+    "durations": {
+      "agent_monotonic_ms": 29757,
+      "compaction_request_elapsed_ms": 0,
+      "model_request_elapsed_ms": 27586,
+      "retry_wait_monotonic_ms": 0,
+      "tool_execution_monotonic_ms": 75
+    },
+    "error_kind": null,
+    "final_assistant_text": "Fixed. `route_path_57` now returns `prefix + \"57\"`, so `path_for(\"route_57\")` yields `\"/v1/routes/57\"`.\n\nVerification:\n- Suite: `PYTHONPATH=src python3 -B -m unittest discover -s tests -t tests` → 4 tests, all OK.\n- Direct check: `path_for(\"route_57\")` returns `\"/v1/routes/57\"`.\n- Confirmed no `\"999\"` remains anywhere in `table.py`, and no other helpers were touched.",
+    "finished_at": "2026-08-31T16:04:44.391670+00:00",
+    "model": {
+      "compaction": {
+        "attempts": 0,
+        "elapsed_ms": 0,
+        "network_retries": 0,
+        "requests": 0,
+        "results": {},
+        "usage": {
+          "cache_creation_input_tokens": null,
+          "cache_read_input_tokens": null,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        "usage_coverage": null
+      },
+      "main": {
+        "attempts": 8,
+        "elapsed_ms": 27586,
+        "network_retries": 0,
+        "requests": 8,
+        "results": {
+          "succeeded": 8
+        },
+        "usage": {
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 50176,
+          "input_tokens": 12324,
+          "output_tokens": 1314
+        },
+        "usage_coverage": 1.0
+      }
+    },
+    "model_identity": {
+      "context_window": 1000000,
+      "max_output_tokens": 32768,
+      "name": "deepseek-v4-pro-0813",
+      "stream": true
+    },
+    "run_id": "024c6c08-dcff-4df4-8e82-c098ff32035b",
+    "schema_version": "run-report-v1",
+    "session_id": "fb94bb53-0b33-4d7f-9b59-098cdf0d50b0",
+    "started_at": "2026-08-31T16:04:15.664340+00:00",
+    "state": "COMPLETED",
+    "stop_reason": "COMPLETED",
+    "tool_schema_hash": "2d824d77ddcd143d5686b350c0415ee1e599371e4468a0a0c899001622cd3834",
+    "tools": {
+      "by_name": {
+        "read_file": {
+          "failed": 0,
+          "proposed": 2,
+          "succeeded": 2
+        },
+        "run_command": {
+          "failed": 0,
+          "proposed": 4,
+          "succeeded": 4
+        },
+        "write_file": {
+          "failed": 0,
+          "proposed": 1,
+          "succeeded": 1
+        }
+      },
+      "calls": [
+        {
+          "args_hash": "1ca36b38e7b667fa9d635cd2b908f3e6b4fe86622c3610cd5ddc2717ed608107",
+          "duration_ms": 0,
+          "executed": true,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "succeeded",
+          "truncated": false
+        },
+        {
+          "args_hash": "4f34ca9397185d080a4b39bb1abfa30744049de871a155021b3f56349bb750ed",
+          "duration_ms": 10,
+          "executed": true,
+          "name": "write_file",
+          "output_bytes": null,
+          "state": "succeeded",
+          "truncated": false
+        },
+        {
+          "args_hash": "ecdf215357e9edf68aa70613a6e7f0c8ed70adf34f38abf7cdac129b08b2035a",
+          "duration_ms": 41,
+          "executed": true,
+          "name": "run_command",
+          "output_bytes": 102,
+          "state": "succeeded",
+          "truncated": false
+        },
+        {
+          "args_hash": "89d9262b53049ef099eb97caf9139064831c0e583c5b8dc0f5d11180fa21c564",
+          "duration_ms": 14,
+          "executed": true,
+          "name": "run_command",
+          "output_bytes": 14,
+          "state": "succeeded",
+          "truncated": false
+        },
+        {
+          "args_hash": "af1f3bd8c4da9ce7984439ae6b913a2d89f923edfec0085ddb617b90cc8afb8f",
+          "duration_ms": 6,
+          "executed": true,
+          "name": "run_command",
+          "output_bytes": 0,
+          "state": "succeeded",
+          "truncated": false
+        },
+        {
+          "args_hash": "db416954ab91994aad778375d88aacd64da2bd23d636646aec00190c6480d2be",
+          "duration_ms": 4,
+          "executed": true,
+          "name": "run_command",
+          "output_bytes": 130,
+          "state": "succeeded",
+          "truncated": false
+        },
+        {
+          "args_hash": "c844ef1a901c44c9cf28fe4cd8e4b3a00e9af4fc92ff26a6d044b2c06a41bf81",
+          "duration_ms": 0,
+          "executed": true,
+          "name": "read_file",
+          "output_bytes": null,
+          "state": "succeeded",
+          "truncated": true
+        }
+      ],
+      "cancelled": 0,
+      "duplicate_calls": 0,
+      "duration_ms": 75,
+      "executed": 7,
+      "failed": 0,
+      "output_bytes": 246,
+      "proposed": 7,
+      "rejected": 0,
+      "skipped": 0,
+      "succeeded": 7,
+      "truncated": 1,
+      "unknown": 0
+    }
+  },
+  "agent_timed_out": false,
+  "artifact_correct": true,
+  "campaign_id": "campaign-f1f83b561e2e",
+  "category": "large_file_edit",
+  "compaction": {
+    "above_target": false,
+    "count": 0,
+    "estimated_minus_provider_tokens": null,
+    "estimated_summary_tokens": null,
+    "input_tokens_after": null,
+    "input_tokens_before": null,
+    "provider_summary_output_tokens": null,
+    "requests": 0
+  },
+  "durations": {
+    "agent_monotonic_ms": 29757,
+    "agent_process_ms": 30914,
+    "oracle_ms": 69,
+    "retry_wait_monotonic_ms": 0,
+    "tool_execution_monotonic_ms": 75,
+    "total_ms": 30988,
+    "workspace_prepare_ms": 5
+  },
+  "error_kind": null,
+  "failure_kind": null,
+  "failure_stage": null,
+  "finished_at": "2026-08-31T16:04:44.740454+00:00",
+  "harness_detail": null,
+  "hashes": {
+    "baseline_tree": "0f2dc3a6b18f1ed8404cea711fcf58b11509f7e19fcccc70054acbb119ae4b2b",
+    "config": "865d5de5591602edebc5aa79b3440ba586dc45182c945540532450b14c4249ed",
+    "diff": "72294c95b05ae2a1f40c3e18a8c8ce8965dae9a6945fc7ab1bf1dfaf1ea3666f",
+    "prompt": "510ffb741b4b65b111c9e1c18a4c23950fd1cb7da0e049930ea1ba246ba92937",
+    "task": "9df76e6f0372309d1f1dd41b32c1ee84c90a7253158733bdd651b931da69b257",
+    "tool_schema": "2d824d77ddcd143d5686b350c0415ee1e599371e4468a0a0c899001622cd3834",
+    "workspace_tree": "883faf8610f6bd476f8bbcf0d6f20f59088eeaec886b4763b9c1d7e8f36d3f9f"
+  },
+  "model": {
+    "attempts": 8,
+    "compaction_requests": 0,
+    "main_requests": 8,
+    "network_retries": 0,
+    "usage": {
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 50176,
+      "input_tokens": 12324,
+      "output_tokens": 1314
+    },
+    "usage_coverage": 1.0
+  },
+  "model_identity": {
+    "context_window": 1000000,
+    "max_output_tokens": 32768,
+    "name": "deepseek-v4-pro-0813",
+    "stream": true
+  },
+  "modifications": {
+    "detected_workspace_escape": false,
+    "files_added": 0,
+    "files_deleted": 0,
+    "files_modified": 1,
+    "forbidden_paths_modified": [],
+    "lines_added": 1,
+    "lines_removed": 1,
+    "out_of_scope_paths": []
+  },
+  "oracle": {
+    "regression": {
+      "duration_ms": 42,
+      "errored": false,
+      "exit_code": 0,
+      "passed": true
+    },
+    "target": {
+      "duration_ms": 24,
+      "errored": false,
+      "exit_code": 0,
+      "passed": true
+    }
+  },
+  "outcome": "OK",
+  "provider": "anthropic_messages",
+  "repeat": 1,
+  "schema_version": "run-v1",
+  "started_at": "2026-08-31T16:04:14.766486+00:00",
+  "state": "COMPLETED",
+  "stop_reason": "COMPLETED",
+  "strict_success": true,
+  "task_id": "large-file-routes",
+  "tools": {
+    "duplicate_calls": 0,
+    "executed": 7,
+    "failed": 0,
+    "output_bytes": 246,
+    "proposed": 7,
+    "skipped": 0,
+    "succeeded": 7,
+    "truncated": 1
+  }
+}

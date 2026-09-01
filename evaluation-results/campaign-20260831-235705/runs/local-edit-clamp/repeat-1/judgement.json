@@ -1,0 +1,16 @@
+{
+  "campaign_id": "campaign-f1f83b561e2e",
+  "error": null,
+  "error_detail": null,
+  "judge_model": "deepseek-v4-pro-0813",
+  "prompt_version": "judge-v1",
+  "rationale": "The edit was correct and both target and regression tests passed, so task completion is fully met. Tool use was largely sensible but had one failed call and one duplicate call, indicating minor redundancy/recovery rather than a perfectly efficient sequence. The final message accurately and concisely describes the only file changed, the new behavior, and the passing verification command.",
+  "repeat": 1,
+  "schema_version": "judgement-v1",
+  "scores": {
+    "communication": 5,
+    "process_quality": 4,
+    "task_completion": 5
+  },
+  "task_id": "local-edit-clamp"
+}

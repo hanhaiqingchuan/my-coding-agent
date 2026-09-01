@@ -1,0 +1,16 @@
+{
+  "campaign_id": "campaign-f1f83b561e2e",
+  "error": null,
+  "error_detail": null,
+  "judge_model": "deepseek-v4-pro-0813",
+  "prompt_version": "judge-v1",
+  "rationale": "The run strictly succeeded: the new file was created correctly, target and regression tests passed, and only the intended file was added with no forbidden or unrelated modifications. All six tool calls succeeded with no duplicates or failures, suggesting an efficient and sensible workflow. The final message accurately and concisely describes the implemented behavior, verification results, and unchanged files.",
+  "repeat": 1,
+  "schema_version": "judgement-v1",
+  "scores": {
+    "communication": 5,
+    "process_quality": 5,
+    "task_completion": 5
+  },
+  "task_id": "new-file-slugify"
+}

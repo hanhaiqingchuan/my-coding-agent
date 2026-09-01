@@ -1,0 +1,16 @@
+{
+  "campaign_id": "campaign-392c037679a1",
+  "error": null,
+  "error_detail": null,
+  "judge_model": "deepseek-v4-pro-0813",
+  "prompt_version": "judge-v1",
+  "rationale": "The run fully achieved the goal: the artifact is correct, strict success is true, and both oracle checks (target and regression) passed. Process quality is strong with only 3 tool executions, no failed, truncated, or duplicated calls, and a minimal one-line edit in the correct file. The final message honestly and concisely reports the exact change, its scope, and verification via the existing test suite, making communication equally excellent.",
+  "repeat": 1,
+  "schema_version": "judgement-v1",
+  "scores": {
+    "communication": 5,
+    "process_quality": 5,
+    "task_completion": 5
+  },
+  "task_id": "large-file-validators"
+}

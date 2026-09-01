@@ -1,0 +1,16 @@
+{
+  "campaign_id": "campaign-bc14479878a2",
+  "error": null,
+  "error_detail": null,
+  "judge_model": "deepseek-v4-pro-0813",
+  "prompt_version": "judge-v1",
+  "rationale": "The artifact is correct and both oracle target and regression tests passed, so completion is full. The run had one failed tool call and two truncated outputs but recovered with no duplicate calls and completed strictly successfully, so process quality is strong but not flawless. The final message accurately and concisely reports the single-line fix and verification command/results.",
+  "repeat": 1,
+  "schema_version": "judgement-v1",
+  "scores": {
+    "communication": 5,
+    "process_quality": 4,
+    "task_completion": 5
+  },
+  "task_id": "large-file-routes"
+}

@@ -1,0 +1,16 @@
+{
+  "campaign_id": "campaign-f1f83b561e2e",
+  "error": null,
+  "error_detail": null,
+  "judge_model": "deepseek-v4-pro-0813",
+  "prompt_version": "judge-v1",
+  "rationale": "The run completed successfully with target and regression tests passing, no failures, no redundant or failed tool calls, and only the intended files modified. The final message clearly and honestly describes the changes, confirms the redundant inline logic was removed, and reports verification via targeted checks and the full unittest suite.",
+  "repeat": 1,
+  "schema_version": "judgement-v1",
+  "scores": {
+    "communication": 5,
+    "process_quality": 5,
+    "task_completion": 5
+  },
+  "task_id": "locate-step-normalize"
+}

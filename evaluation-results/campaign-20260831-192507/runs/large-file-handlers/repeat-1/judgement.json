@@ -1,0 +1,16 @@
+{
+  "campaign_id": "campaign-2f42ac021179",
+  "error": null,
+  "error_detail": null,
+  "judge_model": "deepseek-v4-pro-0813",
+  "prompt_version": "judge-v1",
+  "rationale": "The deterministic oracle shows the target and regression tests passed with the artifact correct, so the task was fully achieved. Tool accounting shows some failed/truncated calls but no duplicate calls and eventual recovery, suggesting mostly sensible but slightly noisy execution. The final message is accurate, concise, and clearly states the change and its test-based verification.",
+  "repeat": 1,
+  "schema_version": "judgement-v1",
+  "scores": {
+    "communication": 5,
+    "process_quality": 4,
+    "task_completion": 5
+  },
+  "task_id": "large-file-handlers"
+}

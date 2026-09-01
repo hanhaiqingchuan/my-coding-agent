@@ -1,0 +1,16 @@
+{
+  "campaign_id": "campaign-bc14479878a2",
+  "error": null,
+  "error_detail": null,
+  "judge_model": "deepseek-v4-pro-0813",
+  "prompt_version": "judge-v1",
+  "rationale": "The run achieved the exact target and regression tests passed, with the correct two-line guard added and no unwanted modifications, so completion is full. Tool use was successful and failure-free, but one duplicate call indicates slight redundancy, capping process quality at 4. The final message honestly and concisely describes the change, what was untouched, and how it was verified with both the full suite and a sanity check.",
+  "repeat": 1,
+  "schema_version": "judgement-v1",
+  "scores": {
+    "communication": 5,
+    "process_quality": 4,
+    "task_completion": 5
+  },
+  "task_id": "local-edit-clamp"
+}

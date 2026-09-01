@@ -1,0 +1,16 @@
+{
+  "campaign_id": "campaign-2f42ac021179",
+  "error": null,
+  "error_detail": null,
+  "judge_model": "deepseek-v4-pro-0813",
+  "prompt_version": "judge-v1",
+  "rationale": "The target and regression tests passed and the artifact is correct, so the task was fully completed. The run was mostly efficient but had one failed tool call and one duplicate call. The final message clearly describes the change and verification, though it slightly misstates the number of added lines (says three, harness records two).",
+  "repeat": 1,
+  "schema_version": "judgement-v1",
+  "scores": {
+    "communication": 4,
+    "process_quality": 4,
+    "task_completion": 5
+  },
+  "task_id": "local-edit-suffix"
+}

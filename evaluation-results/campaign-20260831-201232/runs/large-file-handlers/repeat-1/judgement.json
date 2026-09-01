@@ -1,0 +1,16 @@
+{
+  "campaign_id": "campaign-392c037679a1",
+  "error": null,
+  "error_detail": null,
+  "judge_model": "deepseek-v4-pro-0813",
+  "prompt_version": "judge-v1",
+  "rationale": "The run strictly succeeded: both oracle tests passed, exactly one line was changed in the correct handler file, and no unrelated files were touched. The agent read before editing, recovered from rejected ad-hoc commands by relying on file reads and the full test suite, and made no duplicate calls. Its final message accurately describes the one-line fix, reports verification through fresh reads and unittest output, and honestly discloses the rejected confirmation commands.",
+  "repeat": 1,
+  "schema_version": "judgement-v1",
+  "scores": {
+    "communication": 5,
+    "process_quality": 5,
+    "task_completion": 5
+  },
+  "task_id": "large-file-handlers"
+}

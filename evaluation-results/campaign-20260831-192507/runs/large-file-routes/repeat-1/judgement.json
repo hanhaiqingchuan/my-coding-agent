@@ -1,0 +1,16 @@
+{
+  "campaign_id": "campaign-2f42ac021179",
+  "error": null,
+  "error_detail": null,
+  "judge_model": "deepseek-v4-pro-0813",
+  "prompt_version": "judge-v1",
+  "rationale": "The edit was minimal and correct; the oracle confirms both target and regression tests pass. The agent used a sensible read-edit-verify sequence, made no redundant calls, attempted a test run, and transparently disclosed that command execution was blocked. The final message accurately and briefly describes the single isolated change and how it was verified.",
+  "repeat": 1,
+  "schema_version": "judgement-v1",
+  "scores": {
+    "communication": 5,
+    "process_quality": 5,
+    "task_completion": 5
+  },
+  "task_id": "large-file-routes"
+}

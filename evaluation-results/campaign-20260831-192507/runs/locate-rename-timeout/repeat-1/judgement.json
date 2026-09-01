@@ -1,0 +1,16 @@
+{
+  "campaign_id": "campaign-2f42ac021179",
+  "error": null,
+  "error_detail": null,
+  "judge_model": "deepseek-v4-pro-0813",
+  "prompt_version": "judge-v1",
+  "rationale": "The hidden target test failed, so the run did not achieve the task goal even though existing regression tests passed. Tool use was mostly sensible—reading, editing, then running the suite—but included several duplicate/failed calls and an apparent unsupported value change. The final summary accurately describes the actual edits and verification command, though calling the result 'verified' slightly overstates task-level success.",
+  "repeat": 1,
+  "schema_version": "judgement-v1",
+  "scores": {
+    "communication": 4,
+    "process_quality": 3,
+    "task_completion": 1
+  },
+  "task_id": "locate-rename-timeout"
+}

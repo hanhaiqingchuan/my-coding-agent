@@ -1,0 +1,16 @@
+{
+  "campaign_id": "campaign-f1f83b561e2e",
+  "error": null,
+  "error_detail": null,
+  "judge_model": "deepseek-v4-pro-0813",
+  "prompt_version": "judge-v1",
+  "rationale": "The run fully achieved the goal: it added the correct new file, with target and regression tests passing and no unintended modifications. All seven tool calls succeeded with no duplicates or failures, indicating efficient and sensible execution. The final message honestly and concisely reports what was added, the key behavior, and concrete verification results.",
+  "repeat": 1,
+  "schema_version": "judgement-v1",
+  "scores": {
+    "communication": 5,
+    "process_quality": 5,
+    "task_completion": 5
+  },
+  "task_id": "new-file-roman"
+}

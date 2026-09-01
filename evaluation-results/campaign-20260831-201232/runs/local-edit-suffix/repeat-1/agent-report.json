@@ -1,0 +1,139 @@
+{
+  "compaction": {
+    "above_target": false,
+    "count": 0,
+    "estimate_error": {
+      "estimated_minus_provider_tokens": null,
+      "estimated_summary_tokens": null,
+      "provider_summary_output_tokens": null
+    },
+    "estimator_id": null,
+    "input_tokens_after": null,
+    "input_tokens_before": null,
+    "requests": 0
+  },
+  "durations": {
+    "agent_monotonic_ms": 14894,
+    "compaction_request_elapsed_ms": 0,
+    "model_request_elapsed_ms": 14167,
+    "retry_wait_monotonic_ms": 0,
+    "tool_execution_monotonic_ms": 57
+  },
+  "error_kind": null,
+  "final_assistant_text": "Done. I updated `with_suffix` in `src/strkit/naming.py` to return the name unchanged when it already ends with the suffix:\n\n```python\ndef with_suffix(name: str, suffix: str) -> str:\n    \"\"\"Return ``name`` with ``suffix`` appended unless it already ends with it.\"\"\"\n    if name.endswith(suffix):\n        return name\n    return name + suffix\n```\n\nThis adds two new lines, stays case-sensitive (`DATA.CSV` + `.csv` → `DATA.CSV.csv`), and leaves `drop_prefix` untouched. The existing suite passes:\n\n```\nRan 4 tests in 0.000s\n\nOK\n```",
+  "finished_at": "2026-08-31T12:20:15.611362+00:00",
+  "model": {
+    "compaction": {
+      "attempts": 0,
+      "elapsed_ms": 0,
+      "network_retries": 0,
+      "requests": 0,
+      "results": {},
+      "usage": {
+        "cache_creation_input_tokens": null,
+        "cache_read_input_tokens": null,
+        "input_tokens": null,
+        "output_tokens": null
+      },
+      "usage_coverage": null
+    },
+    "main": {
+      "attempts": 5,
+      "elapsed_ms": 14167,
+      "network_retries": 0,
+      "requests": 5,
+      "results": {
+        "succeeded": 5
+      },
+      "usage": {
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 4096,
+        "input_tokens": 4156,
+        "output_tokens": 550
+      },
+      "usage_coverage": 1.0
+    }
+  },
+  "model_identity": {
+    "context_window": 1000000,
+    "max_output_tokens": 32768,
+    "name": "deepseek-v4-pro-0813",
+    "stream": true
+  },
+  "run_id": "13c0e538-d560-4fb3-b20b-f6caaec9f05f",
+  "schema_version": "run-report-v1",
+  "session_id": "f1f2179e-1aa8-4c2a-9a77-75806d6417c1",
+  "started_at": "2026-08-31T12:20:00.739654+00:00",
+  "state": "COMPLETED",
+  "stop_reason": "COMPLETED",
+  "tool_schema_hash": "402004785c5bd2b7efdab9a9aca21060e10d9fd397e299a1c466567fe674904a",
+  "tools": {
+    "by_name": {
+      "read_file": {
+        "failed": 0,
+        "proposed": 2,
+        "succeeded": 2
+      },
+      "run_command": {
+        "failed": 0,
+        "proposed": 1,
+        "succeeded": 1
+      },
+      "write_file": {
+        "failed": 0,
+        "proposed": 1,
+        "succeeded": 1
+      }
+    },
+    "calls": [
+      {
+        "args_hash": "5e3d083b9d468157d8dc0231855ad2a3335a1ebd24eb0ab9aca162be080ec7e9",
+        "duration_ms": 0,
+        "executed": true,
+        "name": "read_file",
+        "output_bytes": null,
+        "state": "succeeded",
+        "truncated": false
+      },
+      {
+        "args_hash": "3b4de168fd82fff0a07c0c78e5e68e9fd5036be4c2e7d21ebd9c9bad8bd62478",
+        "duration_ms": 12,
+        "executed": true,
+        "name": "write_file",
+        "output_bytes": null,
+        "state": "succeeded",
+        "truncated": false
+      },
+      {
+        "args_hash": "989d69b3615e1d67da8f1daf5b24986a915a101b96b52cc4010b06c37a7a36ce",
+        "duration_ms": 45,
+        "executed": true,
+        "name": "run_command",
+        "output_bytes": 102,
+        "state": "succeeded",
+        "truncated": false
+      },
+      {
+        "args_hash": "5e3d083b9d468157d8dc0231855ad2a3335a1ebd24eb0ab9aca162be080ec7e9",
+        "duration_ms": 0,
+        "executed": true,
+        "name": "read_file",
+        "output_bytes": null,
+        "state": "succeeded",
+        "truncated": false
+      }
+    ],
+    "cancelled": 0,
+    "duplicate_calls": 1,
+    "duration_ms": 57,
+    "executed": 4,
+    "failed": 0,
+    "output_bytes": 102,
+    "proposed": 4,
+    "rejected": 0,
+    "skipped": 0,
+    "succeeded": 4,
+    "truncated": 0,
+    "unknown": 0
+  }
+}

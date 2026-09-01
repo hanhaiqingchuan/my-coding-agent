@@ -1,0 +1,202 @@
+{
+  "compaction": {
+    "above_target": false,
+    "count": 0,
+    "estimate_error": {
+      "estimated_minus_provider_tokens": null,
+      "estimated_summary_tokens": null,
+      "provider_summary_output_tokens": null
+    },
+    "estimator_id": null,
+    "input_tokens_after": null,
+    "input_tokens_before": null,
+    "requests": 0
+  },
+  "durations": {
+    "agent_monotonic_ms": 49451,
+    "compaction_request_elapsed_ms": 0,
+    "model_request_elapsed_ms": 43178,
+    "retry_wait_monotonic_ms": 0,
+    "tool_execution_monotonic_ms": 53
+  },
+  "error_kind": null,
+  "final_assistant_text": "I fixed `handle_event_42` in `src/dispatch/handlers.py` so its return envelope matches its neighbours:\n\n```python\nreturn {\"event\": \"event_42\", \"status\": \"ok\", \"value\": payload * 2}\n```\n\nVerification:\n\n- The existing suite passes: `Ran 5 tests in 0.000s — OK`.\n- Freshly read the source around `handle_event_42` and confirmed it now doubles the payload (`payload * 2`).\n\nWith `payload=21`, `21 * 2 = 42`, so `dispatch(\"event_42\", 21)` returns exactly:\n\n```python\n{\"event\": \"event_42\", \"status\": \"ok\", \"value\": 42}\n```\n\nOnly the `handle_event_42` return line was changed; `HANDLERS`, `dispatch`, `README.md`, and everything under `tests/` are untouched.",
+  "finished_at": "2026-08-31T11:47:45.936422+00:00",
+  "model": {
+    "compaction": {
+      "attempts": 0,
+      "elapsed_ms": 0,
+      "network_retries": 0,
+      "requests": 0,
+      "results": {},
+      "usage": {
+        "cache_creation_input_tokens": null,
+        "cache_read_input_tokens": null,
+        "input_tokens": null,
+        "output_tokens": null
+      },
+      "usage_coverage": null
+    },
+    "main": {
+      "attempts": 10,
+      "elapsed_ms": 43178,
+      "network_retries": 0,
+      "requests": 10,
+      "results": {
+        "succeeded": 10
+      },
+      "usage": {
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 82944,
+        "input_tokens": 16456,
+        "output_tokens": 1782
+      },
+      "usage_coverage": 1.0
+    }
+  },
+  "model_identity": {
+    "context_window": 1000000,
+    "max_output_tokens": 32768,
+    "name": "deepseek-v4-pro-0813",
+    "stream": true
+  },
+  "run_id": "fa8ded33-3106-41aa-a252-b0618c0f5e4d",
+  "schema_version": "run-report-v1",
+  "session_id": "bcfdbcff-69f8-403a-a6ac-1b61deb6f5c0",
+  "started_at": "2026-08-31T11:47:01.469741+00:00",
+  "state": "COMPLETED",
+  "stop_reason": "COMPLETED",
+  "tool_schema_hash": "402004785c5bd2b7efdab9a9aca21060e10d9fd397e299a1c466567fe674904a",
+  "tools": {
+    "by_name": {
+      "read_file": {
+        "failed": 2,
+        "proposed": 7,
+        "succeeded": 5
+      },
+      "run_command": {
+        "failed": 2,
+        "proposed": 3,
+        "succeeded": 1
+      },
+      "write_file": {
+        "failed": 0,
+        "proposed": 1,
+        "succeeded": 1
+      }
+    },
+    "calls": [
+      {
+        "args_hash": "96b6446bfb284e942f4cf450b040fb6537cd3da2c1f7837e4f54f9fd2059c16c",
+        "duration_ms": 0,
+        "executed": true,
+        "name": "read_file",
+        "output_bytes": null,
+        "state": "succeeded",
+        "truncated": false
+      },
+      {
+        "args_hash": "ae6aa6dc8462dd9ff0f76e0d34c716cfd8ac84fb86e4f2a9561582ed37ef73ed",
+        "duration_ms": 9,
+        "executed": true,
+        "name": "write_file",
+        "output_bytes": null,
+        "state": "succeeded",
+        "truncated": false
+      },
+      {
+        "args_hash": "75427a96fba29b43f7027289c4f35a32e1606c349437a056f9018f28e64124cb",
+        "duration_ms": 44,
+        "executed": true,
+        "name": "run_command",
+        "output_bytes": 103,
+        "state": "succeeded",
+        "truncated": false
+      },
+      {
+        "args_hash": "f491d27150b331add0664fd97ac575232caa4a560b2e10e7e9f14d52b77e47a1",
+        "duration_ms": 0,
+        "executed": false,
+        "name": "run_command",
+        "output_bytes": null,
+        "state": "failed",
+        "truncated": false
+      },
+      {
+        "args_hash": "f0b69a9a018ab0857b1b666c6a0424fd6dc3fb24aa1587407ac43b7644ab736a",
+        "duration_ms": 0,
+        "executed": false,
+        "name": "run_command",
+        "output_bytes": null,
+        "state": "failed",
+        "truncated": false
+      },
+      {
+        "args_hash": "4d94e6687ad87d0a5d267174b492241b3a1dbca91b5602a745ecf138dcf3697e",
+        "duration_ms": 0,
+        "executed": true,
+        "name": "read_file",
+        "output_bytes": null,
+        "state": "failed",
+        "truncated": false
+      },
+      {
+        "args_hash": "0fb0392c95274e4a3530bc568fd2c6dd7bfc28d4a003c37cab5d06596ec6162c",
+        "duration_ms": 0,
+        "executed": false,
+        "name": "read_file",
+        "output_bytes": null,
+        "state": "failed",
+        "truncated": false
+      },
+      {
+        "args_hash": "7f5328448fed97df08de8fd177d528d8aabef426c79b1205b1b183ff29ff7d25",
+        "duration_ms": 0,
+        "executed": true,
+        "name": "read_file",
+        "output_bytes": null,
+        "state": "succeeded",
+        "truncated": false
+      },
+      {
+        "args_hash": "cf46146b23b50c2915b84252bd11735d4c027bfc47f33ffcc4c3365d1e41fdc5",
+        "duration_ms": 0,
+        "executed": true,
+        "name": "read_file",
+        "output_bytes": null,
+        "state": "succeeded",
+        "truncated": true
+      },
+      {
+        "args_hash": "693e5c7c995eff2ed0d986c949bf69893a3d222c94db42024da5476aefcfe6c2",
+        "duration_ms": 0,
+        "executed": true,
+        "name": "read_file",
+        "output_bytes": null,
+        "state": "succeeded",
+        "truncated": true
+      },
+      {
+        "args_hash": "dd78a6d5a483608f4b36ad491dfc6fa71404591ad40cb1d239095ee7baebe83e",
+        "duration_ms": 0,
+        "executed": true,
+        "name": "read_file",
+        "output_bytes": null,
+        "state": "succeeded",
+        "truncated": true
+      }
+    ],
+    "cancelled": 0,
+    "duplicate_calls": 0,
+    "duration_ms": 53,
+    "executed": 8,
+    "failed": 4,
+    "output_bytes": 103,
+    "proposed": 11,
+    "rejected": 0,
+    "skipped": 0,
+    "succeeded": 7,
+    "truncated": 3,
+    "unknown": 0
+  }
+}

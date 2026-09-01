@@ -1,0 +1,16 @@
+{
+  "campaign_id": "campaign-f1f83b561e2e",
+  "error": null,
+  "error_detail": null,
+  "judge_model": "deepseek-v4-pro-0813",
+  "prompt_version": "judge-v1",
+  "rationale": "The run succeeded completely: the artifact is correct, target and regression tests pass, one file was added with no unintended modifications, and all seven tool calls succeeded without duplication. The final message honestly summarizes the implementation, maps it to the requirements, and clearly states how it was verified.",
+  "repeat": 1,
+  "schema_version": "judgement-v1",
+  "scores": {
+    "communication": 5,
+    "process_quality": 5,
+    "task_completion": 5
+  },
+  "task_id": "new-file-wordcount"
+}
