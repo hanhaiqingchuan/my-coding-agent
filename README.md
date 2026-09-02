@@ -1,6 +1,6 @@
 # My Coding Agent
 
-(项目要求的1000字内提交文件在README.tx，非本文档README.md)
+(项目要求的1000字内提交文件在README.txt，非本文档README.md)
 
 面向本地代码仓库的 coding agent：通过 Anthropic-compatible Messages API 与模型多轮对话，自主读取文件、提出文件修改、执行命令，并根据工具结果继续工作。使用体验对齐 Codex、OpenCode 一类 coding agent，而不是一次性聊天机器人。
 
@@ -97,15 +97,15 @@ uv run --python 3.12 coding-agent serve \
 
 `coding-agent serve` 的参数：
 
-| 参数                  | 说明                                                                           |
-| --------------------- | ------------------------------------------------------------------------------ |
-| `--config PATH`       | 配置文件路径；省略时读取启动目录下的 `config.toml`                             |
-| `--workspace PATH`    | 初始 Session 的工作目录                                                        |
-| `--data-dir PATH`     | SQLite 与运行数据目录；默认启动目录下的 `.coding-agent/`                       |
-| `--port PORT`         | 覆盖 `server.port`                                                             |
-| `--eval-results PATH` | 评测结果根目录（含多个 campaign 子目录）；默认 `<data-dir>/evaluation-results` |
-| `--open`              | 启动后打开浏览器                                                               |
-| `--yes`               | 受信任模式，跳过所有审批（见 §8）                                              |
+| 参数                  | 说明                                                                          |
+| --------------------- | ----------------------------------------------------------------------------- |
+| `--config PATH`       | 配置文件路径；省略时读取启动目录下的`config.toml`                             |
+| `--workspace PATH`    | 初始 Session 的工作目录                                                       |
+| `--data-dir PATH`     | SQLite 与运行数据目录；默认启动目录下的`.coding-agent/`                       |
+| `--port PORT`         | 覆盖`server.port`                                                             |
+| `--eval-results PATH` | 评测结果根目录（含多个 campaign 子目录）；默认`<data-dir>/evaluation-results` |
+| `--open`              | 启动后打开浏览器                                                              |
+| `--yes`               | 受信任模式，跳过所有审批（见 §8）                                             |
 
 开发模式使用两个终端，Vite 代理 `/api` 与 WebSocket：
 
@@ -132,11 +132,11 @@ uv run --python 3.12 coding-agent run \
 
 `--workspace`、`--data-dir`、`--prompt-file`、`--report-out` 均为必填；`--config` 省略时读取启动目录下的 `config.toml`。配置文件不存在时以 `CONFIG_ERROR` 退出（退出码 2）并指出缺少的路径，不会退回内置默认值。默认仍逐次审批，因此无人值守运行需要显式声明风险：
 
-| 参数                        | 说明                                                                          |
-| --------------------------- | ----------------------------------------------------------------------------- |
-| `--yes`                     | 自动批准所有工具调用                                                          |
-| `--ack-unsafe-auto-approve` | 与 `--yes` 联用，确认已知“非沙箱”风险；缺少它时 `--yes` 直接报 `CONFIG_ERROR` |
-| `--command-policy PATH`     | `command-policy-v1` 精确 command/cwd allowlist；`--yes` 必须提供且不能为空    |
+| 参数                        | 说明                                                                         |
+| --------------------------- | ---------------------------------------------------------------------------- |
+| `--yes`                     | 自动批准所有工具调用                                                         |
+| `--ack-unsafe-auto-approve` | 与`--yes` 联用，确认已知“非沙箱”风险；缺少它时 `--yes` 直接报 `CONFIG_ERROR` |
+| `--command-policy PATH`     | `command-policy-v1` 精确 command/cwd allowlist；`--yes` 必须提供且不能为空   |
 
 `--report-out` 写出 `run-report-v1` 文档：run 状态、停止原因、错误类别、模型标识、主/压缩请求数与 attempts、provider usage 分量、工具统计（参数只以 sha256 哈希出现）、压缩次数与估算误差、各阶段耗时。报告不含 prompt 原文、工具参数原文、命令输出、绝对路径、凭据或 API endpoint。退出码：run 以 `COMPLETED` 结束为 0，否则为 1；配置错误为 2。
 
@@ -170,17 +170,17 @@ description: Guide routine Git operations with staged, explained commands.
 | `make help`          | 列出可用目标和可传入变量，默认目标                                    |
 | `make install`       | 创建 Python 3.12 环境、安装后端与前端依赖及 Playwright Chromium       |
 | `make build`         | `npm --prefix web run build`，生成 FastAPI 托管的 `web/dist`          |
-| `make start`         | 依赖 `build`，启动生产形态的单进程服务                                |
+| `make start`         | 依赖`build`，启动生产形态的单进程服务                                 |
 | `make dev-api`       | 只启动 FastAPI 开发后端                                               |
 | `make dev-web`       | 只启动 Vite 开发服务器                                                |
 | `make eval-run`      | 跑一轮测评 campaign（12 个公开任务；真实模型，需要 API key 环境变量） |
-| `make eval-judge`    | 同 `eval-run`，并在每次运行后用 LLM 裁判打三项分（需要 API key）      |
+| `make eval-judge`    | 同`eval-run`，并在每次运行后用 LLM 裁判打三项分（需要 API key）       |
 | `make eval-history`  | 在终端列出历史 campaign（成功率与裁判均分）                           |
-| `make eval-web`      | 依赖 `build`，启动服务并浏览测评结果网页（只读，可看历史数据）        |
+| `make eval-web`      | 依赖`build`，启动服务并浏览测评结果网页（只读，可看历史数据）         |
 | `make test-backend`  | 运行后端单元与集成测试（`--ignore=tests/live`）                       |
 | `make test-frontend` | 运行前端组件测试                                                      |
-| `make test`          | 顺序执行 `test-backend` 和 `test-frontend`，默认不访问网络            |
-| `make test-e2e`      | 运行基于 `ScriptedModel` 的 Playwright E2E                            |
+| `make test`          | 顺序执行`test-backend` 和 `test-frontend`，默认不访问网络             |
+| `make test-e2e`      | 运行基于`ScriptedModel` 的 Playwright E2E                             |
 | `make lint`          | 后端 Ruff 检查（`src tests scripts`）与前端 lint                      |
 | `make format`        | 后端 Ruff formatter（`src tests scripts`）与前端 format               |
 | `make check`         | 依次执行 lint、默认测试、E2E 和生产构建                               |
